@@ -263,3 +263,7 @@ site/
 
 # Business Documents (Private)
 Business Doc/
+# Android Key Store (Private)
+Android key store file.rtf
+*.keystore
+*.jks
