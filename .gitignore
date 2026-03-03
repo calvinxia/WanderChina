@@ -1,0 +1,262 @@
+# ============================================================================
+# WanderChina - Git Ignore Configuration
+# ============================================================================
+
+# ============================================================================
+# GENERAL
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================================
+# FLUTTER / DART (Mobile App)
+# ============================================================================
+
+# Flutter/Dart
+mobile_app/.dart_tool/
+mobile_app/.flutter-plugins
+mobile_app/.flutter-plugins-dependencies
+mobile_app/.packages
+mobile_app/build/
+mobile_app/.pub-cache/
+mobile_app/.pub/
+
+# Flutter generated files
+mobile_app/flutter_*.png
+mobile_app/lib/generated_plugin_registrant.dart
+mobile_app/pubspec.lock
+
+# Coverage
+mobile_app/coverage/
+mobile_app/test/.test_coverage.dart
+
+# ============================================================================
+# iOS (Flutter)
+# ============================================================================
+
+mobile_app/ios/Pods/
+mobile_app/ios/.symlinks/
+mobile_app/ios/Flutter/Flutter.framework
+mobile_app/ios/Flutter/Flutter.podspec
+mobile_app/ios/Flutter/Generated.xcconfig
+mobile_app/ios/Flutter/app.flx
+mobile_app/ios/Flutter/app.zip
+mobile_app/ios/Flutter/flutter_assets/
+mobile_app/ios/Flutter/flutter_export_environment.sh
+mobile_app/ios/ServiceDefinitions.json
+mobile_app/ios/Runner/GeneratedPluginRegistrant.*
+mobile_app/ios/**/*.mode1v3
+mobile_app/ios/**/*.mode2v3
+mobile_app/ios/**/*.moved-aside
+mobile_app/ios/**/*.pbxuser
+mobile_app/ios/**/*.perspectivev3
+mobile_app/ios/**/*sync/
+mobile_app/ios/**/.sconsign.dblite
+mobile_app/ios/**/.tags*
+mobile_app/ios/**/.vagrant/
+mobile_app/ios/**/DerivedData/
+mobile_app/ios/**/Icon?
+mobile_app/ios/**/Pods/
+mobile_app/ios/**/.symlinks/
+mobile_app/ios/**/profile
+mobile_app/ios/**/xcuserdata
+mobile_app/ios/.generated/
+mobile_app/ios/Flutter/App.framework
+mobile_app/ios/Flutter/Flutter.framework
+mobile_app/ios/Flutter/Generated.xcconfig
+mobile_app/ios/Flutter/app.flx
+mobile_app/ios/Flutter/app.zip
+mobile_app/ios/Flutter/flutter_assets/
+mobile_app/ios/Flutter/flutter_export_environment.sh
+mobile_app/ios/Runner.app
+mobile_app/ios/Runner.ipa
+
+# iOS Certificates & Keys
+mobile_app/ios/**/*.mobileprovision
+mobile_app/ios/**/*.p12
+mobile_app/ios/**/*.cer
+mobile_app/ios/**/*.certSigningRequest
+
+# ============================================================================
+# ANDROID (Flutter)
+# ============================================================================
+
+mobile_app/android/app/build/
+mobile_app/android/build/
+mobile_app/android/.gradle/
+mobile_app/android/local.properties
+mobile_app/android/gradlew
+mobile_app/android/gradlew.bat
+mobile_app/android/captures/
+mobile_app/android/.externalNativeBuild
+mobile_app/android/.cxx
+mobile_app/android/app/debug
+mobile_app/android/app/profile
+mobile_app/android/app/release
+mobile_app/android/key.properties
+mobile_app/android/app/google-services.json
+
+# Android Keystore
+*.jks
+*.keystore
+keystore.properties
+
+# ============================================================================
+# NODE.JS / JAVASCRIPT
+# ============================================================================
+
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================================================
+# ENVIRONMENT VARIABLES & SECRETS
+# ============================================================================
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# API Keys & Secrets
+**/secrets/
+**/credentials/
+*.pem
+*.key
+*.cert
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================================================
+# BUILD OUTPUTS
+# ============================================================================
+
+dist/
+build/
+out/
+target/
+*.apk
+*.aab
+*.ipa
+*.app
+
+# ============================================================================
+# TEMPORARY FILES
+# ============================================================================
+
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.cache
+
+# ============================================================================
+# SPECIFIC TO WANDERCHINA
+# ============================================================================
+
+# Build logs
+mobile_app/build_log.txt
+
+# Private business documents (keep these locally)
+Business Doc/private/
+Business Doc/**/财务*
+Business Doc/**/合同*
+
+# Old archives (if needed, can be tracked separately)
+archive/temp/
+
+# Test data
+test_data/
+mock_data/
+
+# Downloaded maps cache (too large for git)
+mobile_app/maps_cache/
+mobile_app/offline_maps/
+
+# User uploads during development
+uploads/
+user_content/
+
+# ============================================================================
+# PYTHON (if backend uses Python)
+# ============================================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# ============================================================================
+# DOCUMENTATION BUILD
+# ============================================================================
+
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================================================
+# KEEP THESE FILES
+# ============================================================================
+
+# Force include certain files if needed
+!.env.example
+!.gitkeep
+
+# ============================================================================
+# END
+# ============================================================================
