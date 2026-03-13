@@ -1,0 +1,421 @@
+import 'package:flutter/material.dart';
+import 'package:amap_flutter_map/amap_flutter_map.dart';
+import 'package:amap_flutter_base/amap_flutter_base.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/config/amap_config.dart';
+import '../../services/amap_service.dart';
+
+/// 高德地图屏幕 - 集成完整地图功能
+///
+/// 功能包括：
+/// - 地图显示与交互
+/// - 当前定位
+/// - POI标记
+/// - 地图类型切换
+/// - 附近兴趣点
+class MapScreenNew extends StatefulWidget {
+  const MapScreenNew({Key? key}) : super(key: key);
+
+  @override
+  State<MapScreenNew> createState() => _MapScreenNewState();
+}
+
+class _MapScreenNewState extends State<MapScreenNew> {
+  // 地图控制器
+  AMapController? _mapController;
+
+  // 高德服务
+  final AMapService _amapService = AMapService();
+
+  // 地图类型
+  int _currentMapType = AMapConfig.mapTypeNormal;
+
+  // 当前位置
+  LatLng? _currentLocation;
+
+  // 是否正在定位
+  bool _isLocating = false;
+
+  // 标记集合
+  final Set<Marker> _markers = {};
+
+  // 是否显示交通
+  bool _showTraffic = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeMap();
+  }
+
+  /// 初始化地图服务
+  Future<void> _initializeMap() async {
+    try {
+      await _amapService.initialize();
+      print('✅ 地图服务初始化成功');
+    } catch (e) {
+      print('❌ 地图服务初始化失败: $e');
+      _showErrorSnackBar('地图初始化失败，请检查网络连接');
+    }
+  }
+
+  /// 获取当前位置
+  Future<void> _getCurrentLocation() async {
+    if (_isLocating) return;
+
+    setState(() => _isLocating = true);
+
+    try {
+      final location = await _amapService.getLocation();
+
+      if (location != null) {
+        final lat = location['latitude'] as double?;
+        final lng = location['longitude'] as double?;
+
+        if (lat != null && lng != null) {
+          final latLng = LatLng(lat, lng);
+
+          setState(() {
+            _currentLocation = latLng;
+          });
+
+          // 移动地图到当前位置
+          await _mapController?.moveCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: latLng,
+                zoom: 15.0,
+              ),
+            ),
+            animated: true,
+            duration: 500,
+          );
+
+          // 添加当前位置标记
+          _addCurrentLocationMarker(latLng);
+        }
+      }
+    } catch (e) {
+      print('❌ 定位失败: $e');
+      _showErrorSnackBar('定位失败，请检查定位权限');
+    } finally {
+      setState(() => _isLocating = false);
+    }
+  }
+
+  /// 添加当前位置标记
+  void _addCurrentLocationMarker(LatLng position) {
+    final marker = Marker(
+      position: position,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      infoWindow: InfoWindow(
+        title: '我的位置',
+        snippet: '当前所在位置',
+      ),
+    );
+
+    setState(() {
+      _markers.removeWhere((m) => m.id == 'current_location');
+      _markers.add(marker);
+    });
+  }
+
+  /// 切换地图类型
+  void _toggleMapType() {
+    setState(() {
+      _currentMapType = (_currentMapType + 1) % 3;
+    });
+  }
+
+  /// 切换交通显示
+  void _toggleTraffic() {
+    setState(() {
+      _showTraffic = !_showTraffic;
+    });
+  }
+
+  /// 显示错误提示
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 高德地图
+          AMapWidget(
+            apiKey: AMapApiKey(
+              androidKey: AMapConfig.androidApiKey,
+              iosKey: AMapConfig.iosApiKey,
+            ),
+            initialCameraPosition: CameraPosition(
+              target: LatLng(
+                AMapConfig.defaultLatitude,
+                AMapConfig.defaultLongitude,
+              ),
+              zoom: AMapConfig.defaultZoom,
+            ),
+            mapType: _getMapType(),
+            buildingsEnabled: true,
+            compassEnabled: true,
+            scaleEnabled: true,
+            // // zoomControlsEnabled: false, // 使用自定义缩放控件
+            // // myLocationButtonEnabled: false, // 使用自定义定位按钮
+            trafficEnabled: _showTraffic,
+            markers: _markers,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              print('✅ 地图创建成功');
+            },
+            onTap: (latLng) {
+              print('地图点击: ${latLng.latitude}, ${latLng.longitude}');
+            },
+//             onMarkerTap: (markerId) {
+//               print('标记点击: $markerId');
+//             },
+          ),
+
+          // 顶部控制栏
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.m),
+              child: Row(
+                children: [
+                  // 搜索按钮
+                  _buildControlButton(
+                    icon: Icons.search,
+                    onTap: () {
+                      // TODO: 实现搜索功能
+                      _showErrorSnackBar('搜索功能即将推出');
+                    },
+                  ),
+                  Spacer(),
+                  // 图层按钮
+                  _buildControlButton(
+                    icon: Icons.layers,
+                    onTap: _toggleMapType,
+                  ),
+                  SizedBox(width: AppSpacing.s),
+                  // 交通按钮
+                  _buildControlButton(
+                    icon: Icons.traffic,
+                    onTap: _toggleTraffic,
+                    color: _showTraffic ? AppColors.primary : null,
+                  ),
+                  SizedBox(width: AppSpacing.s),
+                  // 定位按钮
+                  _buildControlButton(
+                    icon: _isLocating ? Icons.location_searching : Icons.my_location,
+                    onTap: _getCurrentLocation,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 底部信息面板
+          _buildBottomSheet(),
+        ],
+      ),
+    );
+  }
+
+  /// 构建控制按钮
+  Widget _buildControlButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gray900.withOpacity(0.1),
+              blurRadius: 12,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: color ?? AppColors.gray700,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  /// 构建底部信息面板
+  Widget _buildBottomSheet() {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusXL),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gray900.withOpacity(0.1),
+              blurRadius: 20,
+              offset: Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppSpacing.gapHeightS,
+            // 拖动手柄
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.gray300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(AppSpacing.m),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _getMapTypeName(),
+                    style: AppTextStyles.h4(color: AppColors.gray900),
+                  ),
+                  AppSpacing.gapHeightXS,
+                  Text(
+                    _currentLocation != null
+                        ? '当前位置: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}'
+                        : '点击定位按钮获取当前位置',
+                    style: AppTextStyles.body(color: AppColors.gray600),
+                  ),
+                  AppSpacing.gapHeightM,
+                  // 快捷操作按钮
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickActionButton(
+                          icon: Icons.place,
+                          label: '附近景点',
+                          onTap: () {
+                            _showErrorSnackBar('附近景点功能即将推出');
+                          },
+                        ),
+                      ),
+                      SizedBox(width: AppSpacing.s),
+                      Expanded(
+                        child: _buildQuickActionButton(
+                          icon: Icons.restaurant,
+                          label: '美食推荐',
+                          onTap: () {
+                            _showErrorSnackBar('美食推荐功能即将推出');
+                          },
+                        ),
+                      ),
+                      SizedBox(width: AppSpacing.s),
+                      Expanded(
+                        child: _buildQuickActionButton(
+                          icon: Icons.directions,
+                          label: '路线规划',
+                          onTap: () {
+                            _showErrorSnackBar('路线规划功能即将推出');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 构建快捷操作按钮
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          vertical: AppSpacing.s,
+          horizontal: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 24),
+            SizedBox(height: 4),
+            Text(
+              label,
+              style: AppTextStyles.caption(color: AppColors.primary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 获取地图类型
+  MapType _getMapType() {
+    switch (_currentMapType) {
+      case AMapConfig.mapTypeSatellite:
+        return MapType.satellite;
+      case AMapConfig.mapTypeNight:
+        return MapType.night;
+      default:
+        return MapType.normal;
+    }
+  }
+
+  /// 获取地图类型名称
+  String _getMapTypeName() {
+    switch (_currentMapType) {
+      case AMapConfig.mapTypeSatellite:
+        return '卫星地图';
+      case AMapConfig.mapTypeNight:
+        return '夜间模式';
+      default:
+        return '标准地图';
+    }
+  }
+
+  @override
+  void dispose() {
+    _amapService.stopLocation();
+    // _mapController?.dispose();
+    super.dispose();
+  }
+}

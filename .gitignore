@@ -162,7 +162,6 @@ yarn.lock
 # Environment files
 .env
 .env.*
-!.env.example
 
 # API Keys & Secrets
 **/secrets/
@@ -254,8 +253,14 @@ site/
 # ============================================================================
 
 # Force include certain files if needed
-!.env.example
 !.gitkeep
+
+# ============================================================================
+# MVP_0.1 SPECIFIC IGNORES
+# ============================================================================
+
+# Ignore markdown files in MVP/Front_end
+MVP/Front_end/**/*.md
 
 # ============================================================================
 # END
