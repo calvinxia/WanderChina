@@ -13,6 +13,8 @@ class PrimaryButton extends StatefulWidget {
   final ButtonSize size;
   final IconData? icon;
   final bool isDisabled;
+  final Color? backgroundColor;
+  final Color? textColor;
 
   const PrimaryButton({
     super.key,
@@ -23,6 +25,8 @@ class PrimaryButton extends StatefulWidget {
     this.size = ButtonSize.large,
     this.icon,
     this.isDisabled = false,
+    this.backgroundColor,
+    this.textColor,
   });
 
   @override
@@ -91,17 +95,27 @@ class _PrimaryButtonState extends State<PrimaryButton>
                 minWidth: widget.isFullWidth ? double.infinity : 120,
               ),
               decoration: BoxDecoration(
-                gradient: isEnabled
+                gradient: isEnabled && widget.backgroundColor == null
                     ? _isPressed
                         ? const LinearGradient(
                             colors: [AppColors.jade900, AppColors.jade900],
                           )
                         : AppColors.primaryGradient
                     : null,
-                color: isEnabled ? null : AppColors.gray200,
+                color: isEnabled
+                    ? widget.backgroundColor
+                    : AppColors.gray200,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                 boxShadow: isEnabled && !_isPressed
-                    ? [AppColors.jadeShadow]
+                    ? widget.backgroundColor != null
+                        ? [
+                            BoxShadow(
+                              color: widget.backgroundColor!.withOpacity(0.2),
+                              offset: const Offset(0, 2),
+                              blurRadius: 8,
+                            )
+                          ]
+                        : [AppColors.jadeShadow]
                     : null,
               ),
               child: Material(
@@ -123,14 +137,18 @@ class _PrimaryButtonState extends State<PrimaryButton>
   }
 
   Widget _buildContent() {
+    final effectiveTextColor = widget.isDisabled
+        ? AppColors.gray400
+        : (widget.textColor ?? Colors.white);
+
     if (widget.isLoading) {
       return Center(
         child: SizedBox(
           width: _getLoaderSize(),
           height: _getLoaderSize(),
-          child: const CircularProgressIndicator(
+          child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            valueColor: AlwaysStoppedAnimation<Color>(effectiveTextColor),
           ),
         ),
       );
@@ -143,14 +161,14 @@ class _PrimaryButtonState extends State<PrimaryButton>
         children: [
           Icon(
             widget.icon,
-            color: widget.isDisabled ? AppColors.gray400 : Colors.white,
+            color: effectiveTextColor,
             size: _getIconSize(),
           ),
           const SizedBox(width: AppSpacing.xs),
           Text(
             widget.text,
             style: _getTextStyle().copyWith(
-              color: widget.isDisabled ? AppColors.gray400 : Colors.white,
+              color: effectiveTextColor,
             ),
           ),
         ],
@@ -161,7 +179,7 @@ class _PrimaryButtonState extends State<PrimaryButton>
       child: Text(
         widget.text,
         style: _getTextStyle().copyWith(
-          color: widget.isDisabled ? AppColors.gray400 : Colors.white,
+          color: effectiveTextColor,
         ),
       ),
     );
