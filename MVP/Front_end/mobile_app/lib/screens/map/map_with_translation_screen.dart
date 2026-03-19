@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 import '../../widgets/map/wander_map.dart';
-import '../../widgets/map/translation_overlay_widget.dart';
+import '../../widgets/map/map_search_bar.dart';
+import '../../widgets/map/language_switcher.dart';
+import '../../widgets/map/voice_fab.dart';
+import '../../widgets/map/poi_bottom_sheet.dart';
+import '../../widgets/map/route_overview.dart';
 import '../../models/poi_translation.dart';
+import '../../core/theme/app_colors.dart';
 
-/// 带翻译功能的地图页面示例
+/// Map Screen with Translation - MVP v2.0
 ///
-/// 展示如何使用WanderMap组件实现：
-/// - 多语言地图标签翻译
-/// - 实时语音翻译
-/// - 自定义POI标记
+/// 地图页面，集成翻译蒙层、语音翻译、POI 详情、路线规划
 class MapWithTranslationScreen extends StatefulWidget {
   final String? cityName;
   final LatLng? initialLocation;
@@ -23,25 +25,30 @@ class MapWithTranslationScreen extends StatefulWidget {
   });
 
   @override
-  State<MapWithTranslationScreen> createState() => _MapWithTranslationScreenState();
+  State<MapWithTranslationScreen> createState() =>
+      _MapWithTranslationScreenState();
 }
 
 class _MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
   final GlobalKey<WanderMapState> _mapKey = GlobalKey<WanderMapState>();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
 
   late AppLanguage _currentLanguage;
-  LabelStyle _currentLabelStyle = LabelStyle.badge;
   bool _showTranslationOverlay = true;
-  bool _showVoiceButton = true;
+  bool _showBottomSheet = false;
+  bool _showRouteOverview = false;
+  POITranslation? _selectedPOI;
+  VoiceFABState _voiceState = VoiceFABState.idle;
 
   // 预设城市坐标
   static const Map<String, LatLng> _cityCoordinates = {
-    '北京': LatLng(39.9042, 116.4074),  // 天安门
-    '上海': LatLng(31.2304, 121.4737),  // 外滩
-    '广州': LatLng(23.1291, 113.2644),  // 广州塔
-    '深圳': LatLng(22.5431, 114.0579),  // 市民中心
-    '成都': LatLng(30.6598, 104.0633),  // 天府广场
-    '西安': LatLng(34.2655, 108.9541),  // 钟楼
+    '北京': LatLng(39.9042, 116.4074), // 天安门
+    '上海': LatLng(31.2304, 121.4737), // 外滩
+    '广州': LatLng(23.1291, 113.2644), // 广州塔
+    '深圳': LatLng(22.5431, 114.0579), // 市民中心
+    '成都': LatLng(30.6598, 104.0633), // 天府广场
+    '西安': LatLng(34.2655, 108.9541), // 钟楼
   };
 
   @override
@@ -50,256 +57,242 @@ class _MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     _currentLanguage = widget.language;
   }
 
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
+
   LatLng get _initialCenter {
     if (widget.initialLocation != null) {
       return widget.initialLocation!;
     }
-    if (widget.cityName != null && _cityCoordinates.containsKey(widget.cityName)) {
+    if (widget.cityName != null &&
+        _cityCoordinates.containsKey(widget.cityName)) {
       return _cityCoordinates[widget.cityName]!;
     }
     return _cityCoordinates['北京']!; // 默认北京
   }
 
+  void _handleSearchTap() {
+    // TODO: 打开搜索结果页面
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Search functionality coming soon')),
+    );
+  }
+
+  void _handleSearch(String query) {
+    // TODO: 调用 search_poi 云函数
+    debugPrint('Search: $query');
+  }
+
+  void _handleLanguageChanged(AppLanguage language) {
+    setState(() {
+      _currentLanguage = language;
+    });
+  }
+
+  void _handleOverlayToggle(bool enabled) {
+    setState(() {
+      _showTranslationOverlay = enabled;
+    });
+  }
+
+  void _handleVoiceTap() {
+    // TODO: 打开全屏语音翻译页面
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Opening voice translation...')),
+    );
+  }
+
+  void _handleVoiceLongPress() {
+    // TODO: 就地录音翻译
+    setState(() {
+      _voiceState = VoiceFABState.recording;
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _voiceState = VoiceFABState.idle;
+        });
+      }
+    });
+  }
+
+  void _handleDirectionSwap() {
+    // TODO: 交换翻译方向
+    debugPrint('Swap direction');
+  }
+
+  void _handlePOITap(POITranslation poi) {
+    setState(() {
+      _selectedPOI = poi;
+      _showBottomSheet = true;
+    });
+  }
+
+  void _handleDirections() {
+    setState(() {
+      _showRouteOverview = true;
+    });
+  }
+
+  void _handleDetails() {
+    // Expand bottom sheet to full
+    _sheetController.animateTo(
+      0.8,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _handleCloseBottomSheet() {
+    setState(() {
+      _showBottomSheet = false;
+      _selectedPOI = null;
+    });
+  }
+
+  void _handleRouteSelected(RouteMode mode) {
+    debugPrint('Selected route mode: $mode');
+    // TODO: 在地图上显示路线
+    setState(() {
+      _showRouteOverview = false;
+    });
+  }
+
+  void _handleRecenter() {
+    _mapKey.currentState?.moveTo(_initialCenter, zoom: 15.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.cityName ?? "地图"} - ${_getLanguageName(_currentLanguage)}'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1A1A),
-        elevation: 0,
-        actions: [
-          // 语言切换
-          PopupMenuButton<AppLanguage>(
-            icon: const Icon(Icons.language),
-            tooltip: 'Change Language',
-            onSelected: (language) {
-              setState(() => _currentLanguage = language);
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: AppLanguage.english,
-                child: Row(
-                  children: [
-                    Text('🇬🇧', style: TextStyle(fontSize: 20)),
-                    SizedBox(width: 8),
-                    Text('English'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: AppLanguage.french,
-                child: Row(
-                  children: [
-                    Text('🇫🇷', style: TextStyle(fontSize: 20)),
-                    SizedBox(width: 8),
-                    Text('Français'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: AppLanguage.spanish,
-                child: Row(
-                  children: [
-                    Text('🇪🇸', style: TextStyle(fontSize: 20)),
-                    SizedBox(width: 8),
-                    Text('Español'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // 标签样式切换
-          PopupMenuButton<LabelStyle>(
-            icon: const Icon(Icons.style),
-            tooltip: 'Label Style',
-            onSelected: (style) {
-              setState(() => _currentLabelStyle = style);
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: LabelStyle.badge,
-                child: Row(
-                  children: [
-                    Icon(Icons.label, size: 20),
-                    SizedBox(width: 8),
-                    Text('Badge Style'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: LabelStyle.minimal,
-                child: Row(
-                  children: [
-                    Icon(Icons.text_fields, size: 20),
-                    SizedBox(width: 8),
-                    Text('Minimal Style'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: LabelStyle.floating,
-                child: Row(
-                  children: [
-                    Icon(Icons.card_travel, size: 20),
-                    SizedBox(width: 8),
-                    Text('Floating Style'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // 设置
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-            onPressed: () => _showSettingsDialog(),
-          ),
-        ],
-      ),
-
-      body: WanderMap(
-        key: _mapKey,
-        initialCenter: _initialCenter,
-        initialZoom: 15.0,
-        language: _currentLanguage,
-        labelStyle: _currentLabelStyle,
-        showTranslationOverlay: _showTranslationOverlay,
-        showVoiceButton: _showVoiceButton,
-        onMapTap: (latLng) {
-          debugPrint('地图点击: ${latLng.latitude}, ${latLng.longitude}');
-        },
-      ),
-
-      // 底部城市快速切换
-      bottomNavigationBar: _buildCitySelector(),
-
-      // 浮动操作按钮
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
+      body: Stack(
         children: [
-          // 回到当前城市中心
-          FloatingActionButton.small(
-            heroTag: 'recenter',
-            onPressed: () {
-              _mapKey.currentState?.moveTo(_initialCenter, zoom: 15.0);
-            },
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.my_location, color: Color(0xFFFF6B35)),
+          // 1. Base map layer with translation overlay
+          WanderMap(
+            key: _mapKey,
+            initialCenter: _initialCenter,
+            initialZoom: 15.0,
+            language: _currentLanguage,
+            showTranslationOverlay: _showTranslationOverlay,
+            showVoiceButton: false, // We use custom Voice FAB
+            onPOITap: _handlePOITap,
           ),
-          const SizedBox(height: 8),
 
-          // 清除搜索标记
-          FloatingActionButton.small(
-            heroTag: 'clear',
-            onPressed: () {
-              _mapKey.currentState?.clearSearchMarkers();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Cleared search markers'),
-                  duration: Duration(seconds: 1),
+          // 2. Top UI controls
+          SafeArea(
+            child: Column(
+              children: [
+                // Search bar
+                MapSearchBar(
+                  onTap: _handleSearchTap,
+                  onSearch: _handleSearch,
                 ),
-              );
-            },
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.clear_all, color: Color(0xFFFF6B35)),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildCitySelector() {
-    return Container(
-      height: 60,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+                // Language switcher + overlay toggle
+                LanguageSwitcher(
+                  selectedLanguage: _currentLanguage,
+                  onLanguageChanged: _handleLanguageChanged,
+                  overlayEnabled: _showTranslationOverlay,
+                  onOverlayToggle: _handleOverlayToggle,
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        children: _cityCoordinates.entries.map((entry) {
-          final isSelected = widget.cityName == entry.key;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(entry.key),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  _mapKey.currentState?.moveTo(entry.value, zoom: 15.0);
-                }
-              },
-              selectedColor: const Color(0xFFFF6B35),
-              backgroundColor: Colors.grey[200],
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.black87,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+
+          // 3. Map controls (right side)
+          SafeArea(
+            child: Positioned(
+              right: 16,
+              top: 140,
+              child: Column(
+                children: [
+                  // GPS recenter button
+                  FloatingActionButton.small(
+                    heroTag: 'gps',
+                    onPressed: _handleRecenter,
+                    backgroundColor: Colors.white,
+                    child: const Icon(Icons.my_location, color: AppColors.jade500),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Zoom in
+                  FloatingActionButton.small(
+                    heroTag: 'zoom_in',
+                    onPressed: () {
+                      // TODO: Implement zoom in
+                    },
+                    backgroundColor: Colors.white,
+                    child: const Icon(Icons.add, color: AppColors.gray700),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Zoom out
+                  FloatingActionButton.small(
+                    heroTag: 'zoom_out',
+                    onPressed: () {
+                      // TODO: Implement zoom out
+                    },
+                    backgroundColor: Colors.white,
+                    child: const Icon(Icons.remove, color: AppColors.gray700),
+                  ),
+                ],
               ),
             ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  void _showSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Map Settings'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              title: const Text('Translation Overlay'),
-              subtitle: const Text('Show translated labels on map'),
-              value: _showTranslationOverlay,
-              onChanged: (value) {
-                setState(() => _showTranslationOverlay = value);
-                Navigator.pop(context);
-              },
-              activeColor: const Color(0xFFFF6B35),
-            ),
-            SwitchListTile(
-              title: const Text('Voice Translation'),
-              subtitle: const Text('Show voice translation button'),
-              value: _showVoiceButton,
-              onChanged: (value) {
-                setState(() => _showVoiceButton = value);
-                Navigator.pop(context);
-              },
-              activeColor: const Color(0xFFFF6B35),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
           ),
+
+          // 4. Voice Translation FAB
+          VoiceFAB(
+            onTap: _handleVoiceTap,
+            onLongPress: _handleVoiceLongPress,
+            onDirectionSwap: _handleDirectionSwap,
+            fromLanguage: 'EN',
+            toLanguage: '中',
+            state: _voiceState,
+            bottomOffset: 90.0,
+          ),
+
+          // 5. Route Overview (if shown)
+          if (_showRouteOverview)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 100,
+              child: RouteOverview(
+                options: [
+                  RouteOption(
+                    mode: RouteMode.transit,
+                    duration: '20 min',
+                    cost: '¥3',
+                  ),
+                  RouteOption(
+                    mode: RouteMode.walking,
+                    duration: '35 min',
+                  ),
+                  RouteOption(
+                    mode: RouteMode.driving,
+                    duration: '12 min',
+                    cost: '¥15',
+                  ),
+                ],
+                selectedMode: null,
+                onModeSelected: _handleRouteSelected,
+              ),
+            ),
+
+          // 6. POI Bottom Sheet
+          if (_showBottomSheet && _selectedPOI != null)
+            POIBottomSheet(
+              poi: _selectedPOI!,
+              controller: _sheetController,
+              onDirections: _handleDirections,
+              onDetails: _handleDetails,
+              onClose: _handleCloseBottomSheet,
+            ),
         ],
       ),
     );
-  }
-
-  String _getLanguageName(AppLanguage language) {
-    switch (language) {
-      case AppLanguage.english:
-        return 'English';
-      case AppLanguage.french:
-        return 'Français';
-      case AppLanguage.spanish:
-        return 'Español';
-    }
   }
 }
