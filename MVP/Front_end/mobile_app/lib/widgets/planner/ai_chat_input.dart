@@ -65,7 +65,7 @@ class _AiChatInputState extends State<AiChatInput> {
       child: Row(
         children: [
           // AI icon
-          Icon(
+          const Icon(
             Icons.auto_awesome,
             size: 20,
             color: AppColors.jade500,

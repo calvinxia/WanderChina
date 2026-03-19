@@ -81,7 +81,7 @@ class POIBottomSheet extends StatelessWidget {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.place,
                                 size: 14,
                                 color: AppColors.gray600,
@@ -122,7 +122,7 @@ class POIBottomSheet extends StatelessWidget {
                         color: AppColors.gray200,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Center(
+                      child: const Center(
                         child: Icon(
                           Icons.image,
                           size: 48,

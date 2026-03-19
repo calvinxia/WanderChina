@@ -81,8 +81,8 @@ class TranslationIllustrationPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant TranslationIllustrationPainter old) =>
-      old.accentColor != accentColor;
+  bool shouldRepaint(covariant TranslationIllustrationPainter oldDelegate) =>
+      oldDelegate.accentColor != accentColor;
 }
 
 /// Navigation Illustration Painter
@@ -194,6 +194,6 @@ class NavigationIllustrationPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant NavigationIllustrationPainter old) =>
-      old.accentColor != accentColor;
+  bool shouldRepaint(covariant NavigationIllustrationPainter oldDelegate) =>
+      oldDelegate.accentColor != accentColor;
 }

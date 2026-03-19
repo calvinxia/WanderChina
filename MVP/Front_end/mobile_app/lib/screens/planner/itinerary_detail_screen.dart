@@ -81,7 +81,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.jade50,
               border: Border(
                 bottom: BorderSide(color: AppColors.gray200, width: 1),
@@ -102,7 +102,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
           // Day Tab Bar
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(
                 bottom: BorderSide(color: AppColors.gray200, width: 1),
@@ -140,7 +140,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(
+              border: const Border(
                 top: BorderSide(color: AppColors.gray200, width: 1),
               ),
               boxShadow: [
@@ -202,7 +202,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
             label: const Text('Add Stop'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.jade500,
-              side: BorderSide(color: AppColors.jade500),
+              side: const BorderSide(color: AppColors.jade500),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

@@ -44,7 +44,7 @@ class ActivityCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border(
+        border: const Border(
           left: BorderSide(
             color: AppColors.jade500,
             width: 3,

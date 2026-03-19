@@ -217,7 +217,7 @@ class AppColors {
       case 'advanced':
         return error500;
       case 'expert':
-        return Color(0xFFC62828);
+        return const Color(0xFFC62828);
       case 'master':
         return jade700;
       default:
@@ -231,9 +231,9 @@ class AppColors {
       case 'common':
         return gray500;
       case 'rare':
-        return Color(0xFF2196F3); // Blue
+        return const Color(0xFF2196F3); // Blue
       case 'epic':
-        return Color(0xFF9C27B0); // Purple
+        return const Color(0xFF9C27B0); // Purple
       case 'legendary':
         return warmGold;
       default:
@@ -247,15 +247,15 @@ class AppColors {
       case 'food':
         return orange;
       case 'accommodation':
-        return Color(0xFF4ECDC4);
+        return const Color(0xFF4ECDC4);
       case 'transport':
-        return Color(0xFF45B7D1);
+        return const Color(0xFF45B7D1);
       case 'attractions':
-        return Color(0xFFFFA07A);
+        return const Color(0xFFFFA07A);
       case 'nature':
-        return Color(0xFF98D8C8);
+        return const Color(0xFF98D8C8);
       case 'culture':
-        return Color(0xFFBA68C8);
+        return const Color(0xFFBA68C8);
       case 'shopping':
         return warmGold;
       default:

@@ -164,10 +164,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(width: 4),
                           GestureDetector(
                             onTap: () {},
-                            child: CircleAvatar(
+                            child: const CircleAvatar(
                               radius: 16,
                               backgroundColor: AppColors.jade500,
-                              child: const Icon(Icons.person, color: Colors.white, size: 18),
+                              child: Icon(Icons.person, color: Colors.white, size: 18),
                             ),
                           ),
                         ],
@@ -390,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             border: Border.all(color: AppColors.jade200, width: 1),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [AppColors.shadowSm],
+            boxShadow: const [AppColors.shadowSm],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

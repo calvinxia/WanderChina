@@ -245,7 +245,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
             child: DropdownButtonHideUnderline(
               child: DropdownButton<AppLanguage>(
                 value: _selectedLanguage,
-                icon: Icon(Icons.arrow_drop_down, size: 20, color: AppColors.gray600),
+                icon: const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.gray600),
                 items: const [
                   DropdownMenuItem(
                     value: AppLanguage.english,
@@ -281,7 +281,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.mic_none, size: 64, color: AppColors.gray300),
+            const Icon(Icons.mic_none, size: 64, color: AppColors.gray300),
             const SizedBox(height: 16),
             Text(
               'Tap and hold the mic button\nto start translating',
@@ -373,7 +373,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.volume_up, size: 16, color: AppColors.jade700),
+                            const Icon(Icons.volume_up, size: 16, color: AppColors.jade700),
                             const SizedBox(width: 4),
                             Text(
                               'Tap to replay',

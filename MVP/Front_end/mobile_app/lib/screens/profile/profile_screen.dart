@@ -232,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.map_outlined, size: 64, color: AppColors.gray300),
+            const Icon(Icons.map_outlined, size: 64, color: AppColors.gray300),
             const SizedBox(height: 16),
             Text(
               'No trips yet',
@@ -371,7 +371,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.bookmark_border, size: 64, color: AppColors.gray300),
+          const Icon(Icons.bookmark_border, size: 64, color: AppColors.gray300),
           const SizedBox(height: 16),
           Text(
             'No saved places yet',
@@ -393,7 +393,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history, size: 64, color: AppColors.gray300),
+          const Icon(Icons.history, size: 64, color: AppColors.gray300),
           const SizedBox(height: 16),
           Text(
             'No history yet',
