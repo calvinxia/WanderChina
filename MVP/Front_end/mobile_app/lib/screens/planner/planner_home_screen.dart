@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../services/api_client.dart';
+import '../../models/itinerary.dart';
+import 'itinerary_detail_screen.dart';
 
 /// Screen 9: AI Trip Planner Home
 ///
@@ -52,7 +57,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       appBar: AppBar(
         title: const Text('Plan Your Trip'),
         backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1A1A),
+        foregroundColor: AppColors.gray900,
         elevation: 0,
         actions: [
           IconButton(
@@ -69,13 +74,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // City Selection
-            const Text(
+            Text(
               'Which city?',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1F2937),
-              ),
+              style: AppTextStyles.h4(color: AppColors.gray900),
             ),
             const SizedBox(height: 12),
             _buildCityGrid(),
@@ -83,13 +84,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             const SizedBox(height: 32),
 
             // Days Selection
-            const Text(
+            Text(
               'How many days?',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1F2937),
-              ),
+              style: AppTextStyles.h4(color: AppColors.gray900),
             ),
             const SizedBox(height: 12),
             _buildDaySelector(),
@@ -97,13 +94,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             const SizedBox(height: 32),
 
             // Interests Selection
-            const Text(
+            Text(
               "What's your focus?",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1F2937),
-              ),
+              style: AppTextStyles.h4(color: AppColors.gray900),
             ),
             const SizedBox(height: 12),
             _buildInterestTags(),
@@ -113,18 +106,15 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             // Divider
             Row(
               children: [
-                Expanded(child: Divider(color: Colors.grey[300])),
+                const Expanded(child: Divider(color: AppColors.gray300)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'Or describe in your words',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
+                    style: AppTextStyles.caption(color: AppColors.gray600),
                   ),
                 ),
-                Expanded(child: Divider(color: Colors.grey[300])),
+                const Expanded(child: Divider(color: AppColors.gray300)),
               ],
             ),
 
@@ -135,19 +125,19 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
               height: 100,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: AppColors.gray300),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
                 controller: _customInput,
                 maxLength: 200,
                 maxLines: 3,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: 'e.g. "3 days in Chengdu, love pandas and spicy food, budget traveller"',
                   hintStyle: TextStyle(
                     fontSize: 14,
                     fontStyle: FontStyle.italic,
-                    color: Colors.grey[400],
+                    color: AppColors.gray400,
                   ),
                   border: InputBorder.none,
                   counterText: '',
@@ -164,10 +154,10 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
               child: ElevatedButton(
                 onPressed: _canGenerate() ? _generatePlan : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  disabledBackgroundColor: Colors.grey[200],
+                  backgroundColor: AppColors.jade500,
+                  disabledBackgroundColor: AppColors.gray200,
                   foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.grey[400],
+                  disabledForegroundColor: AppColors.gray400,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -199,19 +189,15 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'My Saved Trips (2)',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
-                  ),
+                  style: AppTextStyles.h4(color: AppColors.gray900),
                 ),
                 TextButton(
                   onPressed: () {},
-                  child: const Text(
+                  child: Text(
                     'View All',
-                    style: TextStyle(color: Color(0xFF10B981)),
+                    style: AppTextStyles.body(color: AppColors.jade500),
                   ),
                 ),
               ],
@@ -252,9 +238,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           },
           child: Container(
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF10B981) : Colors.white,
+              color: isSelected ? AppColors.jade500 : Colors.white,
               border: Border.all(
-                color: isSelected ? const Color(0xFF10B981) : Colors.grey[300]!,
+                color: isSelected ? AppColors.jade500 : AppColors.gray300,
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -266,7 +252,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : const Color(0xFF1F2937),
+                    color: isSelected ? Colors.white : AppColors.gray900,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -274,7 +260,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   city['en']!,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isSelected ? Colors.white70 : Colors.grey[500],
+                    color: isSelected ? Colors.white70 : AppColors.gray600,
                   ),
                 ),
               ],
@@ -303,9 +289,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
               child: Container(
                 height: 44,
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF10B981) : Colors.white,
+                  color: isSelected ? AppColors.jade500 : Colors.white,
                   border: Border.all(
-                    color: isSelected ? const Color(0xFF10B981) : Colors.grey[300]!,
+                    color: isSelected ? AppColors.jade500 : AppColors.gray300,
                   ),
                   borderRadius: BorderRadius.circular(22),
                 ),
@@ -315,7 +301,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : const Color(0xFF1F2937),
+                    color: isSelected ? Colors.white : AppColors.gray900,
                   ),
                 ),
               ),
@@ -346,9 +332,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFFD1FAE5) : Colors.white,
+              color: isSelected ? AppColors.jade100 : Colors.white,
               border: Border.all(
-                color: isSelected ? const Color(0xFF10B981) : Colors.grey[300]!,
+                color: isSelected ? AppColors.jade500 : AppColors.gray300,
               ),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -358,7 +344,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                 Icon(
                   isSelected ? Icons.check_box : Icons.check_box_outline_blank,
                   size: 18,
-                  color: isSelected ? const Color(0xFF059669) : Colors.grey[400],
+                  color: isSelected ? AppColors.jade700 : AppColors.gray400,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -366,7 +352,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isSelected ? const Color(0xFF059669) : const Color(0xFF1F2937),
+                    color: isSelected ? AppColors.jade700 : AppColors.gray900,
                   ),
                 ),
               ],
@@ -387,7 +373,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: AppColors.gray200),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -403,12 +389,12 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFFD1FAE5),
+              color: AppColors.jade100,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.calendar_today,
-              color: Color(0xFF10B981),
+              color: AppColors.jade500,
               size: 24,
             ),
           ),
@@ -419,24 +405,18 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
               children: [
                 Text(
                   '$city · $days · $focus',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
-                  ),
+                  style: AppTextStyles.body(color: AppColors.gray900)
+                      .copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   date,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
+                  style: AppTextStyles.caption(color: AppColors.gray600),
                 ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.grey[400]),
+          const Icon(Icons.chevron_right, color: AppColors.gray400),
         ],
       ),
     );
@@ -447,9 +427,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         (_selectedInterests.isNotEmpty || _customInput.text.trim().isNotEmpty);
   }
 
-  void _generatePlan() {
-    // TODO: 调用DeepSeek API生成行程
-    // Navigator.push to AI Generated Itinerary Screen
+  Future<void> _generatePlan() async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -463,13 +441,13 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           child: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: Color(0xFF10B981)),
+              CircularProgressIndicator(color: AppColors.jade500),
               SizedBox(height: 16),
               Text(
                 'Generating your itinerary...',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF6B7280),
+                  color: AppColors.gray600,
                 ),
               ),
             ],
@@ -478,10 +456,51 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       ),
     );
 
-    // 模拟延迟
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context); // 关闭loading
-      // TODO: 导航到生成的行程页面
-    });
+    try {
+      // 构建请求参数
+      final requestBody = {
+        'city': _selectedCity,
+        'days': _selectedDays,
+        'interests': _selectedInterests.toList(),
+        'customInput': _customInput.text.trim(),
+        'language': 'en',
+      };
+
+      // 调用 create_trip 云函数
+      final response = await ApiClient.post(
+        ApiClient.tripUrl,
+        requestBody,
+        timeout: const Duration(seconds: 30),
+      );
+
+      if (!mounted) return;
+
+      // 解析返回的行程数据
+      final itinerary = Itinerary.fromJson(response['itinerary']);
+
+      // 关闭 loading 对话框
+      Navigator.pop(context);
+
+      // 导航到行程详情页
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ItineraryDetailScreen(itinerary: itinerary),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      // 关闭 loading 对话框
+      Navigator.pop(context);
+
+      // 显示错误信息
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to generate itinerary: ${e.toString()}'),
+          backgroundColor: AppColors.error500,
+        ),
+      );
+    }
   }
 }

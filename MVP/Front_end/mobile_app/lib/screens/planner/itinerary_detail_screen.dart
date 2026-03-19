@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/constants/app_spacing.dart';
 import '../../models/itinerary.dart';
+import '../../widgets/planner/activity_card.dart';
+import '../../widgets/planner/transit_connector.dart';
+import '../../widgets/planner/ai_chat_input.dart';
+import '../../services/api_client.dart';
 
-/// Itinerary Detail Screen - View complete trip itinerary
-/// 行程详情页面
-class ItineraryDetailScreen extends StatelessWidget {
+/// Screen 10: AI-Generated Itinerary Detail Page
+///
+/// 规范来自 FLUTTER_UI_REDESIGN_INSTRUCTIONS.md Step UI-5.2
+/// - Day Tab Bar (swipeable)
+/// - Activity Cards with Navigate/Details buttons
+/// - Transit Connectors between activities
+/// - AI Chat Input for adjustments
+/// - View on Map button
+class ItineraryDetailScreen extends StatefulWidget {
   final Itinerary itinerary;
 
   const ItineraryDetailScreen({
@@ -15,9 +24,33 @@ class ItineraryDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<ItineraryDetailScreen> createState() => _ItineraryDetailScreenState();
+}
+
+class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  bool _isModifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: widget.itinerary.days.length,
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -26,161 +59,388 @@ class ItineraryDetailScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          itinerary.title,
+          '${widget.itinerary.destination} · ${widget.itinerary.totalDays} Days',
           style: AppTextStyles.h4(color: AppColors.gray900),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share, color: AppColors.gray700),
-            onPressed: () {},
+            icon: const Icon(Icons.bookmark_border, color: AppColors.gray700),
+            onPressed: _handleSave,
+            tooltip: 'Save',
           ),
           IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.gray700),
-            onPressed: () {},
+            icon: const Icon(Icons.share_outlined, color: AppColors.gray700),
+            onPressed: _handleShare,
+            tooltip: 'Share',
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: AppSpacing.screenPadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Cover image
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: AppColors.gray100,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.primary.withOpacity(0.3),
-                    AppColors.info500.withOpacity(0.3),
-                  ],
-                ),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.landscape,
-                  size: 80,
-                  color: Colors.white.withOpacity(0.7),
-                ),
+      body: Column(
+        children: [
+          // AI Generated Banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: AppColors.jade50,
+              border: Border(
+                bottom: BorderSide(color: AppColors.gray200, width: 1),
               ),
             ),
-
-            AppSpacing.gapHeightL,
-
-            // Trip info
-            Text(
-              itinerary.title,
-              style: AppTextStyles.h2(color: AppColors.gray900),
-            ),
-
-            AppSpacing.gapHeightS,
-
-            if (itinerary.description != null)
-              Text(
-                itinerary.description!,
-                style: AppTextStyles.body(color: AppColors.gray600),
-              ),
-
-            AppSpacing.gapHeightL,
-
-            // Quick stats
-            Row(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.calendar_today,
-                    label: 'Duration',
-                    value: '${itinerary.totalDays} Days',
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.m),
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.location_city,
-                    label: 'Cities',
-                    value: '${itinerary.cities?.length ?? 1}',
-                  ),
+                const Text('✨', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Text(
+                  'Generated by AI · Tap to edit',
+                  style: AppTextStyles.caption(color: AppColors.jade700),
                 ),
               ],
             ),
+          ),
 
-            AppSpacing.gapHeightXL,
+          // Day Tab Bar
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(color: AppColors.gray200, width: 1),
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: widget.itinerary.days.length > 3,
+              labelColor: AppColors.jade500,
+              unselectedLabelColor: AppColors.gray600,
+              labelStyle: AppTextStyles.body(color: AppColors.jade500).copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: AppTextStyles.body(color: AppColors.gray600),
+              indicatorColor: AppColors.jade500,
+              indicatorWeight: 2,
+              tabs: widget.itinerary.days.map((day) {
+                return Tab(text: 'Day ${day.dayNumber}');
+              }).toList(),
+            ),
+          ),
 
-            // Day-by-day itinerary section
+          // Day Content (swipeable)
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: widget.itinerary.days.map((day) {
+                return _buildDayContent(day);
+              }).toList(),
+            ),
+          ),
+
+          // AI Chat Input (fixed at bottom)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                top: BorderSide(color: AppColors.gray200, width: 1),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: AiChatInput(
+              onSend: _handleAiMessage,
+              placeholder: 'e.g. "add more food stops"',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayContent(ItineraryDay day) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Day Title
+          if (day.title != null) ...[
             Text(
-              'Day-by-Day Itinerary',
+              '${day.title}',
               style: AppTextStyles.h3(color: AppColors.gray900),
             ),
+            const SizedBox(height: 16),
+          ],
 
-            AppSpacing.gapHeightM,
+          // Activities with Transit Connectors
+          ...List.generate(day.activities.length, (index) {
+            final activity = day.activities[index];
+            final isLast = index == day.activities.length - 1;
 
-            // Placeholder for day-by-day view
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.l),
-              decoration: BoxDecoration(
-                color: AppColors.info100,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                border: Border.all(color: AppColors.info300),
+            return Column(
+              children: [
+                ActivityCard(
+                  activity: activity,
+                  onNavigate: () => _handleNavigate(activity),
+                  onDetails: () => _handleDetails(activity),
+                ),
+                if (!isLast) _buildTransitConnector(activity, day.activities[index + 1]),
+              ],
+            );
+          }),
+
+          const SizedBox(height: 16),
+
+          // Add Stop Button
+          OutlinedButton.icon(
+            onPressed: _handleAddStop,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add Stop'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.jade500,
+              side: BorderSide(color: AppColors.jade500),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Column(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // View on Map Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _handleViewOnMap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.jade500,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.event_note, size: 48, color: AppColors.info500),
-                  AppSpacing.gapHeightM,
+                  Icon(Icons.map_outlined, size: 20),
+                  SizedBox(width: 8),
                   Text(
-                    'Day-by-Day Planning',
-                    style: AppTextStyles.h4(color: AppColors.gray900),
-                  ),
-                  AppSpacing.gapHeightS,
-                  Text(
-                    'Start adding activities to each day of your trip',
-                    style: AppTextStyles.body(color: AppColors.gray600),
-                    textAlign: TextAlign.center,
+                    'View on Map',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
+
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransitConnector(Activity from, Activity to) {
+    // Simple transit text generation
+    // In a real app, this would calculate based on coordinates
+    final durationMinutes = to.startTime.difference(from.endTime).inMinutes;
+
+    if (durationMinutes <= 15) {
+      return TransitConnector(
+        transitText: 'Walk $durationMinutes min',
+        icon: Icons.directions_walk,
+      );
+    } else if (durationMinutes <= 30) {
+      return const TransitConnector(
+        transitText: 'Subway or taxi recommended',
+        icon: Icons.directions_transit,
+      );
+    } else {
+      return TransitConnector(
+        transitText: '$durationMinutes min break',
+        icon: Icons.schedule,
+      );
+    }
+  }
+
+  void _handleNavigate(Activity activity) {
+    // Navigate to map with this location
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Navigate to ${activity.title}'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    // TODO: Navigate to Map tab and show route
+  }
+
+  void _handleDetails(Activity activity) {
+    // Show activity details
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                activity.title,
+                style: AppTextStyles.h3(color: AppColors.gray900),
+              ),
+              const SizedBox(height: 8),
+              if (activity.description != null)
+                Text(
+                  activity.description!,
+                  style: AppTextStyles.body(color: AppColors.gray600),
+                ),
+              if (activity.address != null) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 18, color: AppColors.gray600),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        activity.address!,
+                        style: AppTextStyles.body(color: AppColors.gray600),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStatCard({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.m),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.gray900.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  void _handleSave() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Itinerary saved')),
+    );
+    // TODO: Save to local storage or backend
+  }
+
+  void _handleShare() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Share functionality coming soon')),
+    );
+    // TODO: Implement share functionality
+  }
+
+  void _handleAddStop() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Add stop functionality coming soon')),
+    );
+    // TODO: Add stop functionality
+  }
+
+  void _handleViewOnMap() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('View on map functionality coming soon')),
+    );
+    // TODO: Navigate to Map tab with all itinerary points
+  }
+
+  Future<void> _handleAiMessage(String message) async {
+    if (_isModifying) return;
+
+    setState(() {
+      _isModifying = true;
+    });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 28),
-          AppSpacing.gapHeightS,
-          Text(
-            label,
-            style: AppTextStyles.caption(color: AppColors.gray600),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: AppColors.jade500),
+              SizedBox(height: 16),
+              Text(
+                'Adjusting your itinerary...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.gray600,
+                ),
+              ),
+            ],
           ),
-          Text(
-            value,
-            style: AppTextStyles.h4(color: AppColors.gray900),
-          ),
-        ],
+        ),
       ),
     );
+
+    try {
+      // Call create_trip cloud function with action=modify
+      final requestBody = {
+        'itineraryId': widget.itinerary.id,
+        'action': 'modify',
+        'userMessage': message,
+        'language': 'en',
+      };
+
+      await ApiClient.post(
+        ApiClient.tripUrl,
+        requestBody,
+        timeout: const Duration(seconds: 30),
+      );
+
+      if (!mounted) return;
+
+      Navigator.pop(context); // Close loading dialog
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Itinerary updated successfully'),
+          backgroundColor: AppColors.jade500,
+        ),
+      );
+
+      // TODO: Refresh itinerary data
+    } catch (e) {
+      if (!mounted) return;
+
+      Navigator.pop(context); // Close loading dialog
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update: ${e.toString()}'),
+          backgroundColor: AppColors.error500,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isModifying = false;
+        });
+      }
+    }
   }
 }
