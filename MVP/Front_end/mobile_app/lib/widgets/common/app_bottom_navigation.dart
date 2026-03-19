@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 
 /// WanderChina v2.0 底部导航栏
 ///
@@ -8,7 +9,7 @@ import 'package:flutter/material.dart';
 /// - Height: 56px + safe area
 /// - Background: White
 /// - Border top: 1px Gray 200
-/// - Active icon: Jade 500 (#10B981)
+/// - Active icon: Jade 500 (#1FB368)
 /// - Inactive icon: Gray 400
 class AppBottomNavigation extends StatelessWidget {
   final int currentIndex;
@@ -27,7 +28,7 @@ class AppBottomNavigation extends StatelessWidget {
         color: Colors.white,
         border: Border(
           top: BorderSide(
-            color: Colors.grey[200]!,
+            color: AppColors.gray200,
             width: 1,
           ),
         ),
@@ -85,7 +86,7 @@ class AppBottomNavigation extends StatelessWidget {
     bool isVoice = false,
   }) {
     final isActive = currentIndex == index;
-    final color = isActive ? const Color(0xFF10B981) : Colors.grey[400]!;
+    final color = isActive ? AppColors.jade500 : AppColors.gray400;
 
     return Expanded(
       child: InkWell(

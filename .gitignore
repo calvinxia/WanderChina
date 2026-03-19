@@ -169,6 +169,12 @@ yarn.lock
 *.pem
 *.key
 *.cert
+# API key files in various formats
+**/API*keys*.rtf
+**/API*Keys*.rtf
+**/SecretKey*.csv
+**/api_keys*.json
+**/api_key*.txt
 
 # Database
 *.db
@@ -259,8 +265,11 @@ site/
 # MVP_0.1 SPECIFIC IGNORES
 # ============================================================================
 
-# Ignore markdown files in MVP/Front_end
-MVP/Front_end/**/*.md
+# Ignore all markdown documentation files
+*.md
+**/*.md
+# Exception: keep README files at root level
+!README.md
 
 # ============================================================================
 # END
