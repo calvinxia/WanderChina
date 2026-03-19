@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
 import '../../models/poi_translation.dart';
 import '../../services/voice/voice_translation_service.dart';
 
 /// Screen 11: 语音翻译全屏页面
 ///
-/// 规范来自 SCREEN_SPECIFICATIONS_v2.md
+/// 规范来自 FLUTTER_UI_REDESIGN_INSTRUCTIONS.md Step UI-6
 /// - 沉浸式双向语音翻译
-/// - Direction toggle: EN → 中 ⇄ 中 → EN
+/// - Direction toggle: EN → 中 ⇄ 中 → EN (可切换)
 /// - 对话历史记录
-/// - 快捷短语
+/// - 快捷短语（点击自动翻译+播放）
 /// - 80×80px 大麦克风按钮
 class VoiceTranslationScreen extends StatefulWidget {
   const VoiceTranslationScreen({super.key});
@@ -105,9 +107,12 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Voice Translation'),
+        title: Text(
+          'Voice Translation',
+          style: AppTextStyles.h4(color: AppColors.gray900),
+        ),
         backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1A1A),
+        foregroundColor: AppColors.gray900,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
@@ -165,7 +170,19 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
             },
           ),
           const SizedBox(width: 16),
-          const Icon(Icons.swap_horiz, color: Color(0xFF10B981)),
+          // Swap button to toggle direction
+          IconButton(
+            icon: const Icon(Icons.swap_horiz),
+            color: AppColors.jade500,
+            onPressed: () {
+              setState(() {
+                _direction = _direction == TranslationDirection.foreignToChinese
+                    ? TranslationDirection.chineseToForeign
+                    : TranslationDirection.foreignToChinese;
+              });
+            },
+            tooltip: 'Swap direction',
+          ),
           const SizedBox(width: 16),
           _buildDirectionPill(
             label: '中 → ${_getLanguageCode(_selectedLanguage)}',
@@ -192,7 +209,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         width: 140,
         height: 40,
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF10B981) : Colors.grey[100],
+          color: isActive ? AppColors.jade500 : AppColors.gray100,
           borderRadius: BorderRadius.circular(20),
         ),
         alignment: Alignment.center,
@@ -201,7 +218,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isActive ? Colors.white : Colors.grey[600],
+            color: isActive ? Colors.white : AppColors.gray600,
           ),
         ),
       ),
@@ -213,22 +230,22 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          const Text(
+          Text(
             'Language:',
-            style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+            style: AppTextStyles.body(color: AppColors.gray600),
           ),
           const SizedBox(width: 12),
           Container(
             height: 36,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(color: AppColors.gray300),
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<AppLanguage>(
                 value: _selectedLanguage,
-                icon: const Icon(Icons.arrow_drop_down, size: 20),
+                icon: Icon(Icons.arrow_drop_down, size: 20, color: AppColors.gray600),
                 items: const [
                   DropdownMenuItem(
                     value: AppLanguage.english,
@@ -264,15 +281,12 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.mic_none, size: 64, color: Colors.grey[300]),
+            Icon(Icons.mic_none, size: 64, color: AppColors.gray300),
             const SizedBox(height: 16),
             Text(
               'Tap and hold the mic button\nto start translating',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
+              style: AppTextStyles.body(color: AppColors.gray500),
             ),
           ],
         ),
@@ -296,31 +310,25 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                   constraints: const BoxConstraints(maxWidth: 280),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: AppColors.gray50,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'You said:',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF6B7280),
-                        ),
+                        style: AppTextStyles.caption(color: AppColors.gray600),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         result.originalText,
-                        style: const TextStyle(fontSize: 14),
+                        style: AppTextStyles.body(color: AppColors.gray900),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${result.processingTime.inMilliseconds}ms · ${_getLanguageCode(result.foreignLanguage)}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF9CA3AF),
-                        ),
+                        style: AppTextStyles.caption(color: AppColors.gray400),
                       ),
                     ],
                   ),
@@ -334,40 +342,42 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                   constraints: const BoxConstraints(maxWidth: 280),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD1FAE5), // Jade 100
+                    color: AppColors.jade50,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Translation:',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF059669),
-                        ),
+                        style: AppTextStyles.caption(color: AppColors.jade700),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         result.translatedText,
-                        style: const TextStyle(fontSize: 14),
+                        style: AppTextStyles.body(color: AppColors.gray900),
                       ),
                       const SizedBox(height: 8),
                       GestureDetector(
-                        onTap: () {
-                          // TODO: Replay TTS
+                        onTap: () async {
+                          // TODO: Replay TTS for translated text
+                          // await _service.replayTTS(result);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Replay feature coming soon'),
+                              duration: const Duration(seconds: 1),
+                              backgroundColor: AppColors.jade500,
+                            ),
+                          );
                         },
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.volume_up, size: 16, color: Color(0xFF059669)),
-                            SizedBox(width: 4),
+                            Icon(Icons.volume_up, size: 16, color: AppColors.jade700),
+                            const SizedBox(width: 4),
                             Text(
                               'Tap to replay',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF059669),
-                              ),
+                              style: AppTextStyles.caption(color: AppColors.jade700),
                             ),
                           ],
                         ),
@@ -389,14 +399,12 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
             'Quick Phrases:',
-            style: TextStyle(
-              fontSize: 12,
+            style: AppTextStyles.caption(color: AppColors.gray600).copyWith(
               fontWeight: FontWeight.w600,
-              color: Color(0xFF6B7280),
             ),
           ),
         ),
@@ -411,22 +419,27 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: () async {
                     // TODO: Auto-translate and play phrase
+                    // await _service.translateQuickPhrase(...)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Quick phrase: ${phrases[index]}'),
+                        duration: const Duration(seconds: 1),
+                        backgroundColor: AppColors.jade500,
+                      ),
+                    );
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
+                      color: AppColors.gray100,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.grey[300]!),
+                      border: Border.all(color: AppColors.gray300),
                     ),
                     child: Text(
                       phrases[index],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF374151),
-                      ),
+                      style: AppTextStyles.caption(color: AppColors.gray700),
                     ),
                   ),
                 ),
@@ -453,26 +466,26 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
             decoration: BoxDecoration(
               gradient: state == VoiceServiceState.idle
                   ? const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFFFF6B35)],
+                      colors: [AppColors.jade500, Color(0xFFE8723A)], // Jade 500 → #E8723A
                     )
                   : null,
               color: state == VoiceServiceState.idle
                   ? null
                   : state == VoiceServiceState.recording
-                      ? Colors.red
+                      ? AppColors.error500
                       : state == VoiceServiceState.processing
-                          ? const Color(0xFFFF6B35)
+                          ? const Color(0xFFE8723A)
                           : state == VoiceServiceState.playing
                               ? const Color(0xFF4CAF50)
-                              : Colors.grey,
+                              : AppColors.gray400,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
                   color: (state == VoiceServiceState.idle
-                          ? const Color(0xFF10B981)
+                          ? AppColors.jade500
                           : state == VoiceServiceState.recording
-                              ? Colors.red
-                              : const Color(0xFFFF6B35))
+                              ? AppColors.error500
+                              : const Color(0xFFE8723A))
                       .withOpacity(0.3),
                   blurRadius: 16,
                   spreadRadius: 4,
@@ -502,10 +515,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         const SizedBox(height: 12),
         Text(
           _getStateLabel(state),
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF6B7280),
-          ),
+          style: AppTextStyles.caption(color: AppColors.gray600),
         ),
       ],
     );
