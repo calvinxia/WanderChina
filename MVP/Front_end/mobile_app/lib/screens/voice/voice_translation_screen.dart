@@ -156,7 +156,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _buildDirectionPill(
-            label: _getLanguageCode(_selectedLanguage) + ' → 中',
+            label: '${_getLanguageCode(_selectedLanguage)} → 中',
             isActive: _direction == TranslationDirection.foreignToChinese,
             onTap: () {
               setState(() {
@@ -168,7 +168,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
           const Icon(Icons.swap_horiz, color: Color(0xFF10B981)),
           const SizedBox(width: 16),
           _buildDirectionPill(
-            label: '中 → ' + _getLanguageCode(_selectedLanguage),
+            label: '中 → ${_getLanguageCode(_selectedLanguage)}',
             isActive: _direction == TranslationDirection.chineseToForeign,
             onTap: () {
               setState(() {
@@ -357,9 +357,9 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                         onTap: () {
                           // TODO: Replay TTS
                         },
-                        child: Row(
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
+                          children: [
                             Icon(Icons.volume_up, size: 16, color: Color(0xFF059669)),
                             SizedBox(width: 4),
                             Text(

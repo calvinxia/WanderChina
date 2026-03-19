@@ -10,9 +10,9 @@ class ItineraryDetailScreen extends StatelessWidget {
   final Itinerary itinerary;
 
   const ItineraryDetailScreen({
-    Key? key,
+    super.key,
     required this.itinerary,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +22,7 @@ class ItineraryDetailScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.gray900),
+          icon: const Icon(Icons.arrow_back, color: AppColors.gray900),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -31,11 +31,11 @@ class ItineraryDetailScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.share, color: AppColors.gray700),
+            icon: const Icon(Icons.share, color: AppColors.gray700),
             onPressed: () {},
           ),
           IconButton(
-            icon: Icon(Icons.more_vert, color: AppColors.gray700),
+            icon: const Icon(Icons.more_vert, color: AppColors.gray700),
             onPressed: () {},
           ),
         ],
@@ -97,7 +97,7 @@ class ItineraryDetailScreen extends StatelessWidget {
                     value: '${itinerary.totalDays} Days',
                   ),
                 ),
-                SizedBox(width: AppSpacing.m),
+                const SizedBox(width: AppSpacing.m),
                 Expanded(
                   child: _buildStatCard(
                     icon: Icons.location_city,
@@ -120,7 +120,7 @@ class ItineraryDetailScreen extends StatelessWidget {
 
             // Placeholder for day-by-day view
             Container(
-              padding: EdgeInsets.all(AppSpacing.l),
+              padding: const EdgeInsets.all(AppSpacing.l),
               decoration: BoxDecoration(
                 color: AppColors.info100,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -128,7 +128,7 @@ class ItineraryDetailScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.event_note, size: 48, color: AppColors.info500),
+                  const Icon(Icons.event_note, size: 48, color: AppColors.info500),
                   AppSpacing.gapHeightM,
                   Text(
                     'Day-by-Day Planning',
@@ -155,7 +155,7 @@ class ItineraryDetailScreen extends StatelessWidget {
     required String value,
   }) {
     return Container(
-      padding: EdgeInsets.all(AppSpacing.m),
+      padding: const EdgeInsets.all(AppSpacing.m),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -163,7 +163,7 @@ class ItineraryDetailScreen extends StatelessWidget {
           BoxShadow(
             color: AppColors.gray900.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),

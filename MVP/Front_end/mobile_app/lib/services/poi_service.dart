@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/poi.dart';
 import '../core/config/amap_config.dart';
 import '../core/constants/supported_cities.dart';
@@ -12,6 +13,7 @@ class POIService {
   factory POIService() => _instance;
   POIService._internal();
 
+  // ignore: unused_field
   final Dio _dio = Dio();
 
   /// 启用城市过滤（默认启用）
@@ -36,10 +38,10 @@ class POIService {
       if (enableCityFilter) {
         final city = SupportedCities.getCityFromCoordinates(latitude, longitude);
         if (city == null) {
-          print('⚠️ 搜索位置不在支持的城市内（仅支持北京、上海、广州、深圳、成都、西安）');
+          debugPrint('⚠️ 搜索位置不在支持的城市内（仅支持北京、上海、广州、深圳、成都、西安）');
           return [];
         }
-        print('✅ 搜索城市: $city');
+        debugPrint('✅ 搜索城市: $city');
       }
 
       // 这里应该调用实际的高德POI搜索API
@@ -77,7 +79,7 @@ class POIService {
       */
 
     } catch (e) {
-      print('❌ POI搜索失败: $e');
+      debugPrint('❌ POI搜索失败: $e');
       return [];
     }
   }
@@ -98,7 +100,7 @@ class POIService {
       // 检查城市是否在支持列表中
       if (enableCityFilter && city != null) {
         if (!SupportedCities.isCitySupported(city)) {
-          print('⚠️ 不支持的城市: $city（仅支持北京、上海、广州、深圳、成都、西安）');
+          debugPrint('⚠️ 不支持的城市: $city（仅支持北京、上海、广州、深圳、成都、西安）');
           return [];
         }
       }
@@ -107,7 +109,7 @@ class POIService {
       if (enableCityFilter && latitude != null && longitude != null) {
         final detectedCity = SupportedCities.getCityFromCoordinates(latitude, longitude);
         if (detectedCity == null) {
-          print('⚠️ 搜索位置不在支持的城市内');
+          debugPrint('⚠️ 搜索位置不在支持的城市内');
           return [];
         }
       }
@@ -133,7 +135,7 @@ class POIService {
       */
 
     } catch (e) {
-      print('❌ 关键词搜索失败: $e');
+      debugPrint('❌ 关键词搜索失败: $e');
       return [];
     }
   }
@@ -157,7 +159,7 @@ class POIService {
       */
 
     } catch (e) {
-      print('❌ 获取POI详情失败: $e');
+      debugPrint('❌ 获取POI详情失败: $e');
       return null;
     }
   }

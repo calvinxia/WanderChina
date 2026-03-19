@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
@@ -12,9 +11,9 @@ class CreateTripScreen extends StatefulWidget {
   final Itinerary? itinerary; // null for new trip, not null for editing
 
   const CreateTripScreen({
-    Key? key,
+    super.key,
     this.itinerary,
-  }) : super(key: key);
+  });
 
   @override
   State<CreateTripScreen> createState() => _CreateTripScreenState();
@@ -59,7 +58,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.close, color: AppColors.gray900),
+          icon: const Icon(Icons.close, color: AppColors.gray900),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -88,15 +87,15 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   hintStyle: AppTextStyles.body(color: AppColors.gray300),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.gray200),
+                    borderSide: const BorderSide(color: AppColors.gray200),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.gray200),
+                    borderSide: const BorderSide(color: AppColors.gray200),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
                   ),
                 ),
                 validator: (value) {
@@ -121,18 +120,18 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 decoration: InputDecoration(
                   hintText: 'e.g., Beijing, China',
                   hintStyle: AppTextStyles.body(color: AppColors.gray300),
-                  prefixIcon: Icon(Icons.location_on, color: AppColors.primary),
+                  prefixIcon: const Icon(Icons.location_on, color: AppColors.primary),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.gray200),
+                    borderSide: const BorderSide(color: AppColors.gray200),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.gray200),
+                    borderSide: const BorderSide(color: AppColors.gray200),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
                   ),
                 ),
                 validator: (value) {
@@ -160,7 +159,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                       onTap: () => _selectStartDate(context),
                     ),
                   ),
-                  SizedBox(width: AppSpacing.m),
+                  const SizedBox(width: AppSpacing.m),
                   Expanded(
                     child: _buildDateField(
                       label: 'End Date',
@@ -188,15 +187,15 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   hintStyle: AppTextStyles.body(color: AppColors.gray300),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.gray200),
+                    borderSide: const BorderSide(color: AppColors.gray200),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.gray200),
+                    borderSide: const BorderSide(color: AppColors.gray200),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
                   ),
                 ),
               ),
@@ -205,7 +204,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
               // Info card
               Container(
-                padding: EdgeInsets.all(AppSpacing.m),
+                padding: const EdgeInsets.all(AppSpacing.m),
                 decoration: BoxDecoration(
                   color: AppColors.info100,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -213,8 +212,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: AppColors.info700, size: 24),
-                    SizedBox(width: AppSpacing.m),
+                    const Icon(Icons.info_outline, color: AppColors.info700, size: 24),
+                    const SizedBox(width: AppSpacing.m),
                     Expanded(
                       child: Text(
                         'You can add daily activities and details after creating the trip',
@@ -248,7 +247,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(AppSpacing.m),
+        padding: const EdgeInsets.all(AppSpacing.m),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.gray200),
           borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -260,11 +259,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
               label,
               style: AppTextStyles.caption(color: AppColors.gray600),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.calendar_today, color: AppColors.primary, size: 16),
-                SizedBox(width: 8),
+                const Icon(Icons.calendar_today, color: AppColors.primary, size: 16),
+                const SizedBox(width: 8),
                 Text(
                   date != null
                       ? '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}'
@@ -286,11 +285,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       context: context,
       initialDate: _startDate ?? DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 730)),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
+            colorScheme: const ColorScheme.light(
               primary: AppColors.primary,
               onPrimary: Colors.white,
               onSurface: AppColors.gray900,
@@ -316,11 +315,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       context: context,
       initialDate: _endDate ?? (_startDate ?? DateTime.now()),
       firstDate: _startDate ?? DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 730)),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
+            colorScheme: const ColorScheme.light(
               primary: AppColors.primary,
               onPrimary: Colors.white,
               onSurface: AppColors.gray900,
@@ -342,7 +341,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
     if (_startDate == null || _endDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Please select travel dates'),
           backgroundColor: AppColors.error500,
         ),
@@ -356,8 +355,8 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 8),
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
             Text(widget.itinerary != null
                 ? 'Trip updated successfully!'
                 : 'Trip created successfully!'),

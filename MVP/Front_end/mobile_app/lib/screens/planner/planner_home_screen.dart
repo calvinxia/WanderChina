@@ -173,9 +173,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Text(
                       '✨',
                       style: TextStyle(fontSize: 20),
@@ -460,9 +460,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
+          child: const Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               CircularProgressIndicator(color: Color(0xFF10B981)),
               SizedBox(height: 16),
               Text(

@@ -9,7 +9,7 @@ import '../buttons/primary_button.dart';
 /// Currency Converter Dialog
 /// Allows users to convert between different currencies
 class CurrencyConverterDialog extends StatefulWidget {
-  const CurrencyConverterDialog({Key? key}) : super(key: key);
+  const CurrencyConverterDialog({super.key});
 
   @override
   State<CurrencyConverterDialog> createState() =>
@@ -59,8 +59,8 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
         borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
       ),
       child: Container(
-        constraints: BoxConstraints(maxWidth: 400),
-        padding: EdgeInsets.all(AppSpacing.l),
+        constraints: const BoxConstraints(maxWidth: 400),
+        padding: const EdgeInsets.all(AppSpacing.l),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,10 +74,10 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
                   style: AppTextStyles.h2(color: AppColors.gray900),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: AppColors.gray700),
+                  icon: const Icon(Icons.close, color: AppColors.gray700),
                   onPressed: () => Navigator.pop(context),
                   padding: EdgeInsets.zero,
-                  constraints: BoxConstraints(),
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
@@ -115,7 +115,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.primary, width: 2),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.swap_vert,
                     color: AppColors.primary,
                     size: 24,
@@ -146,7 +146,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
 
             // Exchange Rate Info
             Container(
-              padding: EdgeInsets.all(AppSpacing.m),
+              padding: const EdgeInsets.all(AppSpacing.m),
               decoration: BoxDecoration(
                 color: AppColors.info100,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusM),
@@ -154,7 +154,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppColors.info700, size: 20),
+                  const Icon(Icons.info_outline, color: AppColors.info700, size: 20),
                   AppSpacing.gapWidthS,
                   Expanded(
                     child: Text(
@@ -188,7 +188,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
     required ValueChanged<String> onChanged,
   }) {
     return Container(
-      padding: EdgeInsets.all(AppSpacing.m),
+      padding: const EdgeInsets.all(AppSpacing.m),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -197,7 +197,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
           BoxShadow(
             color: AppColors.gray900.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -205,7 +205,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
         children: [
           // Currency Dropdown
           Container(
-            padding: EdgeInsets.symmetric(
+            padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s,
               vertical: AppSpacing.xs,
             ),
@@ -216,7 +216,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
             child: DropdownButton<String>(
               value: currency,
               onChanged: onCurrencyChanged,
-              underline: SizedBox(),
+              underline: const SizedBox(),
               isDense: true,
               items: currencies.map((String currency) {
                 return DropdownMenuItem<String>(
@@ -227,7 +227,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
                         CurrencyService.getSymbol(currency),
                         style: AppTextStyles.h4(color: AppColors.primary),
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         currency,
                         style: AppTextStyles.button(color: AppColors.primary),
@@ -245,7 +245,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
           Expanded(
             child: TextField(
               controller: controller,
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
               ],
@@ -270,7 +270,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
     required ValueChanged<String?> onCurrencyChanged,
   }) {
     return Container(
-      padding: EdgeInsets.all(AppSpacing.m),
+      padding: const EdgeInsets.all(AppSpacing.m),
       decoration: BoxDecoration(
         gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -278,7 +278,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
           BoxShadow(
             color: AppColors.primary.withOpacity(0.3),
             blurRadius: 20,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -286,7 +286,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
         children: [
           // Currency Dropdown
           Container(
-            padding: EdgeInsets.symmetric(
+            padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s,
               vertical: AppSpacing.xs,
             ),
@@ -297,7 +297,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
             child: DropdownButton<String>(
               value: currency,
               onChanged: onCurrencyChanged,
-              underline: SizedBox(),
+              underline: const SizedBox(),
               isDense: true,
               dropdownColor: AppColors.primary,
               items: currencies.map((String currency) {
@@ -309,7 +309,7 @@ class _CurrencyConverterDialogState extends State<CurrencyConverterDialog> {
                         CurrencyService.getSymbol(currency),
                         style: AppTextStyles.h4(color: Colors.white),
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         currency,
                         style: AppTextStyles.button(color: Colors.white),

@@ -17,7 +17,7 @@ void main() async {
 
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
-    SystemUiOverlayStyle(
+    const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       systemNavigationBarColor: Colors.white,
@@ -35,77 +35,77 @@ void main() async {
   // 服务初始化
   // ============================================================================
 
-  print('🚀 开始初始化应用服务...');
+  debugPrint('🚀 开始初始化应用服务...');
 
   // 1. 验证后端配置
   if (!BackendConfig.isConfigured) {
-    print('⚠️ Backend not configured. Run with --dart-define-from-file=.env');
-    print('⚠️ Cloud functions will not be available.');
+    debugPrint('⚠️ Backend not configured. Run with --dart-define-from-file=.env');
+    debugPrint('⚠️ Cloud functions will not be available.');
   } else {
-    print('✅ 后端配置已加载（云函数模式）');
+    debugPrint('✅ 后端配置已加载（云函数模式）');
   }
 
   // 2. 初始化语言管理器
   try {
     await LanguageManager().initialize();
-    print('✅ 语言管理器初始化成功');
+    debugPrint('✅ 语言管理器初始化成功');
   } catch (e) {
-    print('❌ 语言管理器初始化失败: $e');
+    debugPrint('❌ 语言管理器初始化失败: $e');
   }
 
   // 3. 初始化高德地图SDK
   try {
     if (AMapConfig.isApiKeyConfigured()) {
       await AMapService().initialize();
-      print('✅ 高德地图SDK初始化成功');
-      print('📍 Android Key: ${AMapConfig.androidApiKey.substring(0, 10)}...');
-      print('📍 iOS Key: ${AMapConfig.iosApiKey.substring(0, 10)}...');
+      debugPrint('✅ 高德地图SDK初始化成功');
+      debugPrint('📍 Android Key: ${AMapConfig.androidApiKey.substring(0, 10)}...');
+      debugPrint('📍 iOS Key: ${AMapConfig.iosApiKey.substring(0, 10)}...');
     } else {
-      print('⚠️ 高德地图API Key未配置，地图功能将不可用');
+      debugPrint('⚠️ 高德地图API Key未配置，地图功能将不可用');
     }
   } catch (e) {
-    print('❌ 高德地图SDK初始化失败: $e');
+    debugPrint('❌ 高德地图SDK初始化失败: $e');
   }
 
   // 4. 初始化地图翻译服务（路线翻译，本地词典模式）
   try {
     await MapTranslationService().initialize();
-    print('✅ 地图翻译服务初始化成功');
+    debugPrint('✅ 地图翻译服务初始化成功');
   } catch (e) {
-    print('❌ 地图翻译服务初始化失败: $e');
+    debugPrint('❌ 地图翻译服务初始化失败: $e');
   }
 
   // 5. 初始化语音翻译服务
   try {
     await VoiceTranslationService().initialize();
-    print('✅ 语音翻译服务初始化成功');
+    debugPrint('✅ 语音翻译服务初始化成功');
   } catch (e) {
-    print('❌ 语音翻译服务初始化失败: $e');
+    debugPrint('❌ 语音翻译服务初始化失败: $e');
   }
 
   // 6. 恢复用户 session
   try {
     final restored = await AuthService.restoreSession();
     if (restored) {
-      print('✅ 用户 session 已恢复');
+      debugPrint('✅ 用户 session 已恢复');
     } else {
-      print('ℹ️  未找到已保存的 session（首次启动或已登出）');
+      debugPrint('ℹ️  未找到已保存的 session（首次启动或已登出）');
     }
   } catch (e) {
-    print('❌ 恢复 session 失败: $e');
+    debugPrint('❌ 恢复 session 失败: $e');
   }
 
-  print('🎉 应用服务初始化完成！\n');
+  debugPrint('🎉 应用服务初始化完成！\n');
 
   runApp(
-    ProviderScope(
+    const ProviderScope(
       child: WanderChinaApp(),
     ),
   );
 }
 
 class WanderChinaApp extends StatelessWidget {
-  const WanderChinaApp({Key? key}) : super(key: key);
+  const WanderChinaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +119,7 @@ class WanderChinaApp extends StatelessWidget {
       themeMode: ThemeMode.light, // TODO: Make this dynamic
 
       // Initial route
-      home: SplashScreen(),
+      home: const SplashScreen(),
 
       // Routes
       // routes: AppRoutes.routes,

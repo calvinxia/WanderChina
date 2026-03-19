@@ -14,11 +14,11 @@ class BilingualPOIInfoWindow extends StatelessWidget {
   final VoidCallback? onClose;
 
   const BilingualPOIInfoWindow({
-    Key? key,
+    super.key,
     required this.poi,
     this.onTap,
     this.onClose,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        constraints: BoxConstraints(
+        constraints: const BoxConstraints(
           maxWidth: 300,
           minHeight: 100,
         ),
@@ -39,7 +39,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
             BoxShadow(
               color: AppColors.gray900.withOpacity(0.15),
               blurRadius: 16,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -49,10 +49,10 @@ class BilingualPOIInfoWindow extends StatelessWidget {
           children: [
             // 头部 - 名称和关闭按钮
             Container(
-              padding: EdgeInsets.all(AppSpacing.m),
+              padding: const EdgeInsets.all(AppSpacing.m),
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.vertical(
+                borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(AppSpacing.radiusM),
                 ),
               ),
@@ -61,9 +61,9 @@ class BilingualPOIInfoWindow extends StatelessWidget {
                   // POI类别图标
                   Text(
                     poi.category.icon,
-                    style: TextStyle(fontSize: 24),
+                    style: const TextStyle(fontSize: 24),
                   ),
-                  SizedBox(width: AppSpacing.s),
+                  const SizedBox(width: AppSpacing.s),
                   // POI名称
                   Expanded(
                     child: Column(
@@ -79,7 +79,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
                         // 如果显示英文，在下方显示中文原名
                         if (currentLang == 'en' && poi.nameEn != null)
                           Padding(
-                            padding: EdgeInsets.only(top: 2),
+                            padding: const EdgeInsets.only(top: 2),
                             child: Text(
                               poi.name,
                               style: AppTextStyles.caption(
@@ -96,7 +96,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
                   if (onClose != null)
                     GestureDetector(
                       onTap: onClose,
-                      child: Icon(
+                      child: const Icon(
                         Icons.close,
                         size: 20,
                         color: AppColors.gray600,
@@ -108,7 +108,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
             // 内容区域
             Padding(
-              padding: EdgeInsets.all(AppSpacing.m),
+              padding: const EdgeInsets.all(AppSpacing.m),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -123,7 +123,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
                   // 距离
                   if (poi.distance != null) ...[
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     _buildInfoRow(
                       Icons.location_on_outlined,
                       poi.formattedDistance,
@@ -132,7 +132,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
                   // 评分
                   if (poi.rating != null) ...[
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     _buildInfoRow(
                       Icons.star_outline,
                       '${poi.rating} ${poi.ratingStars} (${poi.reviewCount ?? 0} ${AppTexts.reviews})',
@@ -141,7 +141,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
                   // 地址
                   if (poi.address.isNotEmpty) ...[
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     _buildInfoRow(
                       Icons.place_outlined,
                       poi.getAddress(currentLang),
@@ -151,7 +151,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
                   // 营业时间
                   if (poi.openingHours != null) ...[
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     _buildInfoRow(
                       Icons.access_time,
                       poi.openingHours!,
@@ -160,7 +160,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
                   // 价格等级
                   if (poi.priceLevel != null) ...[
-                    SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
                     _buildInfoRow(
                       Icons.attach_money,
                       poi.priceLevelSymbol,
@@ -169,15 +169,15 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
                   // 翻译来源标记（仅当显示英文且有翻译时）
                   if (currentLang == 'en' && poi.isTranslated) ...[
-                    SizedBox(height: AppSpacing.s),
+                    const SizedBox(height: AppSpacing.s),
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.translate,
                           size: 12,
                           color: AppColors.gray500,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
                           _getTranslationSourceText(poi.translationSource),
                           style: AppTextStyles.caption(
@@ -193,7 +193,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
 
             // 底部按钮栏
             Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 border: Border(
                   top: BorderSide(
                     color: AppColors.gray200,
@@ -247,7 +247,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
           size: 16,
           color: AppColors.gray600,
         ),
-        SizedBox(width: 6),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             text,
@@ -269,7 +269,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: AppSpacing.s),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -278,7 +278,7 @@ class BilingualPOIInfoWindow extends StatelessWidget {
               size: 20,
               color: AppColors.primary,
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
               label,
               style: AppTextStyles.caption(color: AppColors.primary),

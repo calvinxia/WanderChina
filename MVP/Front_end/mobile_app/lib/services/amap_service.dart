@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../core/config/amap_config.dart';
 
 // 仅在移动平台导入高德地图SDK
@@ -29,7 +29,7 @@ class AMapService {
     // Web平台跳过高德地图初始化
     if (kIsWeb) {
       _isInitialized = true;
-      print('⚠️ Web平台不支持高德地图SDK，地图功能已禁用');
+      debugPrint('⚠️ Web平台不支持高德地图SDK，地图功能已禁用');
       return;
     }
 
@@ -55,9 +55,9 @@ class AMapService {
       await _configureLocation();
 
       _isInitialized = true;
-      print('✅ 高德地图SDK初始化成功');
+      debugPrint('✅ 高德地图SDK初始化成功');
     } catch (e) {
-      print('❌ 高德地图SDK初始化失败: $e');
+      debugPrint('❌ 高德地图SDK初始化失败: $e');
       // 不要抛出异常，允许应用继续运行
       _isInitialized = true;
     }
@@ -77,7 +77,7 @@ class AMapService {
         ),
       );
     } catch (e) {
-      print('⚠️ 配置定位参数失败: $e');
+      debugPrint('⚠️ 配置定位参数失败: $e');
     }
   }
 
@@ -86,12 +86,12 @@ class AMapService {
   /// 返回定位信息流
   Stream<Map<String, Object>>? startLocation() {
     if (kIsWeb) {
-      print('⚠️ Web平台不支持定位功能');
+      debugPrint('⚠️ Web平台不支持定位功能');
       return null;
     }
 
     if (!_isInitialized || _locationPlugin == null) {
-      print('⚠️ 高德地图SDK未初始化');
+      debugPrint('⚠️ 高德地图SDK未初始化');
       return null;
     }
 
@@ -99,7 +99,7 @@ class AMapService {
       _locationPlugin.startLocation();
       return _locationPlugin.onLocationChanged();
     } catch (e) {
-      print('❌ 开始定位失败: $e');
+      debugPrint('❌ 开始定位失败: $e');
       return null;
     }
   }
@@ -110,19 +110,19 @@ class AMapService {
     try {
       _locationPlugin?.stopLocation();
     } catch (e) {
-      print('⚠️ 停止定位失败: $e');
+      debugPrint('⚠️ 停止定位失败: $e');
     }
   }
 
   /// 获取单次定位
   Future<Map<String, Object>?> getLocation() async {
     if (kIsWeb) {
-      print('⚠️ Web平台不支持定位功能');
+      debugPrint('⚠️ Web平台不支持定位功能');
       return null;
     }
 
     if (!_isInitialized || _locationPlugin == null) {
-      print('⚠️ 高德地图SDK未初始化');
+      debugPrint('⚠️ 高德地图SDK未初始化');
       return null;
     }
 
@@ -145,7 +145,7 @@ class AMapService {
 
       return location;
     } catch (e) {
-      print('❌ 获取定位失败: $e');
+      debugPrint('❌ 获取定位失败: $e');
       return null;
     }
   }
@@ -159,7 +159,7 @@ class AMapService {
       _locationPlugin = null;
       _isInitialized = false;
     } catch (e) {
-      print('⚠️ 销毁定位资源失败: $e');
+      debugPrint('⚠️ 销毁定位资源失败: $e');
     }
   }
 

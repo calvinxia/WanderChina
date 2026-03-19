@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:amap_flutter_map/amap_flutter_map.dart';
-import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:amap_map/amap_map.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 import '../../core/config/amap_config.dart';
 
 /// 高德地图组件
@@ -11,7 +11,7 @@ import '../../core/config/amap_config.dart';
 /// - 平移手势
 /// - 地图类型切换
 /// - 自定义标记
-class AMapWidget extends StatefulWidget {
+class WanderAMapWidget extends StatefulWidget {
   /// 初始中心点纬度
   final double? initialLatitude;
 
@@ -75,8 +75,8 @@ class AMapWidget extends StatefulWidget {
   /// 标记点击回调
   final Function(String)? onMarkerTap;
 
-  const AMapWidget({
-    Key? key,
+  const WanderAMapWidget({
+    super.key,
     this.initialLatitude,
     this.initialLongitude,
     this.initialZoom,
@@ -98,13 +98,14 @@ class AMapWidget extends StatefulWidget {
     this.onCameraIdle,
     this.onMapTap,
     this.onMarkerTap,
-  }) : super(key: key);
+  });
 
   @override
-  State<AMapWidget> createState() => _AMapWidgetState();
+  State<WanderAMapWidget> createState() => _WanderAMapWidgetState();
 }
 
-class _AMapWidgetState extends State<AMapWidget> {
+class _WanderAMapWidgetState extends State<WanderAMapWidget> {
+  // ignore: unused_field
   AMapController? _mapController;
 
   @override
@@ -119,17 +120,11 @@ class _AMapWidgetState extends State<AMapWidget> {
     );
 
     return AMapWidget(
-      apiKey: AMapApiKey(
-        androidKey: AMapConfig.androidApiKey,
-        iosKey: AMapConfig.iosApiKey,
-      ),
       initialCameraPosition: initialCameraPosition,
       mapType: _getMapType(),
       buildingsEnabled: widget.showBuildings,
       compassEnabled: widget.showCompass,
       scaleEnabled: widget.showScaleControl,
-      zoomControlsEnabled: widget.showZoomControl,
-      myLocationButtonEnabled: widget.showMyLocationButton,
       scrollGesturesEnabled: widget.gesturesEnabled,
       zoomGesturesEnabled: widget.gesturesEnabled,
       rotateGesturesEnabled: widget.rotateGesturesEnabled,
@@ -143,11 +138,8 @@ class _AMapWidgetState extends State<AMapWidget> {
         widget.onMapCreated?.call(controller);
       },
       onCameraMove: widget.onCameraMove,
-      onCameraIdle: widget.onCameraIdle,
+      onCameraMoveEnd: widget.onCameraIdle,
       onTap: widget.onMapTap,
-      onMarkerTap: (markerId) {
-        widget.onMarkerTap?.call(markerId);
-      },
     );
   }
 
@@ -165,7 +157,7 @@ class _AMapWidgetState extends State<AMapWidget> {
 
   @override
   void dispose() {
-    _mapController?.dispose();
+    // AMapController 没有 dispose() 方法
     super.dispose();
   }
 }

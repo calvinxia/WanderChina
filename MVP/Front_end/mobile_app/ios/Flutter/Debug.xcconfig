@@ -1,6 +1,4 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
-CODE_SIGN_IDENTITY=
-CODE_SIGN_ENTITLEMENTS=
-CODE_SIGNING_REQUIRED=NO
-CODE_SIGNING_ALLOWED=NO
+SWIFT_ENABLE_EXPLICIT_MODULES=NO
+HEADER_SEARCH_PATHS=$(inherited) "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios/Flutter.xcframework/ios-arm64/Flutter.framework/Headers"

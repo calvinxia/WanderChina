@@ -26,7 +26,7 @@ class LanguageManager extends ChangeNotifier {
     final savedLang = _prefs?.getString(languageKey) ?? 'en';
     _currentLanguage = _parseLanguage(savedLang);
     notifyListeners();
-    print('✅ 语言管理器初始化: ${_currentLanguage.name}');
+    debugPrint('✅ 语言管理器初始化: ${_currentLanguage.name}');
   }
 
   /// 获取当前语言
@@ -67,7 +67,7 @@ class LanguageManager extends ChangeNotifier {
     // 通知监听器
     notifyListeners();
 
-    print('✅ 语言切换为: ${language.name}');
+    debugPrint('✅ 语言切换为: ${language.name}');
   }
 
   /// 循环切换语言（en → fr → es → en）

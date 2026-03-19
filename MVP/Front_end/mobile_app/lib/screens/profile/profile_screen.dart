@@ -6,7 +6,7 @@ import '../../core/constants/app_spacing.dart';
 /// Profile Screen - User profile and settings
 /// Based on Figma design - Screen 7 (Profile)
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +49,7 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildProfileHeader() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: AppColors.primaryGradient,
       ),
       child: SafeArea(
@@ -68,11 +68,11 @@ class ProfileScreen extends StatelessWidget {
                   BoxShadow(
                     color: Colors.black.withOpacity(0.2),
                     blurRadius: 20,
-                    offset: Offset(0, 8),
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.person,
                 size: 50,
                 color: AppColors.primary,
@@ -99,7 +99,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Edit Profile Button
             Container(
-              padding: EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.l,
                 vertical: AppSpacing.s,
               ),
@@ -123,7 +123,7 @@ class ProfileScreen extends StatelessWidget {
     return Padding(
       padding: AppSpacing.screenPaddingH,
       child: Container(
-        padding: EdgeInsets.all(AppSpacing.m),
+        padding: const EdgeInsets.all(AppSpacing.m),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -131,7 +131,7 @@ class ProfileScreen extends StatelessWidget {
             BoxShadow(
               color: AppColors.gray900.withOpacity(0.06),
               blurRadius: 12,
-              offset: Offset(0, 2),
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -237,7 +237,7 @@ class ProfileScreen extends StatelessWidget {
     bool isDestructive = false,
   }) {
     return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.s),
+      margin: const EdgeInsets.only(bottom: AppSpacing.s),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppSpacing.radiusM),
@@ -245,7 +245,7 @@ class ProfileScreen extends StatelessWidget {
           BoxShadow(
             color: AppColors.gray900.withOpacity(0.04),
             blurRadius: 8,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -260,7 +260,7 @@ class ProfileScreen extends StatelessWidget {
             color: isDestructive ? AppColors.error500 : AppColors.gray900,
           ),
         ),
-        trailing: Icon(
+        trailing: const Icon(
           Icons.chevron_right,
           color: AppColors.gray400,
         ),

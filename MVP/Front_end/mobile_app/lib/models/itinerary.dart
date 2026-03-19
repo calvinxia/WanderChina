@@ -1,5 +1,6 @@
 /// Itinerary Models for Trip Planning
 /// 行程规划数据模型
+library;
 
 /// Activity/Event in a day
 /// 单日活动/事件

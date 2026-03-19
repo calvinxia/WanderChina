@@ -1,4 +1,4 @@
-import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 import '../services/route_planning_service.dart';
 
 /// 翻译后的路线步骤

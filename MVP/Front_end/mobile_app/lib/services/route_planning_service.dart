@@ -1,4 +1,5 @@
-import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:flutter/foundation.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 import '../models/translated_route.dart';
 import 'api_client.dart';
 
@@ -200,7 +201,7 @@ class RoutePlanningService {
       return routes;
 
     } catch (e) {
-      print('❌ 路线规划失败: $e');
+      debugPrint('❌ 路线规划失败: $e');
       return [];
     }
   }
@@ -246,7 +247,7 @@ class RoutePlanningService {
 
       return result['pois'] as List;
     } catch (e) {
-      print('❌ 沿途POI搜索失败: $e');
+      debugPrint('❌ 沿途POI搜索失败: $e');
       return [];
     }
   }
@@ -294,7 +295,7 @@ class RoutePlanningService {
       return routes;
 
     } catch (e) {
-      print('❌ 路线规划和翻译失败: $e');
+      debugPrint('❌ 路线规划和翻译失败: $e');
       return [];
     }
   }
@@ -322,7 +323,7 @@ class RoutePlanningService {
 
       return TranslatedRouteInfo.fromJson(result['translated_route']);
     } catch (e) {
-      print('❌ 路线翻译失败: $e');
+      debugPrint('❌ 路线翻译失败: $e');
       return TranslatedRouteInfo.fromRouteInfo(route);
     }
   }

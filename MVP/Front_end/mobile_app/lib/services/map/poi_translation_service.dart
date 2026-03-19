@@ -1,5 +1,6 @@
+import 'package:flutter/foundation.dart';
 // lib/services/map/poi_translation_service.dart
-import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 import '../../models/poi_translation.dart';
 import '../api_client.dart';
 
@@ -48,7 +49,7 @@ class POITranslationService {
 
       return pois;
     } catch (e) {
-      print('[POI] getNearbyPOIs failed: $e');
+      debugPrint('[POI] getNearbyPOIs failed: $e');
       return [];
     }
   }
@@ -85,7 +86,7 @@ class POITranslationService {
           // 如果需要完整信息，需从 _memoryCache 或其他途径获取
         }
       } catch (e) {
-        print('[POI] Cache query failed for $id: $e');
+        debugPrint('[POI] Cache query failed for $id: $e');
       }
     }
 
@@ -145,7 +146,7 @@ class POITranslationService {
         _memoryCache[poiId] = poiTrans;
         results.add(poiTrans);
       } catch (e) {
-        print('[POI] Translation failed for $poiId: $e');
+        debugPrint('[POI] Translation failed for $poiId: $e');
       }
     }
 

@@ -49,7 +49,7 @@ class VoiceTranslationService extends ChangeNotifier {
   // ─── 初始化 ───────────────────────────────────────────
 
   Future<void> initialize() async {
-    print('✅ VoiceTranslationService initialized');
+    debugPrint('✅ VoiceTranslationService initialized');
   }
 
   // ─── 公开接口 ─────────────────────────────────────────
@@ -126,7 +126,7 @@ class VoiceTranslationService extends ChangeNotifier {
       try { File(audioPath).deleteSync(); } catch (_) {}
       return result;
     } catch (e) {
-      print('⚠️ 语音翻译链路失败: $e');
+      debugPrint('⚠️ 语音翻译链路失败: $e');
       _setState(VoiceServiceState.error);
       await Future.delayed(const Duration(seconds: 2));
       _setState(VoiceServiceState.idle);
@@ -177,9 +177,9 @@ class VoiceTranslationService extends ChangeNotifier {
       if (result['recognized_text'] != null) {
         return result['recognized_text'] as String;
       }
-      print('ASR云函数错误: ${result['error']}');
+      debugPrint('ASR云函数错误: ${result['error']}');
     } catch (e) {
-      print('⚠️ ASR云函数请求失败: $e');
+      debugPrint('⚠️ ASR云函数请求失败: $e');
     }
     return null;
   }
@@ -216,7 +216,7 @@ class VoiceTranslationService extends ChangeNotifier {
         return result['translated_text'] as String;
       }
     } catch (e) {
-      print('⚠️ 翻译云函数失败: $e');
+      debugPrint('⚠️ 翻译云函数失败: $e');
     }
     return text; // 降级：返回原文
   }
@@ -249,7 +249,7 @@ class VoiceTranslationService extends ChangeNotifier {
         });
       }
     } catch (e) {
-      print('⚠️ TTS云函数失败: $e');
+      debugPrint('⚠️ TTS云函数失败: $e');
       _setState(VoiceServiceState.idle);
     }
   }

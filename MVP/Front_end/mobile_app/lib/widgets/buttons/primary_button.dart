@@ -15,7 +15,7 @@ class PrimaryButton extends StatefulWidget {
   final bool isDisabled;
 
   const PrimaryButton({
-    Key? key,
+    super.key,
     required this.text,
     this.onPressed,
     this.isLoading = false,
@@ -23,7 +23,7 @@ class PrimaryButton extends StatefulWidget {
     this.size = ButtonSize.large,
     this.icon,
     this.isDisabled = false,
-  }) : super(key: key);
+  });
 
   @override
   State<PrimaryButton> createState() => _PrimaryButtonState();
@@ -93,7 +93,7 @@ class _PrimaryButtonState extends State<PrimaryButton>
               decoration: BoxDecoration(
                 gradient: isEnabled
                     ? _isPressed
-                        ? LinearGradient(
+                        ? const LinearGradient(
                             colors: [AppColors.jade900, AppColors.jade900],
                           )
                         : AppColors.primaryGradient
@@ -128,7 +128,7 @@ class _PrimaryButtonState extends State<PrimaryButton>
         child: SizedBox(
           width: _getLoaderSize(),
           height: _getLoaderSize(),
-          child: CircularProgressIndicator(
+          child: const CircularProgressIndicator(
             strokeWidth: 2,
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
@@ -146,7 +146,7 @@ class _PrimaryButtonState extends State<PrimaryButton>
             color: widget.isDisabled ? AppColors.gray400 : Colors.white,
             size: _getIconSize(),
           ),
-          SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             widget.text,
             style: _getTextStyle().copyWith(
@@ -183,7 +183,7 @@ class _PrimaryButtonState extends State<PrimaryButton>
       case ButtonSize.small:
         return AppSpacing.buttonPaddingSmall;
       case ButtonSize.medium:
-        return EdgeInsets.symmetric(horizontal: 20, vertical: 10);
+        return const EdgeInsets.symmetric(horizontal: 20, vertical: 10);
       case ButtonSize.large:
         return AppSpacing.buttonPadding;
     }

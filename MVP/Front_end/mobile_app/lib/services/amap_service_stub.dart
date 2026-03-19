@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// 高德地图服务存根（Web平台）
 ///
 /// 在Web平台上，高德地图SDK不可用，所有方法返回null或空实现
@@ -11,12 +13,12 @@ class AMapService {
   /// 初始化（Web平台空实现）
   Future<void> initialize() async {
     _isInitialized = true;
-    print('⚠️ Web平台不支持高德地图SDK');
+    debugPrint('⚠️ Web平台不支持高德地图SDK');
   }
 
   /// 开始定位（Web平台返回null）
   Stream<Map<String, Object>>? startLocation() {
-    print('⚠️ Web平台不支持定位功能');
+    debugPrint('⚠️ Web平台不支持定位功能');
     return null;
   }
 
@@ -25,7 +27,7 @@ class AMapService {
 
   /// 获取单次定位（Web平台返回null）
   Future<Map<String, Object>?> getLocation() async {
-    print('⚠️ Web平台不支持定位功能');
+    debugPrint('⚠️ Web平台不支持定位功能');
     return null;
   }
 

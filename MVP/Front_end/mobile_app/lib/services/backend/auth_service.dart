@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // lib/services/backend/auth_service.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api_client.dart';
@@ -22,7 +23,7 @@ class AuthService {
       await _saveSession();
       return true;
     } catch (e) {
-      print('[AUTH] Anonymous auth failed: $e');
+      debugPrint('[AUTH] Anonymous auth failed: $e');
       return false;
     }
   }

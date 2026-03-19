@@ -1,5 +1,5 @@
 import 'dart:ui';
-import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 
 class POITranslation {
   final String gaodePoiId;

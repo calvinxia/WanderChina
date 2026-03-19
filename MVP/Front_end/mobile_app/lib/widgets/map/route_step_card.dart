@@ -15,11 +15,11 @@ class RouteStepCard extends StatelessWidget {
   final bool showTranslationBadge;
 
   const RouteStepCard({
-    Key? key,
+    super.key,
     required this.step,
     required this.stepNumber,
     this.showTranslationBadge = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +27,7 @@ class RouteStepCard extends StatelessWidget {
     final currentLang = languageManager.languageCode;
 
     return Card(
-      margin: EdgeInsets.symmetric(
+      margin: const EdgeInsets.symmetric(
         horizontal: AppSpacing.m,
         vertical: AppSpacing.s,
       ),
@@ -36,13 +36,13 @@ class RouteStepCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppSpacing.radiusM),
       ),
       child: Padding(
-        padding: EdgeInsets.all(AppSpacing.m),
+        padding: const EdgeInsets.all(AppSpacing.m),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 步骤编号和图标
             _buildStepIcon(),
-            SizedBox(width: AppSpacing.m),
+            const SizedBox(width: AppSpacing.m),
 
             // 步骤详情
             Expanded(
@@ -54,18 +54,18 @@ class RouteStepCard extends StatelessWidget {
                     step.getInstruction(currentLang),
                     style: AppTextStyles.h4(),
                   ),
-                  SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.xs),
 
                   // 道路名称
                   if (step.road.isNotEmpty)
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.route,
                           size: 16,
                           color: AppColors.gray500,
                         ),
-                        SizedBox(width: AppSpacing.xs),
+                        const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
                             step.getRoad(currentLang),
@@ -75,7 +75,7 @@ class RouteStepCard extends StatelessWidget {
                       ],
                     ),
 
-                  SizedBox(height: AppSpacing.s),
+                  const SizedBox(height: AppSpacing.s),
 
                   // 距离和时间
                   Row(
@@ -85,7 +85,7 @@ class RouteStepCard extends StatelessWidget {
                         icon: Icons.straighten,
                         label: step.formattedDistance(currentLang),
                       ),
-                      SizedBox(width: AppSpacing.s),
+                      const SizedBox(width: AppSpacing.s),
 
                       // 时间
                       _buildInfoChip(
@@ -96,7 +96,7 @@ class RouteStepCard extends StatelessWidget {
                       // 翻译标记
                       if (showTranslationBadge && step.isTranslated)
                         Padding(
-                          padding: EdgeInsets.only(left: AppSpacing.s),
+                          padding: const EdgeInsets.only(left: AppSpacing.s),
                           child: _buildTranslationBadge(),
                         ),
                     ],
@@ -171,7 +171,7 @@ class RouteStepCard extends StatelessWidget {
                   child: Center(
                     child: Text(
                       '$stepNumber',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 8,
                         fontWeight: FontWeight.bold,
@@ -192,7 +192,7 @@ class RouteStepCard extends StatelessWidget {
     required String label,
   }) {
     return Container(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s,
         vertical: AppSpacing.xs,
       ),
@@ -208,7 +208,7 @@ class RouteStepCard extends StatelessWidget {
             size: 14,
             color: AppColors.gray600,
           ),
-          SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             label,
             style: AppTextStyles.caption(color: AppColors.gray700),
@@ -221,7 +221,7 @@ class RouteStepCard extends StatelessWidget {
   /// 构建翻译标记
   Widget _buildTranslationBadge() {
     return Container(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xs,
         vertical: 2,
       ),
@@ -233,7 +233,7 @@ class RouteStepCard extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Row(
+      child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
@@ -263,9 +263,9 @@ class RouteSummaryCard extends StatelessWidget {
   final TranslatedRouteInfo route;
 
   const RouteSummaryCard({
-    Key? key,
+    super.key,
     required this.route,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -273,13 +273,13 @@ class RouteSummaryCard extends StatelessWidget {
     final currentLang = languageManager.languageCode;
 
     return Card(
-      margin: EdgeInsets.all(AppSpacing.m),
+      margin: const EdgeInsets.all(AppSpacing.m),
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusL),
       ),
       child: Padding(
-        padding: EdgeInsets.all(AppSpacing.l),
+        padding: const EdgeInsets.all(AppSpacing.l),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -291,12 +291,12 @@ class RouteSummaryCard extends StatelessWidget {
                   color: AppColors.primary,
                   size: 28,
                 ),
-                SizedBox(width: AppSpacing.s),
+                const SizedBox(width: AppSpacing.s),
                 Text(
                   route.getRouteTypeLabel(currentLang),
                   style: AppTextStyles.h3(),
                 ),
-                Spacer(),
+                const Spacer(),
                 // 翻译进度标记
                 if (route.isFullyTranslated)
                   _buildFullyTranslatedBadge()
@@ -305,7 +305,7 @@ class RouteSummaryCard extends StatelessWidget {
               ],
             ),
 
-            Divider(height: AppSpacing.l),
+            const Divider(height: AppSpacing.l),
 
             // 距离和时间
             Row(
@@ -334,21 +334,21 @@ class RouteSummaryCard extends StatelessWidget {
 
             // 费用（如果有）
             if (route.formattedFee(currentLang) != null) ...[
-              SizedBox(height: AppSpacing.m),
+              const SizedBox(height: AppSpacing.m),
               Container(
-                padding: EdgeInsets.all(AppSpacing.m),
+                padding: const EdgeInsets.all(AppSpacing.m),
                 decoration: BoxDecoration(
                   color: AppColors.warning.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusM),
                 ),
                 child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.payments,
                       color: AppColors.warning,
                       size: 20,
                     ),
-                    SizedBox(width: AppSpacing.s),
+                    const SizedBox(width: AppSpacing.s),
                     Text(
                       route.formattedFee(currentLang)!,
                       style: AppTextStyles.body(color: AppColors.warning),
@@ -390,12 +390,12 @@ class RouteSummaryCard extends StatelessWidget {
           color: AppColors.gray500,
           size: 24,
         ),
-        SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           label,
           style: AppTextStyles.caption(color: AppColors.gray500),
         ),
-        SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           value,
           style: AppTextStyles.h4(),
@@ -407,7 +407,7 @@ class RouteSummaryCard extends StatelessWidget {
   /// 完全翻译标记
   Widget _buildFullyTranslatedBadge() {
     return Container(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s,
         vertical: AppSpacing.xs,
       ),
@@ -419,7 +419,7 @@ class RouteSummaryCard extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Row(
+      child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
@@ -446,7 +446,7 @@ class RouteSummaryCard extends StatelessWidget {
     final progress = route.translationProgress;
 
     return Container(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s,
         vertical: AppSpacing.xs,
       ),
@@ -467,10 +467,10 @@ class RouteSummaryCard extends StatelessWidget {
               backgroundColor: AppColors.gray300,
             ),
           ),
-          SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             '${(progress * 100).toInt()}%',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.info,
               fontWeight: FontWeight.w600,
@@ -490,10 +490,10 @@ class RouteStepsList extends StatelessWidget {
   final bool showSummary;
 
   const RouteStepsList({
-    Key? key,
+    super.key,
     required this.route,
     this.showSummary = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +506,7 @@ class RouteStepsList extends StatelessWidget {
         // 步骤列表
         ListView.builder(
           shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
+          physics: const NeverScrollableScrollPhysics(),
           itemCount: route.steps.length,
           itemBuilder: (context, index) {
             return RouteStepCard(

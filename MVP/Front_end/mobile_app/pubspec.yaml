@@ -24,9 +24,7 @@ dependencies:
   lottie: ^2.7.0
 
   # Maps & Location
-  amap_flutter_map: ^3.0.0  # 高德地图Flutter SDK
-  amap_flutter_base: ^3.0.0  # 高德地图基础库
-  amap_flutter_location: ^3.0.0  # 高德定位
+  amap_map: ^1.0.15
   geolocator: ^10.1.0
   geocoding: ^2.1.1
 
@@ -46,7 +44,7 @@ dependencies:
 
   # Icons & Fonts
   cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
+  google_fonts: ^8.0.2
   flutter_svg: ^2.0.9
 
   # Networking
@@ -54,7 +52,6 @@ dependencies:
   http: ^1.1.0
 
   # Voice Translation
-  record: ^5.1.2
   audioplayers: ^6.0.0
 
   # Offline Storage
@@ -64,6 +61,8 @@ dependencies:
   # QR Code
   qr_flutter: ^4.1.0
   mobile_scanner: ^3.5.5
+  record: ^6.2.0
+  amap_flutter_location: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -83,3 +82,4 @@ flutter:
     - assets/illustrations/
 
   # Fonts (using Google Fonts at runtime）
+

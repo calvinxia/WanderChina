@@ -10,10 +10,10 @@ class CustomBottomNavBar extends StatelessWidget {
   final Function(int) onTap;
 
   const CustomBottomNavBar({
-    Key? key,
+    super.key,
     required this.currentIndex,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,14 +24,14 @@ class CustomBottomNavBar extends StatelessWidget {
           BoxShadow(
             color: AppColors.gray900.withOpacity(0.08),
             blurRadius: 16,
-            offset: Offset(0, -4),
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
         child: Container(
           height: AppSpacing.bottomNavBarHeight,
-          padding: EdgeInsets.symmetric(horizontal: AppSpacing.s),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -93,8 +93,8 @@ class CustomBottomNavBar extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   AnimatedContainer(
-                    duration: Duration(milliseconds: 200),
-                    padding: EdgeInsets.all(4),
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: isActive
                           ? AppColors.primary.withOpacity(0.1)
@@ -124,7 +124,7 @@ class CustomBottomNavBar extends StatelessWidget {
                     ),
                 ],
               ),
-              SizedBox(height: 1),
+              const SizedBox(height: 1),
               // Label
               Text(
                 label,

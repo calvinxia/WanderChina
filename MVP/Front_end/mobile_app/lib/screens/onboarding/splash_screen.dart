@@ -8,7 +8,7 @@ import 'onboarding_screen.dart';
 /// Splash Screen with beautiful animations
 /// Based on Figma design - Screen 1
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -26,7 +26,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (mounted) {
       // Navigate to onboarding or home based on user state
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => OnboardingScreen()),
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
     }
   }
@@ -37,7 +37,7 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: AppColors.heroGradient,
         ),
         child: SafeArea(
@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Spacer to push content to center
-              Expanded(child: SizedBox()),
+              const Expanded(child: SizedBox()),
 
               // Logo Section
               _buildLogo(),
@@ -55,7 +55,7 @@ class _SplashScreenState extends State<SplashScreen> {
               // Tagline
               _buildTagline(),
 
-              Expanded(child: SizedBox()),
+              const Expanded(child: SizedBox()),
 
               // Loading Indicator
               _buildLoadingIndicator(),
@@ -81,11 +81,11 @@ class _SplashScreenState extends State<SplashScreen> {
             BoxShadow(
               color: AppColors.primary.withOpacity(0.3),
               blurRadius: 30,
-              offset: Offset(0, 10),
+              offset: const Offset(0, 10),
             ),
           ],
         ),
-        child: Center(
+        child: const Center(
           child: Icon(
             Icons.explore,
             size: 60,
@@ -99,8 +99,8 @@ class _SplashScreenState extends State<SplashScreen> {
             curve: Curves.easeOut,
           )
           .scale(
-            begin: Offset(0.8, 0.8),
-            end: Offset(1.0, 1.0),
+            begin: const Offset(0.8, 0.8),
+            end: const Offset(1.0, 1.0),
             duration: 500.ms,
             curve: Curves.elasticOut,
           )
@@ -157,7 +157,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Widget _buildLoadingIndicator() {
-    return SizedBox(
+    return const SizedBox(
       width: 24,
       height: 24,
       child: CircularProgressIndicator(

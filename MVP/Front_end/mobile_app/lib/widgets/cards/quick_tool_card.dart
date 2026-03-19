@@ -13,13 +13,13 @@ class QuickToolCard extends StatefulWidget {
   final bool isEnabled;
 
   const QuickToolCard({
-    Key? key,
+    super.key,
     required this.label,
     required this.icon,
     required this.color,
     this.onTap,
     this.isEnabled = true,
-  }) : super(key: key);
+  });
 
   @override
   State<QuickToolCard> createState() => _QuickToolCardState();
@@ -37,7 +37,7 @@ class _QuickToolCardState extends State<QuickToolCard> {
       onTap: widget.isEnabled ? widget.onTap : null,
       child: AnimatedScale(
         scale: _isPressed ? 0.95 : 1.0,
-        duration: Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 100),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -46,7 +46,7 @@ class _QuickToolCardState extends State<QuickToolCard> {
               BoxShadow(
                 color: AppColors.gray900.withOpacity(0.06),
                 blurRadius: 12,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -71,7 +71,7 @@ class _QuickToolCardState extends State<QuickToolCard> {
                           BoxShadow(
                             color: widget.color.withOpacity(0.2),
                             blurRadius: 12,
-                            offset: Offset(0, 4),
+                            offset: const Offset(0, 4),
                           ),
                         ]
                       : [],

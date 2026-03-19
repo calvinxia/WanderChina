@@ -201,9 +201,9 @@ class AppColors {
       case 'rare':
         return info500;
       case 'epic':
-        return Color(0xFF9C27B0); // Purple
+        return const Color(0xFF9C27B0); // Purple
       case 'legendary':
-        return Color(0xFFFFD700); // Gold
+        return const Color(0xFFFFD700); // Gold
       default:
         return gray500;
     }
@@ -213,19 +213,19 @@ class AppColors {
   static Color getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
-        return Color(0xFFFF6B6B);
+        return const Color(0xFFFF6B6B);
       case 'accommodation':
-        return Color(0xFF4ECDC4);
+        return const Color(0xFF4ECDC4);
       case 'transport':
-        return Color(0xFF45B7D1);
+        return const Color(0xFF45B7D1);
       case 'attractions':
-        return Color(0xFFFFA07A);
+        return const Color(0xFFFFA07A);
       case 'nature':
-        return Color(0xFF98D8C8);
+        return const Color(0xFF98D8C8);
       case 'culture':
-        return Color(0xFFBA68C8);
+        return const Color(0xFFBA68C8);
       case 'shopping':
-        return Color(0xFFFFB74D);
+        return const Color(0xFFFFB74D);
       default:
         return jade500;
     }

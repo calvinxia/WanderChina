@@ -47,3 +47,16 @@ app.*.map.json
 # Environment configuration files
 .env
 .env.example
+
+# API keys and sensitive files
+**/api_keys/
+**/API_keys/
+**/*api*key*.json
+**/*secret*.json
+**/*credential*.json
+**/*SecretKey*.csv
+**/*ApiKey*.txt
+
+# Documentation files
+*.md
+**/*.md

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:amap_flutter_map/amap_flutter_map.dart';
+import 'package:amap_map/amap_map.dart';
 import '../../models/poi_translation.dart';
 import '../../services/map/poi_translation_service.dart';
 
@@ -78,26 +78,35 @@ class _TranslationOverlayState extends State<TranslationOverlay>
         return;
       }
 
+      // ignore: unused_local_variable
       final translations = await _svc.getTranslations(
         gaodePoiIds: ids,
         language:    widget.config.language,
       );
 
+      // TODO: 重构为使用 Marker 方案
+      // AMapController 在 3.0.0 版本中没有 convertCoordinate() 方法
+      // 推荐方案：将翻译标签改为使用 Marker + 自定义 InfoWindow
+      // 参考 AMAP_FIX_INSTRUCTIONS.md 的"修复2"部分
+
       final labels = <OverlayLabel>[];
-      for (final poi in widget.visiblePOIs) {
-        final id    = poi['id'] as String? ?? poi['poiId'] as String? ?? '';
-        final trans = translations[id];
-        if (trans == null) continue;
 
-        final pt = await widget.mapController.convertCoordinate(trans.coordinates);
-        if (pt == null) continue;
-
-        labels.add(OverlayLabel(
-          translation:   trans,
-          screenPosition: Offset(pt.x, pt.y),
-          isHighPriority: _isHighPriority(trans.categoryEn),
-        ));
-      }
+      // 暂时禁用坐标转换功能，等待重构为 Marker 方案
+      // for (final poi in widget.visiblePOIs) {
+      //   final id    = poi['id'] as String? ?? poi['poiId'] as String? ?? '';
+      //   final trans = translations[id];
+      //   if (trans == null) continue;
+      //
+      //   // convertCoordinate 不存在，需要改用 Marker 方案
+      //   // final pt = await widget.mapController.convertCoordinate(trans.coordinates);
+      //   // if (pt == null) continue;
+      //
+      //   labels.add(OverlayLabel(
+      //     translation:   trans,
+      //     screenPosition: Offset(pt.x, pt.y),
+      //     isHighPriority: _isHighPriority(trans.categoryEn),
+      //   ));
+      // }
 
       labels.sort((a, b) => b.isHighPriority ? 1 : -1);
       final filtered = _deduplicate(labels);
@@ -109,7 +118,7 @@ class _TranslationOverlayState extends State<TranslationOverlay>
         });
       }
     } catch (e) {
-      print('⚠️ 翻译蒙层重建失败: $e');
+      debugPrint('⚠️ 翻译蒙层重建失败: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -128,6 +137,7 @@ class _TranslationOverlayState extends State<TranslationOverlay>
     return result;
   }
 
+  // ignore: unused_element
   bool _isHighPriority(String? cat) => const [
     'Attraction', 'Museum', 'Park', 'Metro Station', 'Transport Hub',
   ].contains(cat);

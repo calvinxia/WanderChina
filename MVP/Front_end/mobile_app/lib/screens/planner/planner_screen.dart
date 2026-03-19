@@ -12,7 +12,7 @@ import 'create_trip_screen.dart';
 /// Planner Screen - Trip Planning and Management
 /// 行程规划主界面
 class PlannerScreen extends StatefulWidget {
-  const PlannerScreen({Key? key}) : super(key: key);
+  const PlannerScreen({super.key});
 
   @override
   State<PlannerScreen> createState() => _PlannerScreenState();
@@ -30,12 +30,12 @@ class _PlannerScreenState extends State<PlannerScreen>
       description: 'Explore ancient palaces, temples, and modern Beijing',
       destination: 'Beijing',
       cities: ['Beijing'],
-      startDate: DateTime.now().add(Duration(days: 15)),
-      endDate: DateTime.now().add(Duration(days: 20)),
+      startDate: DateTime.now().add(const Duration(days: 15)),
+      endDate: DateTime.now().add(const Duration(days: 20)),
       coverImageUrl: null,
       days: [],
       status: 'planned',
-      createdAt: DateTime.now().subtract(Duration(days: 5)),
+      createdAt: DateTime.now().subtract(const Duration(days: 5)),
       tags: ['Culture', 'History', 'Food'],
     ),
     Itinerary(
@@ -44,12 +44,12 @@ class _PlannerScreenState extends State<PlannerScreen>
       description: 'Modern metropolis meets classical gardens',
       destination: 'Shanghai',
       cities: ['Shanghai', 'Suzhou'],
-      startDate: DateTime.now().add(Duration(days: 45)),
-      endDate: DateTime.now().add(Duration(days: 50)),
+      startDate: DateTime.now().add(const Duration(days: 45)),
+      endDate: DateTime.now().add(const Duration(days: 50)),
       coverImageUrl: null,
       days: [],
       status: 'draft',
-      createdAt: DateTime.now().subtract(Duration(days: 2)),
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
       tags: ['Urban', 'Gardens', 'Shopping'],
     ),
   ];
@@ -61,12 +61,12 @@ class _PlannerScreenState extends State<PlannerScreen>
       description: 'Terracotta Warriors and ancient city walls',
       destination: 'Xi\'an',
       cities: ['Xi\'an'],
-      startDate: DateTime.now().subtract(Duration(days: 60)),
-      endDate: DateTime.now().subtract(Duration(days: 55)),
+      startDate: DateTime.now().subtract(const Duration(days: 60)),
+      endDate: DateTime.now().subtract(const Duration(days: 55)),
       coverImageUrl: null,
       days: [],
       status: 'completed',
-      createdAt: DateTime.now().subtract(Duration(days: 75)),
+      createdAt: DateTime.now().subtract(const Duration(days: 75)),
       tags: ['History', 'Culture'],
     ),
   ];
@@ -96,11 +96,11 @@ class _PlannerScreenState extends State<PlannerScreen>
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.search, color: AppColors.gray700),
+            icon: const Icon(Icons.search, color: AppColors.gray700),
             onPressed: () {},
           ),
           IconButton(
-            icon: Icon(Icons.filter_list, color: AppColors.gray700),
+            icon: const Icon(Icons.filter_list, color: AppColors.gray700),
             onPressed: () {},
           ),
         ],
@@ -129,7 +129,7 @@ class _PlannerScreenState extends State<PlannerScreen>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createNewTrip,
         backgroundColor: AppColors.primary,
-        icon: Icon(Icons.add, color: Colors.white),
+        icon: const Icon(Icons.add, color: Colors.white),
         label: Text(
           'New Trip',
           style: AppTextStyles.button(color: Colors.white),
@@ -155,7 +155,7 @@ class _PlannerScreenState extends State<PlannerScreen>
       itemCount: upcomingTrips.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: EdgeInsets.only(bottom: AppSpacing.m),
+          padding: const EdgeInsets.only(bottom: AppSpacing.m),
           child: ItineraryCard(
             itinerary: upcomingTrips[index],
             onTap: () => _viewItinerary(upcomingTrips[index]),
@@ -186,7 +186,7 @@ class _PlannerScreenState extends State<PlannerScreen>
       itemCount: draftTrips.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: EdgeInsets.only(bottom: AppSpacing.m),
+          padding: const EdgeInsets.only(bottom: AppSpacing.m),
           child: ItineraryCard(
             itinerary: draftTrips[index],
             onTap: () => _viewItinerary(draftTrips[index]),
@@ -215,7 +215,7 @@ class _PlannerScreenState extends State<PlannerScreen>
       itemCount: _pastTrips.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: EdgeInsets.only(bottom: AppSpacing.m),
+          padding: const EdgeInsets.only(bottom: AppSpacing.m),
           child: ItineraryCard(
             itinerary: _pastTrips[index],
             onTap: () => _viewItinerary(_pastTrips[index]),
@@ -303,26 +303,26 @@ class _PlannerScreenState extends State<PlannerScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Trip?'),
+        title: const Text('Delete Trip?'),
         content: Text(
             'Are you sure you want to delete "${itinerary.title}"? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
               // Delete logic here
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                const SnackBar(
                   content: Text('Trip deleted'),
                   backgroundColor: AppColors.success500,
                 ),
               );
             },
-            child: Text('Delete', style: TextStyle(color: AppColors.error500)),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error500)),
           ),
         ],
       ),

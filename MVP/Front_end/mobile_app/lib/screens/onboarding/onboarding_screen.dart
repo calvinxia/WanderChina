@@ -9,7 +9,7 @@ import '../main/main_screen.dart';
 /// Onboarding Screen with swipeable slides
 /// Based on Figma design - Screen 2
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({Key? key}) : super(key: key);
+  const OnboardingScreen({super.key});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -34,7 +34,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'Real-time translation with your camera, comprehensive phrasebook, and voice assistance',
       icon: Icons.translate,
       color: AppColors.info500,
-      gradient: LinearGradient(
+      gradient: const LinearGradient(
         colors: [AppColors.info500, AppColors.info300],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -46,7 +46,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'Emergency SOS, live location sharing, and community safety tips to keep you secure',
       icon: Icons.security,
       color: AppColors.error500,
-      gradient: LinearGradient(
+      gradient: const LinearGradient(
         colors: [AppColors.error500, AppColors.error300],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -58,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'Find travel companions, connect with local guides, and share your adventure',
       icon: Icons.people,
       color: AppColors.success500,
-      gradient: LinearGradient(
+      gradient: const LinearGradient(
         colors: [AppColors.success500, AppColors.success300],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -81,7 +81,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _nextPage() {
     if (_currentPage < _slides.length - 1) {
       _pageController.nextPage(
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     } else {
@@ -96,7 +96,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _finishOnboarding() {
     // Navigate to main screen
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => MainScreen()),
+      MaterialPageRoute(builder: (_) => const MainScreen()),
     );
   }
 
@@ -140,7 +140,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Align(
       alignment: Alignment.topRight,
       child: Padding(
-        padding: EdgeInsets.all(AppSpacing.m),
+        padding: const EdgeInsets.all(AppSpacing.m),
         child: TextButton(
           onPressed: _skipOnboarding,
           child: Text(
@@ -156,13 +156,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final isActive = index == _currentPage;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Icon with animated container
           AnimatedContainer(
-            duration: Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 300),
             width: isActive ? 200 : 180,
             height: isActive ? 200 : 180,
             decoration: BoxDecoration(
@@ -173,7 +173,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       BoxShadow(
                         color: slide.color.withOpacity(0.3),
                         blurRadius: 30,
-                        offset: Offset(0, 15),
+                        offset: const Offset(0, 15),
                       ),
                     ]
                   : [],
@@ -189,7 +189,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               )
               .fadeIn(duration: 500.ms)
               .scale(
-                begin: Offset(0.8, 0.8),
+                begin: const Offset(0.8, 0.8),
                 duration: 500.ms,
                 curve: Curves.elasticOut,
               ),
@@ -232,8 +232,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: List.generate(
         _slides.length,
         (index) => AnimatedContainer(
-          duration: Duration(milliseconds: 300),
-          margin: EdgeInsets.symmetric(horizontal: 4),
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
           width: _currentPage == index ? 32 : 8,
           height: 8,
           decoration: BoxDecoration(
@@ -249,7 +249,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildNextButton() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: AppSpacing.l),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
       child: PrimaryButton(
         text: _currentPage == _slides.length - 1 ? 'Get Started' : 'Next',
         onPressed: _nextPage,

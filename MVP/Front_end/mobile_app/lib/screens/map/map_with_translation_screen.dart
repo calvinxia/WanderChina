@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:amap_flutter_base/amap_flutter_base.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 import '../../widgets/map/wander_map.dart';
 import '../../widgets/map/translation_overlay_widget.dart';
 import '../../models/poi_translation.dart';
@@ -169,7 +169,7 @@ class _MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
         showTranslationOverlay: _showTranslationOverlay,
         showVoiceButton: _showVoiceButton,
         onMapTap: (latLng) {
-          print('地图点击: ${latLng.latitude}, ${latLng.longitude}');
+          debugPrint('地图点击: ${latLng.latitude}, ${latLng.longitude}');
         },
       ),
 

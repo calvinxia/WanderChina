@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../core/config/amap_config.dart';
@@ -138,7 +139,7 @@ class OfflineMapService {
     try {
       // 检查是否已在下载中
       if (_downloadingCities.containsKey(cityCode)) {
-        print('⚠️ 城市 $cityCode 正在下载中');
+        debugPrint('⚠️ 城市 $cityCode 正在下载中');
         return false;
       }
 
@@ -169,11 +170,11 @@ class OfflineMapService {
         lastUpdated: DateTime.now(),
       );
 
-      print('✅ 城市地图下载完成: ${city.cityName}');
+      debugPrint('✅ 城市地图下载完成: ${city.cityName}');
       return true;
 
     } catch (e) {
-      print('❌ 下载城市地图失败: $e');
+      debugPrint('❌ 下载城市地图失败: $e');
       _downloadingCities.remove(cityCode);
       return false;
     }
@@ -197,11 +198,11 @@ class OfflineMapService {
       // await File('${directory.path}/$cityCode.map').delete();
 
       _downloadedCities.remove(cityCode);
-      print('✅ 删除城市地图成功: $cityCode');
+      debugPrint('✅ 删除城市地图成功: $cityCode');
       return true;
 
     } catch (e) {
-      print('❌ 删除城市地图失败: $e');
+      debugPrint('❌ 删除城市地图失败: $e');
       return false;
     }
   }
@@ -232,6 +233,7 @@ class OfflineMapService {
   /// 检查存储空间是否足够
   Future<bool> _checkStorageSpace(int requiredSize) async {
     try {
+      // ignore: unused_local_variable
       final directory = await getApplicationDocumentsDirectory();
 
       // 简化的检查逻辑（实际需要获取可用空间）
@@ -244,6 +246,7 @@ class OfflineMapService {
   }
 
   /// 获取离线地图存储目录
+  // ignore: unused_element
   Future<Directory> _getOfflineMapDirectory() async {
     final appDir = await getApplicationDocumentsDirectory();
     final mapDir = Directory('${appDir.path}/${AMapConfig.offlineMapPath}');
@@ -262,7 +265,7 @@ class OfflineMapService {
     Function(double)? onProgress,
   ) async {
     for (var i = 0; i <= 100; i++) {
-      await Future.delayed(Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 50));
       final progress = i / 100.0;
 
       // 更新下载进度

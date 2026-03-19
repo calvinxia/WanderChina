@@ -13,12 +13,12 @@ class ItineraryCard extends StatefulWidget {
   final VoidCallback? onDelete;
 
   const ItineraryCard({
-    Key? key,
+    super.key,
     required this.itinerary,
     this.onTap,
     this.onEdit,
     this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   State<ItineraryCard> createState() => _ItineraryCardState();
@@ -36,7 +36,7 @@ class _ItineraryCardState extends State<ItineraryCard> {
       onTap: widget.onTap,
       child: AnimatedScale(
         scale: _isPressed ? 0.98 : 1.0,
-        duration: Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 100),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -45,7 +45,7 @@ class _ItineraryCardState extends State<ItineraryCard> {
               BoxShadow(
                 color: AppColors.gray900.withOpacity(0.08),
                 blurRadius: 16,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -57,7 +57,7 @@ class _ItineraryCardState extends State<ItineraryCard> {
 
               // Content section
               Padding(
-                padding: EdgeInsets.all(AppSpacing.m),
+                padding: const EdgeInsets.all(AppSpacing.m),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -79,12 +79,12 @@ class _ItineraryCardState extends State<ItineraryCard> {
                     // Destination
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.location_on,
                           size: 16,
                           color: AppColors.gray500,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             widget.itinerary.cities?.join(', ') ??
@@ -102,12 +102,12 @@ class _ItineraryCardState extends State<ItineraryCard> {
                     // Date range
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.calendar_today,
                           size: 16,
                           color: AppColors.primary,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             _formatDateRange(),
@@ -131,7 +131,7 @@ class _ItineraryCardState extends State<ItineraryCard> {
                         runSpacing: 6,
                         children: widget.itinerary.tags!.take(3).map((tag) {
                           return Container(
-                            padding: EdgeInsets.symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 4,
                             ),
@@ -158,11 +158,11 @@ class _ItineraryCardState extends State<ItineraryCard> {
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: widget.onEdit,
-                                icon: Icon(Icons.edit, size: 16),
-                                label: Text('Edit'),
+                                icon: const Icon(Icons.edit, size: 16),
+                                label: const Text('Edit'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primary,
-                                  side: BorderSide(color: AppColors.primary),
+                                  side: const BorderSide(color: AppColors.primary),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(
                                         AppSpacing.radiusM),
@@ -171,16 +171,16 @@ class _ItineraryCardState extends State<ItineraryCard> {
                               ),
                             ),
                           if (widget.onEdit != null && widget.onDelete != null)
-                            SizedBox(width: AppSpacing.s),
+                            const SizedBox(width: AppSpacing.s),
                           if (widget.onDelete != null)
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: widget.onDelete,
-                                icon: Icon(Icons.delete, size: 16),
-                                label: Text('Delete'),
+                                icon: const Icon(Icons.delete, size: 16),
+                                label: const Text('Delete'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.error500,
-                                  side: BorderSide(color: AppColors.error500),
+                                  side: const BorderSide(color: AppColors.error500),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(
                                         AppSpacing.radiusM),
@@ -206,7 +206,7 @@ class _ItineraryCardState extends State<ItineraryCard> {
       height: 160,
       decoration: BoxDecoration(
         color: AppColors.gray100,
-        borderRadius: BorderRadius.vertical(
+        borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppSpacing.radiusXL),
         ),
         image: widget.itinerary.coverImageUrl != null
@@ -271,7 +271,7 @@ class _ItineraryCardState extends State<ItineraryCard> {
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: statusColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(AppSpacing.radiusS),
@@ -283,7 +283,7 @@ class _ItineraryCardState extends State<ItineraryCard> {
                 .copyWith(fontSize: 10, fontWeight: FontWeight.bold),
           ),
         ),
-        Spacer(),
+        const Spacer(),
         if (widget.itinerary.isUpcoming)
           Text(
             'in ${widget.itinerary.daysUntilStart} days',

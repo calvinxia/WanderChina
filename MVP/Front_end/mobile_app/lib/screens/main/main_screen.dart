@@ -13,7 +13,7 @@ import '../profile/profile_screen.dart';
 /// - Voice标签打开全屏模态框
 /// - 使用IndexedStack保持页面状态
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();

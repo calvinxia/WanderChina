@@ -20,7 +20,7 @@ class ChallengeCard extends StatefulWidget {
   final VoidCallback? onTap;
 
   const ChallengeCard({
-    Key? key,
+    super.key,
     required this.title,
     required this.description,
     this.imageUrl,
@@ -32,7 +32,7 @@ class ChallengeCard extends StatefulWidget {
     this.isActive = false,
     this.isCompleted = false,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   State<ChallengeCard> createState() => _ChallengeCardState();
@@ -52,7 +52,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
       onTap: widget.onTap,
       child: AnimatedScale(
         scale: _isPressed ? 0.97 : 1.0,
-        duration: Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 100),
         child: Container(
           width: AppSpacing.challengeCardWidth,
           height: AppSpacing.challengeCardHeight,
@@ -63,7 +63,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
               BoxShadow(
                 color: AppColors.gray900.withOpacity(0.1),
                 blurRadius: 20,
-                offset: Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -76,7 +76,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
               // Content section
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s,
                     vertical: 8,
                   ),
@@ -87,7 +87,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                       // Difficulty & Points
                       _buildHeaderRow(),
 
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
 
                       // Title
                       Text(
@@ -97,7 +97,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                         overflow: TextOverflow.ellipsis,
                       ),
 
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
 
                       // Description
                       Flexible(
@@ -110,7 +110,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                         ),
                       ),
 
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
 
                       // Progress section
                       if (!widget.isCompleted) _buildProgressSection(progress),
@@ -136,7 +136,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
           height: 160,
           decoration: BoxDecoration(
             color: AppColors.gray100,
-            borderRadius: BorderRadius.vertical(
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(AppSpacing.radiusXL),
             ),
             image: widget.imageUrl != null
@@ -147,7 +147,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                 : null,
           ),
           child: widget.imageUrl == null
-              ? Center(
+              ? const Center(
                   child: Icon(
                     Icons.emoji_events,
                     size: 64,
@@ -161,7 +161,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
         Container(
           height: 160,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.vertical(
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(AppSpacing.radiusXL),
             ),
             gradient: LinearGradient(
@@ -181,7 +181,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
             top: AppSpacing.s,
             left: AppSpacing.s,
             child: Container(
-              padding: EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s,
                 vertical: 6,
               ),
@@ -192,7 +192,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                   BoxShadow(
                     color: AppColors.primary.withOpacity(0.3),
                     blurRadius: 8,
-                    offset: Offset(0, 2),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -202,7 +202,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                   Container(
                     width: 6,
                     height: 6,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
@@ -211,7 +211,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                       .fadeOut(duration: 1000.ms)
                       .then()
                       .fadeIn(duration: 1000.ms),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text(
                     'Active',
                     style: AppTextStyles.caption(color: Colors.white),
@@ -227,7 +227,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
             top: AppSpacing.s,
             right: AppSpacing.s,
             child: Container(
-              padding: EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s,
                 vertical: 6,
               ),
@@ -238,12 +238,12 @@ class _ChallengeCardState extends State<ChallengeCard> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.timer,
                     size: 14,
                     color: Colors.white,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
                     widget.timeRemaining!,
                     style: AppTextStyles.caption(color: Colors.white),
@@ -262,7 +262,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
         // Difficulty badge
         Flexible(
           child: Container(
-            padding: EdgeInsets.symmetric(
+            padding: const EdgeInsets.symmetric(
               horizontal: 8,
               vertical: 3,
             ),
@@ -286,16 +286,16 @@ class _ChallengeCardState extends State<ChallengeCard> {
           ),
         ),
 
-        Spacer(),
+        const Spacer(),
 
         // Points
         Container(
-          padding: EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: 8,
             vertical: 3,
           ),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               colors: [AppColors.warning500, AppColors.warning300],
             ),
             borderRadius: BorderRadius.circular(AppSpacing.radiusS),
@@ -303,12 +303,12 @@ class _ChallengeCardState extends State<ChallengeCard> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              const Icon(
                 Icons.stars,
                 size: 12,
                 color: Colors.white,
               ),
-              SizedBox(width: 3),
+              const SizedBox(width: 3),
               Text(
                 '${widget.points} pts',
                 style: AppTextStyles.caption(color: Colors.white)
@@ -336,7 +336,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
                 FractionallySizedBox(
                   widthFactor: progress,
                   child: Container(
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       gradient: AppColors.primaryGradient,
                     ),
                   ),
@@ -346,7 +346,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
           ),
         ),
 
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
 
         // Progress text
         Row(
@@ -370,7 +370,7 @@ class _ChallengeCardState extends State<ChallengeCard> {
 
   Widget _buildCompletedBadge() {
     return Container(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.m,
         vertical: AppSpacing.s,
       ),
@@ -382,12 +382,12 @@ class _ChallengeCardState extends State<ChallengeCard> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.check_circle,
             size: 20,
             color: AppColors.success500,
           ),
-          SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             'Completed!',
             style: AppTextStyles.button(color: AppColors.success700),
@@ -397,6 +397,6 @@ class _ChallengeCardState extends State<ChallengeCard> {
     )
         .animate()
         .fadeIn(duration: 300.ms)
-        .scale(begin: Offset(0.8, 0.8), duration: 300.ms);
+        .scale(begin: const Offset(0.8, 0.8), duration: 300.ms);
   }
 }

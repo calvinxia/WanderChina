@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/translated_route.dart';
 import '../services/route_planning_service.dart';
@@ -43,9 +44,9 @@ class MapTranslationService {
       await _loadCacheFromStorage();
 
       _isInitialized = true;
-      print('✅ 地图翻译服务初始化成功（本地词典模式）');
+      debugPrint('✅ 地图翻译服务初始化成功（本地词典模式）');
     } catch (e) {
-      print('❌ 地图翻译服务初始化失败: $e');
+      debugPrint('❌ 地图翻译服务初始化失败: $e');
       _isInitialized = true; // 允许应用继续运行
     }
   }
@@ -69,7 +70,7 @@ class MapTranslationService {
       // 检查城市
       if (enableCityFilter && city != null) {
         if (!SupportedCities.isCitySupported(city)) {
-          print('⚠️ 城市不在支持范围内，跳过翻译: $city');
+          debugPrint('⚠️ 城市不在支持范围内，跳过翻译: $city');
           return TranslatedRouteInfo.fromRouteInfo(route);
         }
       }
@@ -89,7 +90,7 @@ class MapTranslationService {
       return translatedRoute;
 
     } catch (e) {
-      print('❌ 路线翻译失败: $e');
+      debugPrint('❌ 路线翻译失败: $e');
       return TranslatedRouteInfo.fromRouteInfo(route);
     }
   }
@@ -118,7 +119,7 @@ class MapTranslationService {
       }
 
     } catch (e) {
-      print('⚠️ 路线步骤翻译失败: $e');
+      debugPrint('⚠️ 路线步骤翻译失败: $e');
     }
 
     return translatedStep;
@@ -161,7 +162,7 @@ class MapTranslationService {
       return null;
 
     } catch (e) {
-      print('❌ 道路翻译失败: $e');
+      debugPrint('❌ 道路翻译失败: $e');
       return null;
     }
   }
@@ -228,7 +229,7 @@ class MapTranslationService {
       return null;
 
     } catch (e) {
-      print('❌ 站点翻译失败: $e');
+      debugPrint('❌ 站点翻译失败: $e');
       return null;
     }
   }
@@ -294,7 +295,7 @@ class MapTranslationService {
       return null;
 
     } catch (e) {
-      print('❌ 指令翻译失败: $e');
+      debugPrint('❌ 指令翻译失败: $e');
       return null;
     }
   }
@@ -341,7 +342,7 @@ class MapTranslationService {
       return null; // MVP 不使用数据库
 
     } catch (e) {
-      print('❌ 区域翻译失败: $e');
+      debugPrint('❌ 区域翻译失败: $e');
       return null;
     }
   }
@@ -387,10 +388,10 @@ class MapTranslationService {
 
       final totalCached = _roadCache.length + _stationCache.length +
           _instructionCache.length + _areaCache.length;
-      print('✅ 加载了 $totalCached 条地图翻译缓存');
+      debugPrint('✅ 加载了 $totalCached 条地图翻译缓存');
 
     } catch (e) {
-      print('⚠️ 加载缓存失败: $e');
+      debugPrint('⚠️ 加载缓存失败: $e');
     }
   }
 
@@ -405,7 +406,7 @@ class MapTranslationService {
     try {
       await _prefs!.setString('map_trans_$type:$key', value);
     } catch (e) {
-      print('⚠️ 保存缓存失败: $e');
+      debugPrint('⚠️ 保存缓存失败: $e');
     }
   }
 
@@ -425,7 +426,7 @@ class MapTranslationService {
       }
     }
 
-    print('✅ 地图翻译缓存已清空');
+    debugPrint('✅ 地图翻译缓存已清空');
   }
 
   /// 获取缓存统计

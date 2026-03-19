@@ -12,7 +12,7 @@ import '../planner/planner_screen.dart';
 /// Home Dashboard Screen
 /// Based on Figma design - Screen 3 (Home)
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
         IconButton(
           icon: Stack(
             children: [
-              Icon(Icons.notifications_outlined, color: AppColors.gray700),
+              const Icon(Icons.notifications_outlined, color: AppColors.gray700),
               Positioned(
                 right: 0,
                 top: 0,
@@ -135,10 +135,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         // Profile
         Padding(
-          padding: EdgeInsets.only(right: AppSpacing.m),
+          padding: const EdgeInsets.only(right: AppSpacing.m),
           child: GestureDetector(
             onTap: () {},
-            child: CircleAvatar(
+            child: const CircleAvatar(
               radius: 18,
               backgroundColor: AppColors.primary,
               child: Icon(Icons.person, color: Colors.white, size: 20),
@@ -153,9 +153,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: AppSpacing.screenPaddingH,
       child: Container(
-        padding: EdgeInsets.all(AppSpacing.m),
+        padding: const EdgeInsets.all(AppSpacing.m),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             colors: [AppColors.info500, AppColors.info300],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -165,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
             BoxShadow(
               color: AppColors.info500.withOpacity(0.3),
               blurRadius: 20,
-              offset: Offset(0, 8),
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -178,12 +178,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.wb_sunny,
                         size: 48,
                         color: Colors.white,
                       ),
-                      SizedBox(width: AppSpacing.s),
+                      const SizedBox(width: AppSpacing.s),
                       Text(
                         '24°C',
                         style: AppTextStyles.h1(color: Colors.white),
@@ -229,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: Colors.white.withOpacity(0.8)),
-        SizedBox(width: 4),
+        const SizedBox(width: 4),
         Text(
           value,
           style: AppTextStyles.caption(
@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'Budget':
         // Budget feature not in MVP
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Budget feature coming soon!')),
+          const SnackBar(content: Text('Budget feature coming soon!')),
         );
         break;
       case 'Map':
@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'Challenges':
         // Challenges feature not in MVP
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Challenges feature coming soon!')),
+          const SnackBar(content: Text('Challenges feature coming soon!')),
         );
         break;
       case 'Community':
@@ -300,8 +300,8 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: AppSpacing.screenPaddingH,
           child: GridView.builder(
             shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               crossAxisSpacing: AppSpacing.s,
               mainAxisSpacing: AppSpacing.s,
@@ -348,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () {
                   // Challenges feature not in MVP
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Challenges feature coming soon!')),
+                    const SnackBar(content: Text('Challenges feature coming soon!')),
                   );
                 },
                 child: Text(
@@ -377,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 isActive: true,
                 onTap: () {},
               ),
-              SizedBox(width: AppSpacing.m),
+              const SizedBox(width: AppSpacing.m),
               ChallengeCard(
                 title: 'Great Wall Master',
                 description:
@@ -434,12 +434,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 reviewCount: 2340,
                 category: 'Historic',
                 distance: '2.3 km',
-                tags: ['UNESCO', 'Garden'],
+                tags: const ['UNESCO', 'Garden'],
                 size: PlaceCardSize.medium,
                 onTap: () {},
                 onFavorite: () {},
               ),
-              SizedBox(width: AppSpacing.m),
+              const SizedBox(width: AppSpacing.m),
               PlaceCard(
                 name: 'Temple of Heaven',
                 location: 'Dongcheng District',
@@ -447,13 +447,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 reviewCount: 3120,
                 category: 'Cultural',
                 distance: '3.7 km',
-                tags: ['UNESCO', 'Temple'],
+                tags: const ['UNESCO', 'Temple'],
                 isFavorite: true,
                 size: PlaceCardSize.medium,
                 onTap: () {},
                 onFavorite: () {},
               ),
-              SizedBox(width: AppSpacing.m),
+              const SizedBox(width: AppSpacing.m),
               PlaceCard(
                 name: 'Beihai Park',
                 location: 'Xicheng District',
@@ -461,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 reviewCount: 1890,
                 category: 'Nature',
                 distance: '1.8 km',
-                tags: ['Park', 'Lake'],
+                tags: const ['Park', 'Lake'],
                 size: PlaceCardSize.medium,
                 onTap: () {},
                 onFavorite: () {},
@@ -499,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 reviewCount: 1560,
                 category: 'Nature',
                 distance: '1.2 km',
-                tags: ['Viewpoint', 'Park'],
+                tags: const ['Viewpoint', 'Park'],
                 size: PlaceCardSize.large,
                 onTap: () {},
                 onFavorite: () {},
@@ -512,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 reviewCount: 2890,
                 category: 'Shopping',
                 distance: '2.1 km',
-                tags: ['Hutong', 'Food'],
+                tags: const ['Hutong', 'Food'],
                 size: PlaceCardSize.large,
                 onTap: () {},
                 onFavorite: () {},

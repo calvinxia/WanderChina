@@ -21,7 +21,7 @@ class PlaceCard extends StatefulWidget {
   final PlaceCardSize size;
 
   const PlaceCard({
-    Key? key,
+    super.key,
     required this.name,
     required this.location,
     this.imageUrl,
@@ -34,7 +34,7 @@ class PlaceCard extends StatefulWidget {
     this.onTap,
     this.onFavorite,
     this.size = PlaceCardSize.medium,
-  }) : super(key: key);
+  });
 
   @override
   State<PlaceCard> createState() => _PlaceCardState();
@@ -52,7 +52,7 @@ class _PlaceCardState extends State<PlaceCard> {
       onTap: widget.onTap,
       child: AnimatedScale(
         scale: _isPressed ? 0.97 : 1.0,
-        duration: Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 100),
         child: Container(
           width: _getWidth(),
           height: _getHeight(),
@@ -63,7 +63,7 @@ class _PlaceCardState extends State<PlaceCard> {
               BoxShadow(
                 color: AppColors.gray900.withOpacity(0.08),
                 blurRadius: 16,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -76,7 +76,7 @@ class _PlaceCardState extends State<PlaceCard> {
               // Content section
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.all(AppSpacing.s),
+                  padding: const EdgeInsets.all(AppSpacing.s),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -100,12 +100,12 @@ class _PlaceCardState extends State<PlaceCard> {
                       Flexible(
                         child: Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.location_on,
                               size: 12,
                               color: AppColors.gray500,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 widget.location,
@@ -120,7 +120,7 @@ class _PlaceCardState extends State<PlaceCard> {
                         ),
                       ),
 
-                      Spacer(),
+                      const Spacer(),
 
                       // Rating & Tags
                       _buildBottomRow(),
@@ -143,7 +143,7 @@ class _PlaceCardState extends State<PlaceCard> {
           height: _getImageHeight(),
           decoration: BoxDecoration(
             color: AppColors.gray100,
-            borderRadius: BorderRadius.vertical(
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(AppSpacing.radiusL),
             ),
             image: widget.imageUrl != null
@@ -154,7 +154,7 @@ class _PlaceCardState extends State<PlaceCard> {
                 : null,
           ),
           child: widget.imageUrl == null
-              ? Center(
+              ? const Center(
                   child: Icon(
                     Icons.image,
                     size: 48,
@@ -168,7 +168,7 @@ class _PlaceCardState extends State<PlaceCard> {
         Container(
           height: _getImageHeight(),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.vertical(
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(AppSpacing.radiusL),
             ),
             gradient: LinearGradient(
@@ -205,7 +205,7 @@ class _PlaceCardState extends State<PlaceCard> {
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
               blurRadius: 8,
-              offset: Offset(0, 2),
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -216,8 +216,8 @@ class _PlaceCardState extends State<PlaceCard> {
         ),
       ),
     ).animate(target: widget.isFavorite ? 1 : 0).scale(
-          begin: Offset(1, 1),
-          end: Offset(1.2, 1.2),
+          begin: const Offset(1, 1),
+          end: const Offset(1.2, 1.2),
           duration: 200.ms,
           curve: Curves.easeOut,
         );
@@ -229,7 +229,7 @@ class _PlaceCardState extends State<PlaceCard> {
         if (widget.category != null) ...[
           Flexible(
             child: Container(
-              padding: EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: 6,
                 vertical: 2,
               ),
@@ -248,7 +248,7 @@ class _PlaceCardState extends State<PlaceCard> {
               ),
             ),
           ),
-          SizedBox(width: 4),
+          const SizedBox(width: 4),
         ],
         if (widget.distance != null)
           Flexible(
@@ -269,8 +269,8 @@ class _PlaceCardState extends State<PlaceCard> {
       children: [
         // Rating
         if (widget.rating != null) ...[
-          Icon(Icons.star, size: 11, color: AppColors.warning500),
-          SizedBox(width: 2),
+          const Icon(Icons.star, size: 11, color: AppColors.warning500),
+          const SizedBox(width: 2),
           Text(
             widget.rating!.toStringAsFixed(1),
             style: AppTextStyles.bodySmall(color: AppColors.gray900)
