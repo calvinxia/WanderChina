@@ -108,9 +108,16 @@ class VoiceTranslationService extends ChangeNotifier {
       );
 
       // Step 3: 云函数TTS播放
+      final ttsLang = direction == TranslationDirection.foreignToChinese
+          ? 'zh'
+          : (foreignLanguage == AppLanguage.english
+              ? 'en'
+              : foreignLanguage == AppLanguage.french
+                  ? 'fr'
+                  : 'es');
       await _cloudTTS(
-        text:      translated,
-        isChinese: direction == TranslationDirection.foreignToChinese,
+        text: translated,
+        language: ttsLang,
       );
 
       stopwatch.stop();
@@ -149,6 +156,60 @@ class VoiceTranslationService extends ChangeNotifier {
   void clearHistory() {
     _history.clear();
     notifyListeners();
+  }
+
+  /// 重播上一条翻译结果的 TTS
+  Future<void> replayTTS(String text, String targetLang) async {
+    await _cloudTTS(text: text, language: targetLang);
+  }
+
+  /// 快捷短语：直接翻译 + 播放，跳过录音步骤
+  Future<VoiceTranslationResult?> translateQuickPhrase({
+    required String phrase,
+    required TranslationDirection direction,
+    required AppLanguage foreignLanguage,
+  }) async {
+    if (_state != VoiceServiceState.idle) return null;
+
+    _setState(VoiceServiceState.processing);
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      // 直接翻译短语
+      final translated = await _cloudTranslate(
+        text: phrase,
+        direction: direction,
+        foreignLanguage: foreignLanguage,
+      );
+
+      // TTS播放
+      final ttsLang = direction == TranslationDirection.foreignToChinese
+          ? 'zh'
+          : (foreignLanguage == AppLanguage.english
+              ? 'en'
+              : foreignLanguage == AppLanguage.french
+                  ? 'fr'
+                  : 'es');
+      await _cloudTTS(text: translated, language: ttsLang);
+
+      stopwatch.stop();
+      final result = VoiceTranslationResult(
+        originalText: phrase,
+        translatedText: translated,
+        direction: direction,
+        foreignLanguage: foreignLanguage,
+        processingTime: stopwatch.elapsed,
+      );
+      _history.add(result);
+
+      return result;
+    } catch (e) {
+      debugPrint('⚠️ 快捷短语翻译失败: $e');
+      _setState(VoiceServiceState.error);
+      await Future.delayed(const Duration(seconds: 2));
+      _setState(VoiceServiceState.idle);
+      return null;
+    }
   }
 
   // ─── 云函数ASR ──────────────────────────────────────────
@@ -225,12 +286,12 @@ class VoiceTranslationService extends ChangeNotifier {
 
   Future<void> _cloudTTS({
     required String text,
-    required bool   isChinese,
+    required String language, // 'zh', 'en', 'fr', 'es'
   }) async {
     try {
       final result = await ApiClient.post(ApiClient.ttsUrl, {
         'text': text,
-        'language': isChinese ? 'zh' : 'en',
+        'language': language,
       });
 
       if (result['audio_base64'] != null) {

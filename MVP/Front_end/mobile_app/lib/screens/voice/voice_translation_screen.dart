@@ -360,15 +360,15 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                       const SizedBox(height: 8),
                       GestureDetector(
                         onTap: () async {
-                          // TODO: Replay TTS for translated text
-                          // await _service.replayTTS(result);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Replay feature coming soon'),
-                              duration: const Duration(seconds: 1),
-                              backgroundColor: AppColors.jade500,
-                            ),
-                          );
+                          // Replay TTS for translated text
+                          final targetLang = result.direction == TranslationDirection.foreignToChinese
+                              ? 'zh'
+                              : (result.foreignLanguage == AppLanguage.english
+                                  ? 'en'
+                                  : result.foreignLanguage == AppLanguage.french
+                                      ? 'fr'
+                                      : 'es');
+                          await _service.replayTTS(result.translatedText, targetLang);
                         },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -420,14 +420,11 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
                   onTap: () async {
-                    // TODO: Auto-translate and play phrase
-                    // await _service.translateQuickPhrase(...)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Quick phrase: ${phrases[index]}'),
-                        duration: const Duration(seconds: 1),
-                        backgroundColor: AppColors.jade500,
-                      ),
+                    // Auto-translate and play phrase
+                    await _service.translateQuickPhrase(
+                      phrase: phrases[index],
+                      direction: _direction,
+                      foreignLanguage: _selectedLanguage,
                     );
                   },
                   child: Container(
