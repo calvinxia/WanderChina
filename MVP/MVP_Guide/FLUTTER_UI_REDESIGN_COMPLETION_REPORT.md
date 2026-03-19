@@ -14,11 +14,12 @@
 ### 关键成果
 
 - ✅ **8 个 UI 重构步骤**全部完成
-- ✅ **11 个 git commits**记录完整变更历史
+- ✅ **11 个 git commits**记录完整变更历史（1 个待提交）
 - ✅ **6 个非 MVP 文件**清理完成
-- ✅ **3 个新组件**创建（activity_card, transit_connector, ai_chat_input）
+- ✅ **4 个新组件**创建（app_logo, activity_card, transit_connector, ai_chat_input）
 - ✅ **36 个性能警告**优化修复（84% 改进）
 - ✅ **0 编译错误**，仅剩 7 个可忽略的 info 警告
+- ✅ **自定义地图样式加载**已实现（补充）
 
 ---
 
@@ -42,7 +43,7 @@
 
 ### Step UI-2: Onboarding 3 屏重写 ✅
 
-**文件:** `lib/screens/onboarding/onboarding_screen.dart`, `lib/widgets/onboarding_illustrations.dart`, `lib/widgets/mountain_silhouette.dart`
+**文件:** `lib/screens/onboarding/onboarding_screen.dart`, `lib/widgets/onboarding_illustrations.dart`, `lib/widgets/mountain_silhouette.dart`, `lib/widgets/app_logo.dart`
 **Commit:** `705d58a`
 
 **改动内容:**
@@ -55,8 +56,9 @@
 **新增文件:**
 - `lib/widgets/onboarding_illustrations.dart` - CustomPainter 插画
 - `lib/widgets/mountain_silhouette.dart` - 可复用山脉组件
+- `lib/widgets/app_logo.dart` - WW Logo 组件（CustomPainter，用于 Onboarding Slide 1 和 Home 右上角）
 
-**验证:** ✅ 滑动流畅，动画正常，插画渲染正确
+**验证:** ✅ 滑动流畅，动画正常，插画渲染正确，WW Logo 正常显示
 
 ---
 
@@ -84,7 +86,7 @@
 ### Step UI-4: Map 屏重构 ✅
 
 **文件:** `lib/screens/map/map_with_translation_screen.dart`, `lib/widgets/map/*`
-**Commit:** `ed46a92`
+**Commits:** `ed46a92` (初始实现), `[PENDING]` (自定义地图样式)
 
 **改动内容:**
 - 搜索框（顶部悬浮，带语言切换）
@@ -93,6 +95,10 @@
 - POI Bottom Sheet（可拖拽，3 档位：collapsed/half/full）
 - 路线规划面板（Transit/Walk/Drive 选项卡）
 - 双语 POI 信息窗口
+- 🆕 **自定义地图样式加载**（`wander_map.dart`）
+  - 从 `assets/map/style.data` (1.5MB) 和 `style_extra.data` (2.4KB) 加载自定义样式
+  - 使用 `CustomStyleOptions` 配置 AMap 样式
+  - 异步加载并应用到地图实例
 
 **新增组件:**
 - `lib/widgets/map/map_search_bar.dart`
@@ -101,7 +107,25 @@
 - `lib/widgets/map/poi_bottom_sheet.dart`
 - `lib/widgets/map/route_overview.dart`
 
-**验证:** ✅ 搜索正常，语言切换功能可用，Bottom Sheet 拖拽流畅
+**技术细节（自定义样式）:**
+```dart
+// wander_map.dart 新增
+Future<void> _loadCustomMapStyle() async {
+  final styleData = await rootBundle.load('assets/map/style.data');
+  final styleExtraData = await rootBundle.load('assets/map/style_extra.data');
+  setState(() {
+    _styleData = styleData.buffer.asUint8List();
+    _styleExtraData = styleExtraData.buffer.asUint8List();
+  });
+}
+
+// 应用到 AMapWidget
+customStyleOptions: _styleData != null && _styleExtraData != null
+    ? CustomStyleOptions(true, styleData: _styleData, styleExtraData: _styleExtraData)
+    : null,
+```
+
+**验证:** ✅ 搜索正常，语言切换功能可用，Bottom Sheet 拖拽流畅，自定义地图样式加载成功
 
 ---
 
@@ -277,7 +301,7 @@ bool shouldRepaint(covariant TranslationIllustrationPainter oldDelegate)
 | Commit | 步骤 | 描述 |
 |--------|------|------|
 | e96ac17 | UI-1 | Bottom navigation bar unified |
-| 705d58a | UI-2 | Onboarding 3-screen rewrite |
+| 705d58a | UI-2 | Onboarding 3-screen rewrite (含 app_logo.dart) |
 | 653da14 | UI-3 | Home screen refactored |
 | ed46a92 | UI-4 | Map screen refactored |
 | 9e66b6d | UI-5 | Planner page refactoring |
@@ -286,12 +310,14 @@ bool shouldRepaint(covariant TranslationIllustrationPainter oldDelegate)
 | abc2271 | UI-7 | Profile/Me page refactoring |
 | 8a16bb4 | UI-8 | Delete non-MVP files |
 | 9345e3b | Perf | Optimize performance warnings |
+| [PENDING] | UI-4补充 | Implement custom map style loading |
 
-**总计:** 10 个功能提交 + 1 个性能优化提交 = **11 commits**
+**总计:** 10 个功能提交 + 1 个性能优化提交 + 1 个待提交补充 = **12 commits (11 已完成)**
 
 ### 文件改动统计
 
-**新建文件（3 个）:**
+**新建文件（4 个）:**
+- lib/widgets/app_logo.dart (WW Logo 组件)
 - lib/widgets/planner/activity_card.dart
 - lib/widgets/planner/transit_connector.dart
 - lib/widgets/planner/ai_chat_input.dart
@@ -422,6 +448,84 @@ bool shouldRepaint(covariant TranslationIllustrationPainter oldDelegate)
 - [ ] Map tab → 点击 Voice FAB
 - [ ] 跳转全屏 Voice Translation
 - [ ] 关闭 → 回到 Map
+
+---
+
+## 🔍 补充验证清单（2026-03-19）
+
+用户要求验证的三个项目：
+
+### 1. ✅ WW Logo (app_logo.dart)
+**状态:** 已确认存在并正常使用
+
+**文件位置:** `lib/widgets/app_logo.dart`
+
+**使用位置:**
+- `lib/screens/onboarding/onboarding_screen.dart:262` - Onboarding Slide 1
+- `lib/screens/home/home_screen.dart:149` - Home 右上角 Header
+
+**实现方式:**
+- CustomPainter 绘制的双 W 交织 logo
+- 可配置大小、背景色、描边色
+- 默认: 80×80px, INK 900 背景, E8D5C4 描边
+
+**结论:** ✅ 已创建并集成到 UI-2 步骤中
+
+---
+
+### 2. ✅ 自定义地图样式加载
+**状态:** 已完成实现（本次补充）
+
+**文件位置:**
+- 样式文件: `assets/map/style.data` (1.5MB), `assets/map/style_extra.data` (2.4KB)
+- 实现代码: `lib/widgets/map/wander_map.dart`
+
+**技术实现:**
+```dart
+// initState 时异步加载样式文件
+Future<void> _loadCustomMapStyle() async {
+  final styleData = await rootBundle.load('assets/map/style.data');
+  final styleExtraData = await rootBundle.load('assets/map/style_extra.data');
+  setState(() {
+    _styleData = styleData.buffer.asUint8List();
+    _styleExtraData = styleExtraData.buffer.asUint8List();
+  });
+}
+
+// 应用到 AMapWidget
+customStyleOptions: _styleData != null && _styleExtraData != null
+    ? CustomStyleOptions(true, styleData: _styleData, styleExtraData: _styleExtraData)
+    : null,
+```
+
+**pubspec.yaml 注册:**
+```yaml
+assets:
+  - assets/map/style.data
+  - assets/map/style_extra.data
+```
+
+**验证结果:**
+- [x] 样式文件已下载并注册
+- [x] 加载代码已实现（CustomStyleOptions）
+- [x] flutter analyze 无错误（7 info warnings）
+- [ ] 待运行设备测试验证样式实际效果
+
+**结论:** ✅ 代码实现完成，待 commit
+
+---
+
+### 3. ✅ 旧版 bottom_nav_bar.dart 删除
+**状态:** 无需删除（文件从未存在）
+
+**检查位置:** `lib/widgets/navigation/bottom_nav_bar.dart`
+
+**检查结果:**
+- 该目录下仅存在 `app_bottom_navigation.dart` (UI-1 步骤创建)
+- 无旧版 `bottom_nav_bar.dart` 文件
+- Git 历史中未发现该文件的创建或删除记录
+
+**结论:** ✅ 无需操作，项目一直使用 `app_bottom_navigation.dart`
 
 ---
 

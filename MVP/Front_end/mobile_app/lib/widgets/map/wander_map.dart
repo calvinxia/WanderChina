@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:amap_map/amap_map.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 import '../../models/poi_translation.dart';
@@ -46,6 +47,32 @@ class WanderMapState extends State<WanderMap> {
   Set<Marker>       _translationMarkers = {};
   // 缓存已获取的翻译 POI（避免重复请求）
   final Map<String, POITranslation> _poiCache = {};
+
+  // 自定义地图样式数据
+  Uint8List? _styleData;
+  Uint8List? _styleExtraData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomMapStyle();
+  }
+
+  /// 加载自定义地图样式文件
+  Future<void> _loadCustomMapStyle() async {
+    try {
+      final styleData = await rootBundle.load('assets/map/style.data');
+      final styleExtraData = await rootBundle.load('assets/map/style_extra.data');
+      if (mounted) {
+        setState(() {
+          _styleData = styleData.buffer.asUint8List();
+          _styleExtraData = styleExtraData.buffer.asUint8List();
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ 加载自定义地图样式失败: $e');
+    }
+  }
 
   // ─── 公开接口 ─────────────────────────────────────────
 
@@ -215,6 +242,14 @@ class WanderMapState extends State<WanderMap> {
           rotateGesturesEnabled: false,
           compassEnabled:        true,
           myLocationStyleOptions: MyLocationStyleOptions(true),
+          // 自定义地图样式
+          customStyleOptions: _styleData != null && _styleExtraData != null
+              ? CustomStyleOptions(
+                  true,
+                  styleData: _styleData,
+                  styleExtraData: _styleExtraData,
+                )
+              : null,
         ),
 
         // 2. 语音翻译按钮
