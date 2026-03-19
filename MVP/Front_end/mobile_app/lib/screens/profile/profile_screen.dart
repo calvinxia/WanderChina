@@ -1,44 +1,126 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/constants/app_spacing.dart';
 
-/// Profile Screen - User profile and settings
-/// Based on Figma design - Screen 7 (Profile)
-class ProfileScreen extends StatelessWidget {
+/// Screen 12: Profile / Me Page
+///
+/// 规范来自 FLUTTER_UI_REDESIGN_INSTRUCTIONS.md Step UI-7
+/// - Simplified profile header with 2 stats (Places + Trips)
+/// - 3-tab layout: Trips · Saved Places · History
+/// - Removed non-MVP features: Challenges, Budget Tracker, Points
+/// - Trip cards with View/Edit/Share actions
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // App Bar with Profile Header
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            backgroundColor: Colors.white,
-            flexibleSpace: FlexibleSpaceBar(
-              background: _buildProfileHeader(),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.gray900),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.gray700),
+            onPressed: _handleSettings,
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Profile Header
+          _buildProfileHeader(),
+
+          const SizedBox(height: 24),
+
+          // Stats
+          _buildStats(),
+
+          const SizedBox(height: 16),
+
+          // Edit Profile Button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton(
+                onPressed: _handleEditProfile,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.jade500,
+                  side: const BorderSide(color: AppColors.jade500, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+                child: Text(
+                  'Edit Profile',
+                  style: AppTextStyles.button(color: AppColors.jade500),
+                ),
+              ),
             ),
           ),
 
-          // Profile Content
-          SliverToBoxAdapter(
-            child: Column(
+          const SizedBox(height: 24),
+
+          // Tab Bar
+          Container(
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: AppColors.gray200, width: 1),
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: AppColors.jade500,
+              unselectedLabelColor: AppColors.gray600,
+              labelStyle: AppTextStyles.body(color: AppColors.jade500).copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: AppTextStyles.body(color: AppColors.gray600),
+              indicatorColor: AppColors.jade500,
+              indicatorWeight: 2,
+              tabs: const [
+                Tab(text: 'Trips'),
+                Tab(text: 'Saved Places'),
+                Tab(text: 'History'),
+              ],
+            ),
+          ),
+
+          // Tab Content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
               children: [
-                AppSpacing.gapHeightL,
-
-                // Stats Section
-                _buildStatsSection(),
-
-                AppSpacing.gapHeightL,
-
-                // Menu Section
-                _buildMenuSection(),
-
-                AppSpacing.gapHeightXL,
+                _buildTripsTab(),
+                _buildSavedPlacesTab(),
+                _buildHistoryTab(),
               ],
             ),
           ),
@@ -48,224 +130,333 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProfileHeader() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: AppColors.primaryGradient,
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Avatar
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.person,
-                size: 50,
-                color: AppColors.primary,
-              ),
-            ),
-
-            AppSpacing.gapHeightM,
-
-            // Name
-            Text(
-              'John Traveler',
-              style: AppTextStyles.h2(color: Colors.white),
-            ),
-
-            AppSpacing.gapHeightXS,
-
-            // Email
-            Text(
-              'john@wanderchina.com',
-              style: AppTextStyles.body(color: Colors.white.withOpacity(0.9)),
-            ),
-
-            AppSpacing.gapHeightM,
-
-            // Edit Profile Button
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.l,
-                vertical: AppSpacing.s,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              child: Text(
-                'Edit Profile',
-                style: AppTextStyles.button(color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsSection() {
-    return Padding(
-      padding: AppSpacing.screenPaddingH,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.m),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.gray900.withOpacity(0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildStatItem('Places Visited', '23'),
-            _buildDivider(),
-            _buildStatItem('Challenges', '8'),
-            _buildDivider(),
-            _buildStatItem('Points', '1,240'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
     return Column(
       children: [
-        Text(
-          value,
-          style: AppTextStyles.h2(color: AppColors.primary),
+        // Avatar
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: AppColors.gray100,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.gray200, width: 2),
+          ),
+          child: const Icon(
+            Icons.person,
+            size: 40,
+            color: AppColors.gray600,
+          ),
         ),
-        AppSpacing.gapHeightXS,
+
+        const SizedBox(height: 12),
+
+        // Name
         Text(
-          label,
-          style: AppTextStyles.caption(color: AppColors.gray600),
+          'Alex Chen',
+          style: AppTextStyles.h2(color: AppColors.gray900),
+        ),
+
+        const SizedBox(height: 4),
+
+        // Bio
+        Text(
+          '"Backpacker from NYC"',
+          style: AppTextStyles.bodySmall(color: AppColors.gray600),
+        ),
+
+        const SizedBox(height: 8),
+
+        // Location
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.location_on, size: 16, color: AppColors.jade500),
+            const SizedBox(width: 4),
+            Text(
+              'Beijing',
+              style: AppTextStyles.caption(color: AppColors.jade500),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildDivider() {
-    return Container(
-      width: 1,
-      height: 40,
-      color: AppColors.gray200,
-    );
-  }
-
-  Widget _buildMenuSection() {
+  Widget _buildStats() {
     return Padding(
-      padding: AppSpacing.screenPaddingH,
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildMenuItem(
-            icon: Icons.bookmark_border,
-            title: 'Saved Places',
-            onTap: () {},
+          _buildStatItem('📍 12 Places'),
+          Container(
+            width: 1,
+            height: 20,
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            color: AppColors.gray300,
           ),
-          _buildMenuItem(
-            icon: Icons.emoji_events_outlined,
-            title: 'My Challenges',
-            onTap: () {},
-          ),
-          _buildMenuItem(
-            icon: Icons.account_balance_wallet_outlined,
-            title: 'Budget Tracker',
-            onTap: () {},
-          ),
-          _buildMenuItem(
-            icon: Icons.language,
-            title: 'Language & Region',
-            onTap: () {},
-          ),
-          _buildMenuItem(
-            icon: Icons.notifications_outlined,
-            title: 'Notifications',
-            onTap: () {},
-          ),
-          _buildMenuItem(
-            icon: Icons.security_outlined,
-            title: 'Privacy & Security',
-            onTap: () {},
-          ),
-          _buildMenuItem(
-            icon: Icons.help_outline,
-            title: 'Help & Support',
-            onTap: () {},
-          ),
-          _buildMenuItem(
-            icon: Icons.info_outline,
-            title: 'About',
-            onTap: () {},
-          ),
-          AppSpacing.gapHeightM,
-          _buildMenuItem(
-            icon: Icons.logout,
-            title: 'Sign Out',
-            onTap: () {},
-            isDestructive: true,
-          ),
+          _buildStatItem('🗺️ 3 Trips'),
         ],
       ),
     );
   }
 
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool isDestructive = false,
+  Widget _buildStatItem(String text) {
+    return Text(
+      text,
+      style: AppTextStyles.body(color: AppColors.gray700).copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _buildTripsTab() {
+    // Mock trip data
+    final trips = [
+      {
+        'destination': 'Beijing',
+        'days': 3,
+        'type': 'Culture',
+        'date': 'Jan 12, 2026',
+      },
+      {
+        'destination': 'Shanghai',
+        'days': 5,
+        'type': 'Food',
+        'date': 'Dec 28, 2025',
+      },
+    ];
+
+    if (trips.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, size: 64, color: AppColors.gray300),
+            const SizedBox(height: 16),
+            Text(
+              'No trips yet',
+              style: AppTextStyles.body(color: AppColors.gray500),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create your first itinerary in the Planner',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption(color: AppColors.gray400),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: trips.length,
+      itemBuilder: (context, index) {
+        final trip = trips[index];
+        return _buildTripCard(
+          destination: trip['destination'] as String,
+          days: trip['days'] as int,
+          type: trip['type'] as String,
+          date: trip['date'] as String,
+        );
+      },
+    );
+  }
+
+  Widget _buildTripCard({
+    required String destination,
+    required int days,
+    required String type,
+    required String date,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.s),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gray900.withOpacity(0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: isDestructive ? AppColors.error500 : AppColors.gray700,
-        ),
-        title: Text(
-          title,
-          style: AppTextStyles.body(
-            color: isDestructive ? AppColors.error500 : AppColors.gray900,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          Row(
+            children: [
+              const Text('📅', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$destination · $days Days · $type',
+                  style: AppTextStyles.h4(color: AppColors.gray900),
+                ),
+              ),
+            ],
           ),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: AppColors.gray400,
-        ),
-        onTap: onTap,
+
+          const SizedBox(height: 8),
+
+          // Date
+          Text(
+            date,
+            style: AppTextStyles.caption(color: AppColors.gray600),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Actions
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _handleViewTrip(destination),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.jade500,
+                    side: const BorderSide(color: AppColors.jade500),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: const Text('View'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _handleEditTrip(destination),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.gray700,
+                    side: const BorderSide(color: AppColors.gray300),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: const Text('Edit'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _handleShareTrip(destination),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.gray700,
+                    side: const BorderSide(color: AppColors.gray300),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: const Text('Share'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildSavedPlacesTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.bookmark_border, size: 64, color: AppColors.gray300),
+          const SizedBox(height: 16),
+          Text(
+            'No saved places yet',
+            style: AppTextStyles.body(color: AppColors.gray500),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Save places from the Map to see them here',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.caption(color: AppColors.gray400),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.history, size: 64, color: AppColors.gray300),
+          const SizedBox(height: 16),
+          Text(
+            'No history yet',
+            style: AppTextStyles.body(color: AppColors.gray500),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Your translation and navigation history will appear here',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.caption(color: AppColors.gray400),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleSettings() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Settings page coming soon'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    // TODO: Navigate to settings screen (Screen 13)
+  }
+
+  void _handleEditProfile() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Edit profile functionality coming soon'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    // TODO: Navigate to edit profile screen
+  }
+
+  void _handleViewTrip(String destination) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('View trip: $destination'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    // TODO: Navigate to itinerary detail screen
+  }
+
+  void _handleEditTrip(String destination) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Edit trip: $destination'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    // TODO: Navigate to trip edit/regeneration
+  }
+
+  void _handleShareTrip(String destination) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Share trip: $destination'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    // TODO: Implement share functionality
   }
 }
