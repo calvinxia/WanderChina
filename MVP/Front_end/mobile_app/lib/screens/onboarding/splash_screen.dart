@@ -3,6 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../services/backend/auth_service.dart';
+import '../../widgets/app_logo.dart';
+import '../main/main_screen.dart';
 import 'onboarding_screen.dart';
 
 /// Splash Screen with beautiful animations
@@ -22,9 +25,21 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateToNext() async {
-    await Future.delayed(const Duration(seconds: 3));
-    if (mounted) {
-      // Navigate to onboarding or home based on user state
+    // 并行执行：最少显示 2 秒 + 同时检查 session
+    final results = await Future.wait([
+      Future.delayed(const Duration(seconds: 2)),
+      AuthService.restoreSession(),
+    ]);
+
+    if (!mounted) return;
+
+    final isLoggedIn = results[1] as bool;
+
+    if (isLoggedIn) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+      );
+    } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
@@ -85,13 +100,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ],
         ),
-        child: const Center(
-          child: Icon(
-            Icons.explore,
-            size: 60,
-            color: AppColors.primary,
-          ),
-        ),
+        child: const AppLogo(size: 60),
       )
           .animate()
           .fadeIn(

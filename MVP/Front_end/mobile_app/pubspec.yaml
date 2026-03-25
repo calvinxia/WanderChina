@@ -44,7 +44,7 @@ dependencies:
 
   # Icons & Fonts
   cupertino_icons: ^1.0.6
-  google_fonts: ^8.0.2
+  google_fonts: ^6.2.1
   flutter_svg: ^2.0.9
 
   # Networking
@@ -80,6 +80,7 @@ flutter:
     - assets/icons/
     - assets/animations/
     - assets/illustrations/
+    - assets/map/
 
   # Fonts (using Google Fonts at runtime）
 

@@ -51,22 +51,22 @@ class RouteStep {
   /// 格式化距离
   String get formattedDistance {
     if (distance < 1000) {
-      return '${distance.toStringAsFixed(0)}米';
+      return '${distance.toStringAsFixed(0)}m';
     } else {
-      return '${(distance / 1000).toStringAsFixed(1)}公里';
+      return '${(distance / 1000).toStringAsFixed(1)} km';
     }
   }
 
   /// 格式化时长
   String get formattedDuration {
     if (duration < 60) {
-      return '$duration秒';
+      return '${duration}s';
     } else if (duration < 3600) {
-      return '${(duration / 60).toStringAsFixed(0)}分钟';
+      return '${(duration / 60).toStringAsFixed(0)} min';
     } else {
       final hours = (duration / 3600).floor();
       final minutes = ((duration % 3600) / 60).floor();
-      return '$hours小时$minutes分钟';
+      return '${hours}h ${minutes}min';
     }
   }
 }
@@ -96,22 +96,22 @@ class RouteInfo {
   /// 格式化总距离
   String get formattedDistance {
     if (totalDistance < 1000) {
-      return '${totalDistance.toStringAsFixed(0)}米';
+      return '${totalDistance.toStringAsFixed(0)}m';
     } else {
-      return '${(totalDistance / 1000).toStringAsFixed(1)}公里';
+      return '${(totalDistance / 1000).toStringAsFixed(1)} km';
     }
   }
 
   /// 格式化总时长
   String get formattedDuration {
     if (totalDuration < 60) {
-      return '$totalDuration秒';
+      return '${totalDuration}s';
     } else if (totalDuration < 3600) {
-      return '${(totalDuration / 60).toStringAsFixed(0)}分钟';
+      return '${(totalDuration / 60).toStringAsFixed(0)} min';
     } else {
       final hours = (totalDuration / 3600).floor();
       final minutes = ((totalDuration % 3600) / 60).floor();
-      return '$hours小时$minutes分钟';
+      return '${hours}h ${minutes}min';
     }
   }
 }
@@ -140,61 +140,87 @@ class RoutePlanningService {
   }) async {
     try {
       // 调用云函数进行路线规划
-      final result = await ApiClient.post(ApiClient.routeUrl, {
-        'origin': '${origin.longitude},${origin.latitude}',
-        'destination': '${destination.longitude},${destination.latitude}',
-        'route_type': routeType.value,
-        'strategy': strategy.value,
-        'multi_route': multiRoute,
-      });
+      final result = await ApiClient.post(
+        ApiClient.routeUrl,
+        {
+          'origin': '${origin.longitude},${origin.latitude}',
+          'destination': '${destination.longitude},${destination.latitude}',
+          'mode': routeType.value,
+          'lang': 'en',
+        },
+        timeout: const Duration(seconds: 45),
+      );
 
       final routes = <RouteInfo>[];
-      final routesData = result['routes'] as List;
+      final routesData = result['routes'] as List? ?? [];
 
-      for (final routeData in routesData) {
+      for (int i = 0; i < routesData.length; i++) {
+        final routeData = routesData[i];
+
+        // 解析步骤
         final steps = <RouteStep>[];
-        final stepsData = routeData['steps'] as List;
-
+        final stepsData = routeData['steps'] as List? ?? [];
         for (final stepData in stepsData) {
+          String instruction = '';
+
+          // 优先英文，fallback 中文
+          if (stepData['instruction_en'] != null) {
+            instruction = stepData['instruction_en'] as String;
+          } else if (stepData['instruction_zh'] != null) {
+            instruction = stepData['instruction_zh'] as String;
+          }
+
+          // Transit 类型：拼接上下站英文信息
+          if (stepData['type'] == 'transit' && stepData['sub_steps'] != null) {
+            final subSteps = stepData['sub_steps'] as List;
+            final parts = <String>[];
+            for (final sub in subSteps) {
+              final textEn = sub['text_en'] as String?;
+              if (textEn != null) parts.add(textEn);
+            }
+            if (parts.isNotEmpty) {
+              instruction = '${stepData['instruction_en'] ?? stepData['line_en'] ?? ''}\n${parts.join(' → ')}';
+            }
+          }
+
+          // 路名：优先英文，fallback 中文
+          final road = (stepData['road_en'] ?? stepData['road_zh'] ?? '') as String;
+
           steps.add(RouteStep(
-            instruction: stepData['instruction'] as String,
-            road: stepData['road'] as String,
-            distance: (stepData['distance'] as num).toDouble(),
-            duration: stepData['duration'] as int,
-            startLocation: LatLng(
-              (stepData['start_location']['lat'] as num).toDouble(),
-              (stepData['start_location']['lng'] as num).toDouble(),
-            ),
-            endLocation: LatLng(
-              (stepData['end_location']['lat'] as num).toDouble(),
-              (stepData['end_location']['lng'] as num).toDouble(),
-            ),
+            instruction: instruction,
+            road: road,
+            distance: (stepData['distance'] as num?)?.toDouble() ?? 0,
+            duration: (stepData['duration'] as num?)?.toInt() ?? 0,
+            startLocation: const LatLng(0, 0),  // 云函数未返回，填默认值
+            endLocation: const LatLng(0, 0),
           ));
         }
 
-        // 解析路线坐标点
+        // 解析 polyline：云函数返回格式 "lng,lat;lng,lat;..."
         final polyline = <LatLng>[];
-        final polylineData = routeData['polyline'] as List;
-        for (final point in polylineData) {
-          polyline.add(LatLng(
-            (point['lat'] as num).toDouble(),
-            (point['lng'] as num).toDouble(),
-          ));
+        final polylineStr = routeData['polyline'] as String? ?? '';
+        if (polylineStr.isNotEmpty) {
+          for (final point in polylineStr.split(';')) {
+            final parts = point.split(',');
+            if (parts.length == 2) {
+              final lng = double.tryParse(parts[0]);
+              final lat = double.tryParse(parts[1]);
+              if (lng != null && lat != null) {
+                polyline.add(LatLng(lat, lng));  // 注意：高德是 lng,lat 顺序
+              }
+            }
+          }
         }
 
         routes.add(RouteInfo(
-          routeId: routeData['route_id'] as String,
+          routeId: 'route_$i',
           routeType: routeType,
-          totalDistance: (routeData['total_distance'] as num).toDouble(),
-          totalDuration: routeData['total_duration'] as int,
+          totalDistance: (routeData['distance'] as num?)?.toDouble() ?? 0,
+          totalDuration: (routeData['duration'] as num?)?.toInt() ?? 0,
           steps: steps,
           polyline: polyline,
-          taxiFee: routeData['taxi_fee'] != null
-              ? (routeData['taxi_fee'] as num).toDouble()
-              : null,
-          transitFee: routeData['transit_fee'] != null
-              ? (routeData['transit_fee'] as num).toDouble()
-              : null,
+          taxiFee: routeData['cost'] != null ? (routeData['cost'] as num).toDouble() : null,
+          transitFee: routeData['cost'] != null ? (routeData['cost'] as num).toDouble() : null,
         ));
       }
 

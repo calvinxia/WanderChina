@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import '../models/poi.dart';
 import '../core/config/amap_config.dart';
-import '../core/constants/supported_cities.dart';
 import 'package:dio/dio.dart';
+import 'api_client.dart';
+import '../core/config/backend_config.dart';
 
 /// POI搜索服务
 ///
 /// 提供兴趣点搜索、附近POI查询等功能
-/// 仅支持6个主要城市：北京、上海、广州、深圳、成都、西安
 class POIService {
   static final POIService _instance = POIService._internal();
   factory POIService() => _instance;
@@ -15,9 +15,6 @@ class POIService {
 
   // ignore: unused_field
   final Dio _dio = Dio();
-
-  /// 启用城市过滤（默认启用）
-  bool enableCityFilter = true;
 
   /// 搜索附近POI
   ///
@@ -34,19 +31,6 @@ class POIService {
     int limit = AMapConfig.poiSearchLimit,
   }) async {
     try {
-      // 检查坐标是否在支持的城市内
-      if (enableCityFilter) {
-        final city = SupportedCities.getCityFromCoordinates(latitude, longitude);
-        if (city == null) {
-          debugPrint('⚠️ 搜索位置不在支持的城市内（仅支持北京、上海、广州、深圳、成都、西安）');
-          return [];
-        }
-        debugPrint('✅ 搜索城市: $city');
-      }
-
-      // 这里应该调用实际的高德POI搜索API
-      // 由于需要API Key和网络请求，这里提供模拟数据示例
-
       // 模拟数据（实际使用时需要替换为真实API调用）
       final mockPOIs = _generateMockPOIs(
         latitude,
@@ -84,6 +68,19 @@ class POIService {
     }
   }
 
+  /// 映射英文城市名到中文
+  String _mapCityToZh(String city) {
+    const cityMap = {
+      'Beijing': '北京',
+      'Shanghai': '上海',
+      'Guangzhou': '广州',
+      'Shenzhen': '深圳',
+      'Chengdu': '成都',
+      "Xi'an": '西安',
+    };
+    return cityMap[city] ?? city;
+  }
+
   /// 搜索POI（按关键词）
   ///
   /// [keyword] 搜索关键词
@@ -97,42 +94,27 @@ class POIService {
     double? longitude,
   }) async {
     try {
-      // 检查城市是否在支持列表中
-      if (enableCityFilter && city != null) {
-        if (!SupportedCities.isCitySupported(city)) {
-          debugPrint('⚠️ 不支持的城市: $city（仅支持北京、上海、广州、深圳、成都、西安）');
-          return [];
-        }
+      final body = <String, dynamic>{
+        'keyword': keyword,
+        'lang': 'en',
+      };
+      if (city != null) body['city'] = _mapCityToZh(city);
+
+      final result = await ApiClient.post(BackendConfig.searchUrl, body);
+
+      final pois = <POI>[];
+      final poisData = result['results'] as List? ?? [];
+      for (final p in poisData) {
+        pois.add(POI(
+          id: p['poi_id']?.toString() ?? '',
+          name: p['name_translated'] ?? p['name_zh'] ?? '',
+          address: p['address']?.toString() ?? '',
+          latitude: double.tryParse(p['lat'].toString()) ?? 0,
+          longitude: double.tryParse(p['lng'].toString()) ?? 0,
+          category: POICategory.other,
+        ));
       }
-
-      // 检查坐标是否在支持的城市内
-      if (enableCityFilter && latitude != null && longitude != null) {
-        final detectedCity = SupportedCities.getCityFromCoordinates(latitude, longitude);
-        if (detectedCity == null) {
-          debugPrint('⚠️ 搜索位置不在支持的城市内');
-          return [];
-        }
-      }
-
-      // 模拟搜索结果
-      return _generateMockPOIs(
-        latitude ?? AMapConfig.defaultLatitude,
-        longitude ?? AMapConfig.defaultLongitude,
-        null,
-        10,
-      );
-
-      /* 真实API调用示例：
-      final response = await _dio.get(
-        'https://restapi.amap.com/v3/place/text',
-        queryParameters: {
-          'key': AMapConfig.androidApiKey,
-          'keywords': keyword,
-          'city': city ?? '',
-          'offset': 20,
-        },
-      );
-      */
+      return pois;
 
     } catch (e) {
       debugPrint('❌ 关键词搜索失败: $e');

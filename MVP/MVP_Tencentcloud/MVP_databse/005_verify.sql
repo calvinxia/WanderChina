@@ -7,14 +7,14 @@
 
 
 -- ========================================================================
--- 1. 扩展检查（预期 4 个）
+-- 1. 扩展检查（预期 5 个）
 -- ========================================================================
 SELECT '1. Extensions' AS check_section;
 
 SELECT extname, extversion FROM pg_extension
-WHERE extname IN ('uuid-ossp', 'postgis', 'pgcrypto', 'pg_trgm')
+WHERE extname IN ('uuid-ossp', 'postgis', 'postgis_topology', 'pgcrypto', 'pg_trgm')
 ORDER BY extname;
--- 预期: 4 行
+-- 预期: 5 行
 
 
 -- ========================================================================

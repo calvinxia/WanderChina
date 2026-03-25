@@ -13,6 +13,8 @@ class BackendConfig {
   static const String ttsUrl = String.fromEnvironment('TTS_URL');
   static const String searchUrl = String.fromEnvironment('SEARCH_URL');
   static const String routeUrl = String.fromEnvironment('ROUTE_URL');
+  static const String generateItineraryUrl = String.fromEnvironment('GENERATE_ITINERARY_URL');
+  static const String poiPhotoUrl = String.fromEnvironment('POI_PHOTO_URL');
 
   // ===== COS 公开信息 =====
   static const String cosStaticUrl = String.fromEnvironment('COS_STATIC_URL');

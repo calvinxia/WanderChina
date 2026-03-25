@@ -7,7 +7,7 @@ import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/mountain_silhouette.dart';
 import '../../widgets/onboarding_illustrations.dart';
-import '../main/main_screen.dart';
+import '../auth/login_screen.dart';
 
 /// WanderChina Onboarding Screen - MVP v2.0
 ///
@@ -79,7 +79,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _finishOnboarding() {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
 

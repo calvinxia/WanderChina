@@ -8,6 +8,7 @@ import '../../services/api_client.dart';
 import '../../core/config/backend_config.dart';
 import 'voice_translation_overlay.dart';
 import 'translation_overlay_widget.dart'; // 保留以导入 LabelStyle
+import 'marker_badge_painter.dart';
 
 class WanderMap extends StatefulWidget {
   final LatLng    initialCenter;
@@ -16,8 +17,9 @@ class WanderMap extends StatefulWidget {
   final LabelStyle labelStyle; // 保留参数以兼容现有代码
   final bool      showTranslationOverlay;
   final bool      showVoiceButton;
-  final void Function(LatLng)?         onMapTap;
-  final void Function(POITranslation)? onPOITap;
+  final void Function(LatLng)?           onMapTap;
+  final void Function(POITranslation)?   onPOITap;
+  final void Function(CameraPosition)?   onCameraMove;
 
   const WanderMap({
     super.key,
@@ -29,6 +31,7 @@ class WanderMap extends StatefulWidget {
     this.showVoiceButton        = true,
     this.onMapTap,
     this.onPOITap,
+    this.onCameraMove,
   });
 
   @override
@@ -45,8 +48,12 @@ class WanderMapState extends State<WanderMap> {
   final Set<Marker> _searchMarkers = {};
   // 翻译标记（蒙层 POI）
   Set<Marker>       _translationMarkers = {};
+  // 路线 polylines（Step 1.1）
+  Set<Polyline>     _routePolylines = {};
   // 缓存已获取的翻译 POI（避免重复请求）
   final Map<String, POITranslation> _poiCache = {};
+  // badge 图片缓存: key = poi_id, value = PNG bytes
+  final Map<String, Uint8List> _badgeCache = {};
 
   // 自定义地图样式数据
   Uint8List? _styleData;
@@ -56,6 +63,15 @@ class WanderMapState extends State<WanderMap> {
   void initState() {
     super.initState();
     _loadCustomMapStyle();
+  }
+
+  @override
+  void didUpdateWidget(WanderMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.language != widget.language) {
+      _badgeCache.clear(); // 清缓存，下次 _fetchAndBuildMarkers 会重新渲染
+      _scheduleOverlayUpdate();
+    }
   }
 
   /// 加载自定义地图样式文件
@@ -100,6 +116,55 @@ class WanderMapState extends State<WanderMap> {
 
   void clearSearchMarkers() => setState(() => _searchMarkers.clear());
 
+  // Step 1.2: 路线绘制方法
+  /// 在地图上绘制路线
+  void showRoute(List<LatLng> points, {Color color = const Color(0xFF1FB368), double width = 6.0}) {
+    if (points.isEmpty) return;  // 空 polyline 不画线
+    setState(() {
+      _routePolylines = {
+        Polyline(
+          points: points,
+          color: color,
+          width: width,
+          capType: CapType.round,
+          joinType: JoinType.round,
+        ),
+      };
+    });
+  }
+
+  /// 清除路线
+  void clearRoute() {
+    setState(() {
+      _routePolylines.clear();
+    });
+  }
+
+  /// 显示路线 + 起终点 Marker
+  void showRouteWithMarkers(List<LatLng> points, LatLng origin, LatLng destination) {
+    // 画线
+    showRoute(points);
+
+    // 起点绿色 marker
+    _searchMarkers.add(Marker(
+      position: origin,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    ));
+
+    // 终点红色 marker
+    _searchMarkers.add(Marker(
+      position: destination,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+    ));
+
+    setState(() {});
+
+    // 移动地图让路线可见（移动到中点）
+    final midLat = (origin.latitude + destination.latitude) / 2;
+    final midLng = (origin.longitude + destination.longitude) / 2;
+    moveTo(LatLng(midLat, midLng), zoom: 13);
+  }
+
   // ─── 地图事件 ─────────────────────────────────────────
 
   void _onMapCreated(AMapController ctrl) {
@@ -112,6 +177,7 @@ class WanderMapState extends State<WanderMap> {
     _currentCenter = pos.target;
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), _scheduleOverlayUpdate);
+    widget.onCameraMove?.call(pos);
   }
 
   Future<void> _scheduleOverlayUpdate() async {
@@ -171,19 +237,22 @@ class WanderMapState extends State<WanderMap> {
         }
       }
 
-      // 3. 优先级排序 + 取前 12 个
+      // 3. 优先级排序 + 根据缩放级别取前 N 个
       translations.sort((a, b) {
         final aPri = _isHighPriority(a.categoryEn) ? 1 : 0;
         final bPri = _isHighPriority(b.categoryEn) ? 1 : 0;
         return bPri.compareTo(aPri);
       });
-      final topPOIs = translations.take(12).toList();
+      final limit = _getMarkerLimit(_currentZoom);
+      final topPOIs = translations.take(limit).toList();
 
-      // 4. 生成 Marker
+      // 4. 异步生成 Badge Marker（并行渲染所有 badge）
       final markers = <Marker>{};
-      for (final poi in topPOIs) {
-        markers.add(_buildTranslationMarker(poi));
-      }
+
+      // 并行渲染所有 badge（比逐个等快）
+      final futures = topPOIs.map((poi) => _buildTranslationMarker(poi));
+      final markerList = await Future.wait(futures);
+      markers.addAll(markerList);
 
       if (mounted) {
         setState(() => _translationMarkers = markers);
@@ -193,20 +262,37 @@ class WanderMapState extends State<WanderMap> {
     }
   }
 
-  /// 为单个 POI 生成 Marker
-  Marker _buildTranslationMarker(POITranslation poi) {
+  /// 为 POI 生成自定义 badge marker
+  Future<Marker> _buildTranslationMarker(POITranslation poi) async {
     final isHigh = _isHighPriority(poi.categoryEn);
+
+    // 检查缓存
+    Uint8List? badgeBytes = _badgeCache[poi.gaodePoiId];
+
+    if (badgeBytes == null) {
+      // 获取设备像素密度
+      final dpr = MediaQuery.of(context).devicePixelRatio;
+
+      badgeBytes = await MarkerBadgePainter.renderBadge(
+        textEn: poi.localizedName(widget.language),
+        textZh: poi.nameZh,
+        isHighPriority: isHigh,
+        devicePixelRatio: dpr,
+      );
+
+      _badgeCache[poi.gaodePoiId] = badgeBytes;
+    }
+
     return Marker(
       position: poi.coordinates,
-      infoWindow: InfoWindow(
-        title:   poi.localizedName(widget.language),
-        snippet: poi.nameZh,
-      ),
-      icon: isHigh
-          ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange)
-          : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-      // Note: AMap SDK 3.0.0 的 Marker onTap 签名与我们的需求不匹配
-      // 如需要点击事件，可以通过 AMapWidget 的全局 marker tap 事件处理
+      icon: BitmapDescriptor.fromBytes(badgeBytes),
+      infoWindow: InfoWindow.noText,
+      onTap: (markerId) {
+        final tappedPOI = _poiCache[poi.gaodePoiId];
+        if (tappedPOI != null) {
+          widget.onPOITap?.call(tappedPOI);
+        }
+      },
     );
   }
 
@@ -221,6 +307,14 @@ class WanderMapState extends State<WanderMap> {
     if (zoom >= 15) return 1000;
     if (zoom >= 14) return 2000;
     return 3000;
+  }
+
+  /// 根据缩放级别决定显示的 marker 数量
+  int _getMarkerLimit(double zoom) {
+    if (zoom >= 17) return 15;  // 街道级：多显示
+    if (zoom >= 15) return 12;  // 社区级：标准
+    if (zoom >= 13) return 8;   // 城区级：只显示重要的
+    return 5;                    // 城市级：只显示地标
   }
 
   // ─── build ────────────────────────────────────────────
@@ -239,9 +333,14 @@ class WanderMapState extends State<WanderMap> {
           onCameraMove: _onCameraMove,
           onTap:        (ll) => widget.onMapTap?.call(ll),
           markers:      {..._translationMarkers, ..._searchMarkers},
+          polylines:    _routePolylines, // Step 1.3: 传入 polylines
           rotateGesturesEnabled: false,
           compassEnabled:        true,
-          myLocationStyleOptions: MyLocationStyleOptions(true),
+          myLocationStyleOptions: MyLocationStyleOptions(
+            true,
+            // 注：高德原生 SDK 的定位蓝点 InfoWindow 文字无法直接改为英文
+            // MyLocationStyleOptions 只有 enabled 参数，无法禁用 InfoWindow
+          ),
           // 自定义地图样式
           customStyleOptions: _styleData != null && _styleExtraData != null
               ? CustomStyleOptions(

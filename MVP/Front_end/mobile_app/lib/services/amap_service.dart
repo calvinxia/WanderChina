@@ -20,6 +20,9 @@ class AMapService {
   // 是否已初始化
   bool _isInitialized = false;
 
+  // 缓存的 broadcast stream，避免多次 listen 冲突
+  Stream<Map<String, Object>>? _broadcastStream;
+
   /// 初始化高德地图SDK
   ///
   /// 必须在使用地图功能前调用
@@ -96,8 +99,10 @@ class AMapService {
     }
 
     try {
+      // 用缓存的 broadcast stream，避免重复 listen
+      _broadcastStream ??= _locationPlugin.onLocationChanged().asBroadcastStream();
       _locationPlugin.startLocation();
-      return _locationPlugin.onLocationChanged();
+      return _broadcastStream;
     } catch (e) {
       debugPrint('❌ 开始定位失败: $e');
       return null;
@@ -135,10 +140,13 @@ class AMapService {
         ),
       );
 
+      // 用缓存的 broadcast stream，避免重复 listen
+      _broadcastStream ??= _locationPlugin.onLocationChanged().asBroadcastStream();
+
       _locationPlugin.startLocation();
 
       // 等待定位结果
-      final location = await _locationPlugin.onLocationChanged().first;
+      final location = await _broadcastStream!.first;
 
       // 恢复原配置
       await _configureLocation();
@@ -146,6 +154,8 @@ class AMapService {
       return location;
     } catch (e) {
       debugPrint('❌ 获取定位失败: $e');
+      // stream 可能已失效，清空缓存下次重建
+      _broadcastStream = null;
       return null;
     }
   }
@@ -157,6 +167,7 @@ class AMapService {
       stopLocation();
       _locationPlugin?.destroy();
       _locationPlugin = null;
+      _broadcastStream = null;
       _isInitialized = false;
     } catch (e) {
       debugPrint('⚠️ 销毁定位资源失败: $e');

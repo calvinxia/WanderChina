@@ -14,6 +14,8 @@ class ApiClient {
   static String get ttsUrl => BackendConfig.ttsUrl;
   static String get searchUrl => BackendConfig.searchUrl;
   static String get routeUrl => BackendConfig.routeUrl;
+  static String get generateItineraryUrl => BackendConfig.generateItineraryUrl;
+  static String get poiPhotoUrl => BackendConfig.poiPhotoUrl;
 
   /// 通用 POST 请求
   static Future<Map<String, dynamic>> post(
@@ -23,12 +25,16 @@ class ApiClient {
   }) async {
     final response = await http.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
       body: json.encode(body),
     ).timeout(timeout);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return json.decode(response.body);
+      // 显式使用 UTF-8 解码，确保中文字符正确处理
+      final responseBody = utf8.decode(response.bodyBytes);
+      return json.decode(responseBody);
     }
     throw ApiException(response.statusCode, response.body);
   }

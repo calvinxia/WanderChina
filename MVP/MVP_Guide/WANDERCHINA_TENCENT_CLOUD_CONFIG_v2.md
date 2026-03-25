@@ -125,7 +125,7 @@ VPC 名称:     wanderchina-vpc
 ```yaml
 计费模式:    按量计费（MVP 推荐）或 包年包月（稳定后转）
 地域:        广州
-可用区:      广州三区
+可用区:      广州六区
 数据库版本:  PostgreSQL 14.x
 实例名:      wanderchina-pg-prod
 
@@ -2234,9 +2234,7 @@ if missing:
 
 ## 8. 安全配置
 
-### 8.1 安全组规则
-
-**数据库安全组（wanderchina-db-sg）**
+###**数据库安全组（wanderchina-db-sg）**
 
 ```
 入站规则:

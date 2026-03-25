@@ -44,11 +44,11 @@ class LanguageSwitcher extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                _buildLanguagePill(AppLanguage.english, 'EN'),
+                _buildLanguagePill(context, AppLanguage.english, 'EN'),
                 const SizedBox(width: 8),
-                _buildLanguagePill(AppLanguage.french, 'FR'),
+                _buildLanguagePill(context, AppLanguage.french, 'FR'),
                 const SizedBox(width: 8),
-                _buildLanguagePill(AppLanguage.spanish, 'ES'),
+                _buildLanguagePill(context, AppLanguage.spanish, 'ES'),
               ],
             ),
           ),
@@ -74,24 +74,41 @@ class LanguageSwitcher extends StatelessWidget {
     );
   }
 
-  Widget _buildLanguagePill(AppLanguage language, String label) {
+  Widget _buildLanguagePill(BuildContext context, AppLanguage language, String label) {
     final isSelected = selectedLanguage == language;
+    final isDisabled = language == AppLanguage.french || language == AppLanguage.spanish;
 
-    return GestureDetector(
-      onTap: () => onLanguageChanged(language),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.jade500 : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.caption(
-            color: isSelected ? Colors.white : AppColors.gray700,
-          ).copyWith(
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+    return Opacity(
+      opacity: isDisabled ? 0.5 : 1.0,
+      child: GestureDetector(
+        onTap: () {
+          if (isDisabled) {
+            // FR/ES 暂不支持，显示提示
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('French/Spanish translation coming soon — English available now'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
+          // EN 正常切换
+          onLanguageChanged(language);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.jade500 : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.caption(
+              color: isSelected ? Colors.white : AppColors.gray700,
+            ).copyWith(
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            ),
           ),
         ),
       ),

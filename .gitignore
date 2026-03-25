@@ -271,6 +271,13 @@ site/
 # Exception: keep README files at root level
 !README.md
 
+# Ignore SDK zip files
+*.zip
+
+# Ignore Podfile.lock (iOS dependency lock file)
+**/ios/Podfile.lock
+**/Podfile.lock
+
 # ============================================================================
 # END
 # ============================================================================

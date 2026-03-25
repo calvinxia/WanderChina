@@ -13,6 +13,9 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- PostGIS 空间索引（POI 地理查询 + geohash 自动计算）
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
+-- PostGIS 拓扑功能
+CREATE EXTENSION IF NOT EXISTS "postgis_topology";
+
 -- 密码哈希（bcrypt，用于 user_auth 云函数）
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -22,7 +25,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 -- ============================================================================
 -- 验证
 -- ============================================================================
--- 执行后应返回 4 行:
+-- 执行后应返回 5 行:
 SELECT extname, extversion FROM pg_extension
-WHERE extname IN ('uuid-ossp', 'postgis', 'pgcrypto', 'pg_trgm')
+WHERE extname IN ('uuid-ossp', 'postgis', 'postgis_topology', 'pgcrypto', 'pg_trgm')
 ORDER BY extname;

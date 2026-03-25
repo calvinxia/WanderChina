@@ -2,6 +2,9 @@
 /// 行程规划数据模型
 library;
 
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+
 /// Activity/Event in a day
 /// 单日活动/事件
 class Activity {
@@ -58,6 +61,53 @@ class Activity {
     );
   }
 
+  /// 从云函数/DeepSeek 格式构造
+  factory Activity.fromCloudData(Map<String, dynamic> json, {required DateTime dayDate, int index = 0}) {
+    debugPrint('🎯 Activity.fromCloudData [$index] - JSON keys: ${json.keys.toList()}');
+
+    // 如果数据已经是 toJson 格式（从数据库读取的已保存行程），用 fromJson 解析
+    if (json.containsKey('startTime') && json.containsKey('endTime')) {
+      debugPrint('🎯 Detected toJson format, using fromJson');
+      return Activity.fromJson(json);
+    }
+
+    // 否则是 DeepSeek 原始格式，手动解析
+    debugPrint('🎯 Detected DeepSeek format, parsing manually');
+
+    // 解析时间 "09:00" → DateTime
+    final timeStr = json['time'] as String? ?? '09:00';
+    final parts = timeStr.split(':');
+    final hour = int.tryParse(parts[0]) ?? 9;
+    final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    final startTime = DateTime(dayDate.year, dayDate.month, dayDate.day, hour, minute);
+
+    // 解析 duration "2 hrs" → 结束时间
+    final durationStr = json['duration'] as String? ?? '1 hrs';
+    final durationHours = double.tryParse(durationStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1;
+    final endTime = startTime.add(Duration(minutes: (durationHours * 60).round()));
+
+    // 解析费用 "¥60" → double
+    final costStr = json['cost'] as String? ?? '¥0';
+    final cost = double.tryParse(costStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+
+    final title = json['name'] as String? ?? json['title'] as String? ?? '';
+    debugPrint('🎯 Activity: $title, time: $timeStr, duration: $durationStr, cost: $costStr');
+
+    return Activity(
+      id: json['id'] as String? ?? 'act_$index',
+      title: title,
+      description: json['description'] as String? ?? '',
+      location: json['name_zh'] as String? ?? json['location'] as String? ?? '',
+      address: json['address'] as String?,
+      startTime: startTime,
+      endTime: endTime,
+      category: json['category'] as String? ?? 'sightseeing',
+      estimatedCost: cost,
+      currency: 'CNY',
+      notes: json['name_zh'] as String?,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -106,7 +156,7 @@ class ItineraryDay {
   factory ItineraryDay.fromJson(Map<String, dynamic> json) {
     return ItineraryDay(
       id: json['id'] as String,
-      dayNumber: json['dayNumber'] as int,
+      dayNumber: (json['day_number'] ?? json['dayNumber'] ?? 1) as int,
       date: DateTime.parse(json['date'] as String),
       title: json['title'] as String?,
       activities: (json['activities'] as List<dynamic>)
@@ -116,10 +166,58 @@ class ItineraryDay {
     );
   }
 
+  /// 从云函数/DeepSeek 格式构造
+  factory ItineraryDay.fromCloudData(Map<String, dynamic> json, {required DateTime startDate}) {
+    debugPrint('📅 ItineraryDay.fromCloudData - Input JSON keys: ${json.keys.toList()}');
+
+    // 如果数据已经是 toJson 格式（从数据库读取的已保存行程），用 fromJson 解析
+    if (json.containsKey('date') && json.containsKey('id')) {
+      debugPrint('📅 Detected toJson format, using fromJson');
+      return ItineraryDay.fromJson(json);
+    }
+
+    // 否则是 DeepSeek/云函数格式
+    debugPrint('📅 Detected DeepSeek/cloud format, parsing manually');
+
+    final dayNumber = (json['day_number'] ?? json['dayNumber'] ?? 1) as int;
+    final dayDate = startDate.add(Duration(days: dayNumber - 1));
+    debugPrint('📅 Day $dayNumber, Date: $dayDate');
+
+    // activities 可能是 String（JSON）或 List
+    var activitiesRaw = json['activities'];
+    debugPrint('📅 activities type: ${activitiesRaw.runtimeType}, value: $activitiesRaw');
+
+    if (activitiesRaw is String) {
+      debugPrint('📅 Decoding activities from JSON string');
+      activitiesRaw = jsonDecode(activitiesRaw) as List;
+    }
+    activitiesRaw ??= [];
+
+    final activities = (activitiesRaw as List).asMap().entries.map((entry) {
+      final actData = entry.value;
+      debugPrint('📅 Activity ${entry.key} type: ${actData.runtimeType}');
+      return Activity.fromCloudData(
+        actData is String ? jsonDecode(actData) as Map<String, dynamic> : actData as Map<String, dynamic>,
+        dayDate: dayDate,
+        index: entry.key,
+      );
+    }).toList();
+
+    debugPrint('📅 ItineraryDay created with ${activities.length} activities');
+    return ItineraryDay(
+      id: json['id'] as String? ?? 'day_$dayNumber',
+      dayNumber: dayNumber,
+      date: dayDate,
+      title: json['title'] as String? ?? json['summary'] as String?,
+      activities: activities,
+      notes: json['summary'] as String?,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'dayNumber': dayNumber,
+      'day_number': dayNumber,
       'date': date.toIso8601String(),
       'title': title,
       'activities': activities.map((a) => a.toJson()).toList(),
@@ -209,6 +307,55 @@ class Itinerary {
       isPublic: json['isPublic'] as bool? ?? false,
       likes: json['likes'] as int?,
       saves: json['saves'] as int?,
+    );
+  }
+
+  /// 从云函数/DeepSeek 格式构造
+  factory Itinerary.fromCloudData(Map<String, dynamic> json) {
+    debugPrint('🗺️ Itinerary.fromCloudData - Input JSON keys: ${json.keys.toList()}');
+
+    final now = DateTime.now();
+    final totalDays = (json['totalDays'] ?? json['duration_days'] ?? 3) as int;
+    final startDate = now;
+    final endDate = startDate.add(Duration(days: totalDays - 1));
+    debugPrint('🗺️ Total days: $totalDays, startDate: $startDate, endDate: $endDate');
+
+    final daysRaw = json['days'] as List? ?? [];
+    debugPrint('🗺️ Processing ${daysRaw.length} days');
+    final days = daysRaw.map((day) {
+      return ItineraryDay.fromCloudData(
+        day as Map<String, dynamic>,
+        startDate: startDate,
+      );
+    }).toList();
+
+    final citiesRaw = json['cities'];
+    debugPrint('🗺️ cities type: ${citiesRaw.runtimeType}, value: $citiesRaw');
+    final cities = citiesRaw is String
+        ? [citiesRaw]
+        : (citiesRaw as List?)?.map((c) => c.toString()).toList();
+    final destination = cities != null && cities.isNotEmpty
+        ? cities.first.toString()
+        : 'Unknown';
+
+    final title = json['title'] as String? ?? 'My Trip';
+    debugPrint('🗺️ Itinerary created: $title, destination: $destination, ${days.length} days');
+
+    return Itinerary(
+      id: json['trip_id'] as String? ?? 'preview_${now.millisecondsSinceEpoch}',
+      title: title,
+      description: json['description'] as String?,
+      destination: destination,
+      cities: cities,
+      startDate: startDate,
+      endDate: endDate,
+      coverImageUrl: json['coverImageUrl'] as String?,
+      days: days,
+      status: json['status'] as String? ?? 'draft',
+      createdAt: now,
+      updatedAt: now,
+      tags: (json['interests'] as List<dynamic>?)?.map((t) => t.toString()).toList(),
+      isPublic: false,
     );
   }
 

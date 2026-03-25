@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../services/backend/auth_service.dart';
+import '../../services/api_client.dart';
+import '../../core/config/backend_config.dart';
+import '../../services/amap_service.dart';
+import '../../models/itinerary.dart';
+import '../auth/login_screen.dart';
+import '../planner/itinerary_detail_screen.dart';
+import 'edit_profile_screen.dart';
 
 /// Screen 12: Profile / Me Page
 ///
@@ -19,11 +27,86 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  Map<String, dynamic>? _userProfile;
+  bool _isLoadingProfile = true;
+  List<Map<String, dynamic>> _userTrips = [];
+  bool _isLoadingTrips = true;
+  String _currentCity = 'China';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadProfile();
+    _loadTrips();
+    _loadCurrentCity();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await AuthService.getProfile();
+      debugPrint('📷 avatar_url: ${profile?['avatar_url']}');
+      debugPrint('👤 Profile data: $profile');
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Load profile error: $e');
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
+  }
+
+  Future<void> _loadTrips() async {
+    try {
+      final userId = AuthService.currentUserId;
+      if (userId == null) {
+        setState(() => _isLoadingTrips = false);
+        return;
+      }
+      final result = await ApiClient.post(BackendConfig.tripUrl, {
+        'action': 'list',
+        'user_id': userId,
+      });
+      if (mounted) {
+        setState(() {
+          _userTrips = List<Map<String, dynamic>>.from(result['trips'] ?? []);
+          _isLoadingTrips = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Load trips error: $e');
+      if (mounted) setState(() => _isLoadingTrips = false);
+    }
+  }
+
+  Future<void> _loadCurrentCity() async {
+    try {
+      final amapService = AMapService();
+      await amapService.initialize();
+      final location = await amapService.getLocation();
+      if (location != null && mounted) {
+        final lat = double.tryParse(location['latitude'].toString()) ?? 0;
+        final lng = double.tryParse(location['longitude'].toString()) ?? 0;
+        setState(() {
+          _currentCity = _detectCity(lat, lng);
+        });
+      }
+    } catch (e) {
+      debugPrint('📍 Profile location failed: $e');
+    }
+  }
+
+  String _detectCity(double lat, double lng) {
+    if (lat > 39.4 && lat < 40.4 && lng > 115.7 && lng < 117.0) return 'Beijing';
+    if (lat > 30.8 && lat < 31.8 && lng > 120.8 && lng < 122.0) return 'Shanghai';
+    if (lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0) return 'Guangzhou';
+    if (lat > 22.3 && lat < 22.9 && lng > 113.7 && lng < 114.5) return 'Shenzhen';
+    if (lat > 30.0 && lat < 31.0 && lng > 103.5 && lng < 104.8) return 'Chengdu';
+    if (lat > 33.8 && lat < 34.6 && lng > 108.5 && lng < 109.5) return "Xi'an";
+    return 'China';
   }
 
   @override
@@ -39,10 +122,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.gray900),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
+        title: const Text('My Profile'),
+        foregroundColor: AppColors.gray900,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: AppColors.gray700),
@@ -51,81 +133,109 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Profile Header
-          _buildProfileHeader(),
+      body: _isLoadingProfile
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Profile Header
+                _buildProfileHeader(),
 
-          const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-          // Stats
-          _buildStats(),
+                // Stats
+                _buildStats(),
 
-          const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-          // Edit Profile Button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: OutlinedButton(
-                onPressed: _handleEditProfile,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.jade500,
-                  side: const BorderSide(color: AppColors.jade500, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
+                // Edit Profile Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: _handleEditProfile,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.jade500,
+                        side: const BorderSide(color: AppColors.jade500, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                      ),
+                      child: Text(
+                        'Edit Profile',
+                        style: AppTextStyles.button(color: AppColors.jade500),
+                      ),
+                    ),
                   ),
                 ),
-                child: Text(
-                  'Edit Profile',
-                  style: AppTextStyles.button(color: AppColors.jade500),
+
+                const SizedBox(height: 24),
+
+                // Tab Bar
+                Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: AppColors.gray200, width: 1),
+                    ),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: AppColors.jade500,
+                    unselectedLabelColor: AppColors.gray600,
+                    labelStyle: AppTextStyles.body(color: AppColors.jade500).copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    unselectedLabelStyle: AppTextStyles.body(color: AppColors.gray600),
+                    indicatorColor: AppColors.jade500,
+                    indicatorWeight: 2,
+                    tabs: const [
+                      Tab(text: 'Trips'),
+                      Tab(text: 'Saved Places'),
+                      Tab(text: 'History'),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          ),
 
-          const SizedBox(height: 24),
+                // Tab Content
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTripsTab(),
+                      _buildSavedPlacesTab(),
+                      _buildHistoryTab(),
+                    ],
+                  ),
+                ),
 
-          // Tab Bar
-          Container(
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: AppColors.gray200, width: 1),
-              ),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: AppColors.jade500,
-              unselectedLabelColor: AppColors.gray600,
-              labelStyle: AppTextStyles.body(color: AppColors.jade500).copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              unselectedLabelStyle: AppTextStyles.body(color: AppColors.gray600),
-              indicatorColor: AppColors.jade500,
-              indicatorWeight: 2,
-              tabs: const [
-                Tab(text: 'Trips'),
-                Tab(text: 'Saved Places'),
-                Tab(text: 'History'),
+                // Log Out Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        await AuthService.logout();
+                        if (mounted) {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            (route) => false,
+                          );
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Log Out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-
-          // Tab Content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTripsTab(),
-                _buildSavedPlacesTab(),
-                _buildHistoryTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -133,26 +243,22 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Column(
       children: [
         // Avatar
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: AppColors.gray100,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.gray200, width: 2),
-          ),
-          child: const Icon(
-            Icons.person,
-            size: 40,
-            color: AppColors.gray600,
-          ),
+        CircleAvatar(
+          radius: 40,
+          backgroundColor: Colors.grey[200],
+          backgroundImage: _userProfile?['avatar_url'] != null
+              ? NetworkImage(_userProfile!['avatar_url'])
+              : null,
+          child: _userProfile?['avatar_url'] == null
+              ? const Icon(Icons.person, size: 40, color: Colors.grey)
+              : null,
         ),
 
         const SizedBox(height: 12),
 
         // Name
         Text(
-          'Alex Chen',
+          _userProfile?['username'] ?? _userProfile?['display_name'] ?? 'Traveler',
           style: AppTextStyles.h2(color: AppColors.gray900),
         ),
 
@@ -160,7 +266,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
         // Bio
         Text(
-          '"Backpacker from NYC"',
+          _userProfile?['bio'] ?? '',
           style: AppTextStyles.bodySmall(color: AppColors.gray600),
         ),
 
@@ -173,7 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             const Icon(Icons.location_on, size: 16, color: AppColors.jade500),
             const SizedBox(width: 4),
             Text(
-              'Beijing',
+              '📍 $_currentCity',
               style: AppTextStyles.caption(color: AppColors.jade500),
             ),
           ],
@@ -183,19 +289,22 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildStats() {
+    final tripsCount = _userProfile?['trips_count'] ?? 0;
+    final translationsCount = _userProfile?['translations_count'] ?? 0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildStatItem('📍 12 Places'),
+          _buildStatItem('🗺️ $tripsCount Trips'),
           Container(
             width: 1,
             height: 20,
             margin: const EdgeInsets.symmetric(horizontal: 24),
             color: AppColors.gray300,
           ),
-          _buildStatItem('🗺️ 3 Trips'),
+          _buildStatItem('🌐 $translationsCount Translations'),
         ],
       ),
     );
@@ -211,159 +320,114 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildTripsTab() {
-    // Mock trip data
-    final trips = [
-      {
-        'destination': 'Beijing',
-        'days': 3,
-        'type': 'Culture',
-        'date': 'Jan 12, 2026',
-      },
-      {
-        'destination': 'Shanghai',
-        'days': 5,
-        'type': 'Food',
-        'date': 'Dec 28, 2025',
-      },
-    ];
-
-    if (trips.isEmpty) {
+    if (_isLoadingTrips) {
+      return const Center(child: CircularProgressIndicator());
+    } else if (_userTrips.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.map_outlined, size: 64, color: AppColors.gray300),
-            const SizedBox(height: 16),
-            Text(
-              'No trips yet',
-              style: AppTextStyles.body(color: AppColors.gray500),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create your first itinerary in the Planner',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.caption(color: AppColors.gray400),
-            ),
+            Icon(Icons.luggage, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 12),
+            Text('No trips yet', style: TextStyle(color: Colors.grey[500], fontSize: 15)),
+            const SizedBox(height: 4),
+            Text('Your saved trips will appear here', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
           ],
         ),
       );
+    } else {
+      return ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _userTrips.length,
+        itemBuilder: (context, index) {
+          final trip = _userTrips[index];
+          return _buildTripCard(trip);
+        },
+      );
     }
+  }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: trips.length,
-      itemBuilder: (context, index) {
-        final trip = trips[index];
-        return _buildTripCard(
-          destination: trip['destination'] as String,
-          days: trip['days'] as int,
-          type: trip['type'] as String,
-          date: trip['date'] as String,
-        );
-      },
+  Widget _buildTripCard(Map<String, dynamic> trip) {
+    final title = trip['title'] ?? 'My Trip';
+    final createdAt = _formatDate(trip['created_at']);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: ListTile(
+        leading: const Icon(Icons.calendar_today, color: AppColors.jade500),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(createdAt, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: () async {
+                try {
+                  final detail = await ApiClient.post(BackendConfig.tripUrl, {
+                    'action': 'get',
+                    'trip_id': trip['trip_id'],
+                  });
+
+                  final itinerary = Itinerary.fromCloudData({
+                    'days': detail['days'],
+                    'title': detail['title'],
+                    'cities': detail['cities'],
+                    'duration_days': detail['duration_days'],
+                    'interests': detail['interests'],
+                    'trip_id': detail['trip_id'],
+                    'status': detail['status'],
+                  });
+
+                  if (mounted) {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ItineraryDetailScreen(
+                          itinerary: itinerary,
+                          tripId: detail['trip_id'],
+                        ),
+                      ),
+                    );
+                    _loadTrips(); // 返回后刷新
+                  }
+                } catch (e) {
+                  debugPrint('❌ View trip error: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to load trip: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('View', style: TextStyle(color: AppColors.jade500)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildTripCard({
-    required String destination,
-    required int days,
-    required String type,
-    required String date,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gray200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title
-          Row(
-            children: [
-              const Text('📅', style: TextStyle(fontSize: 20)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '$destination · $days Days · $type',
-                  style: AppTextStyles.h4(color: AppColors.gray900),
-                ),
-              ),
-            ],
-          ),
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return 'Unknown date';
+    try {
+      // Handle different timestamp formats
+      DateTime date;
+      if (timestamp is String) {
+        date = DateTime.parse(timestamp);
+      } else if (timestamp is int) {
+        date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+      } else {
+        return 'Unknown date';
+      }
 
-          const SizedBox(height: 8),
-
-          // Date
-          Text(
-            date,
-            style: AppTextStyles.caption(color: AppColors.gray600),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _handleViewTrip(destination),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.jade500,
-                    side: const BorderSide(color: AppColors.jade500),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: const Text('View'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _handleEditTrip(destination),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.gray700,
-                    side: const BorderSide(color: AppColors.gray300),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: const Text('Edit'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _handleShareTrip(destination),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.gray700,
-                    side: const BorderSide(color: AppColors.gray300),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: const Text('Share'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+      // Format as "Jan 12, 2026"
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    } catch (e) {
+      return 'Unknown date';
+    }
   }
 
   Widget _buildSavedPlacesTab() {
@@ -371,18 +435,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.bookmark_border, size: 64, color: AppColors.gray300),
-          const SizedBox(height: 16),
-          Text(
-            'No saved places yet',
-            style: AppTextStyles.body(color: AppColors.gray500),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Save places from the Map to see them here',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption(color: AppColors.gray400),
-          ),
+          Icon(Icons.bookmark_border, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 12),
+          Text('No saved places yet', style: TextStyle(color: Colors.grey[500], fontSize: 15)),
+          const SizedBox(height: 4),
+          Text('Places you save will appear here', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
         ],
       ),
     );
@@ -393,18 +450,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.history, size: 64, color: AppColors.gray300),
-          const SizedBox(height: 16),
-          Text(
-            'No history yet',
-            style: AppTextStyles.body(color: AppColors.gray500),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Your translation and navigation history will appear here',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption(color: AppColors.gray400),
-          ),
+          Icon(Icons.history, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 12),
+          Text('No history yet', style: TextStyle(color: Colors.grey[500], fontSize: 15)),
+          const SizedBox(height: 4),
+          Text('Your translation and navigation history will appear here', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
         ],
       ),
     );
@@ -420,43 +470,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     // TODO: Navigate to settings screen (Screen 13)
   }
 
-  void _handleEditProfile() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Edit profile functionality coming soon'),
-        duration: Duration(seconds: 2),
-      ),
+  Future<void> _handleEditProfile() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
     );
-    // TODO: Navigate to edit profile screen
-  }
-
-  void _handleViewTrip(String destination) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('View trip: $destination'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    // TODO: Navigate to itinerary detail screen
-  }
-
-  void _handleEditTrip(String destination) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Edit trip: $destination'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    // TODO: Navigate to trip edit/regeneration
-  }
-
-  void _handleShareTrip(String destination) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Share trip: $destination'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    // TODO: Implement share functionality
+    _loadProfile();  // 返回后重新加载
   }
 }

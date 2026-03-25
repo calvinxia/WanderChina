@@ -1,211 +1,340 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
+import '../../services/route_planning_service.dart';
 
-/// Route Overview - Route plan options display
-///
-/// 路线方案概览卡片
-/// 显示 Transit / Walking / Driving 三种方案
-enum RouteMode {
-  transit,
-  walking,
-  driving,
-}
+class RouteOverviewPanel extends StatefulWidget {
+  final String originName;       // "My Location"
+  final String destinationName;  // "Palace Museum (故宫)"
+  final Function(RouteType) onRouteSelected; // 选择某种方式后的回调
+  final VoidCallback onClose;
+  final VoidCallback? onEditOrigin;  // 编辑起点回调
+  final List<RouteInfo>? transitRoutes;
+  final List<RouteInfo>? walkingRoutes;
+  final List<RouteInfo>? drivingRoutes;
+  final bool isLoading;
 
-class RouteOption {
-  final RouteMode mode;
-  final String duration;
-  final String? cost;
-  final String? distance;
-
-  RouteOption({
-    required this.mode,
-    required this.duration,
-    this.cost,
-    this.distance,
-  });
-}
-
-class RouteOverview extends StatelessWidget {
-  final List<RouteOption> options;
-  final RouteMode? selectedMode;
-  final Function(RouteMode)? onModeSelected;
-
-  const RouteOverview({
+  const RouteOverviewPanel({
     super.key,
-    required this.options,
-    this.selectedMode,
-    this.onModeSelected,
+    required this.originName,
+    required this.destinationName,
+    required this.onRouteSelected,
+    required this.onClose,
+    this.onEditOrigin,
+    this.transitRoutes,
+    this.walkingRoutes,
+    this.drivingRoutes,
+    this.isLoading = false,
   });
+
+  @override
+  State<RouteOverviewPanel> createState() => _RouteOverviewPanelState();
+}
+
+class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
+  RouteType _selectedType = RouteType.transit;
+  bool _showStepDetails = false;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Choose Route',
-                style: AppTextStyles.h4(color: AppColors.gray900),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                color: AppColors.gray600,
-                onPressed: () {
-                  // Close route overview
-                },
-              ),
-            ],
+          // 拖拽指示条
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
           ),
+
+          // 起终点显示
+          _buildEndpoints(),
+          const SizedBox(height: 16),
+
+          // 三种出行方式 tab
+          _buildRouteTypeTabs(),
           const SizedBox(height: 12),
-          ...options.map((option) => _buildRouteCard(option)),
+
+          // 当前选中方式的路线详情
+          if (widget.isLoading)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: AppColors.jade500),
+            )
+          else
+            _buildSelectedRouteDetail(),
+
+          const SizedBox(height: 12),
+
+          // 开始导航按钮
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => widget.onRouteSelected(_selectedType),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.jade500,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Show Route on Map', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildRouteCard(RouteOption option) {
-    final isSelected = selectedMode == option.mode;
-
-    return GestureDetector(
-      onTap: () => onModeSelected?.call(option.mode),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.jade50 : AppColors.gray100,
-          border: Border.all(
-            color: isSelected ? AppColors.jade500 : Colors.transparent,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            // Mode icon
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.jade500 : AppColors.gray300,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _getModeIcon(option.mode),
-                color: isSelected ? Colors.white : AppColors.gray700,
-                size: 20,
+  Widget _buildEndpoints() {
+    return Column(
+      children: [
+        // 起点（可编辑）
+        GestureDetector(
+          onTap: widget.onEditOrigin,
+          child: Row(children: [
+            const Icon(Icons.circle, size: 12, color: AppColors.jade500),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(widget.originName, style: const TextStyle(fontSize: 14))),
+                    Icon(Icons.edit, size: 14, color: Colors.grey[400]),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 12),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 5),
+          child: Container(width: 2, height: 20, color: Colors.grey[300]),
+        ),
+        // 终点（保持不变）
+        Row(children: [
+          Icon(Icons.location_on, size: 14, color: Colors.red[400]),
+          const SizedBox(width: 7),
+          Expanded(child: Text(widget.destinationName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+          IconButton(icon: const Icon(Icons.close, size: 20), onPressed: widget.onClose),
+        ]),
+      ],
+    );
+  }
 
-            // Mode details
-            Expanded(
+  Widget _buildRouteTypeTabs() {
+    return Row(
+      children: [
+        _buildTab(RouteType.transit, '🚇', 'Transit', widget.transitRoutes),
+        const SizedBox(width: 8),
+        _buildTab(RouteType.walking, '🚶', 'Walk', widget.walkingRoutes),
+        const SizedBox(width: 8),
+        _buildTab(RouteType.driving, '🚗', 'Drive', widget.drivingRoutes),
+      ],
+    );
+  }
+
+  Widget _buildTab(RouteType type, String emoji, String label, List<RouteInfo>? routes) {
+    final isSelected = _selectedType == type;
+    final route = (routes != null && routes.isNotEmpty) ? routes.first : null;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedType = type),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.jade500.withOpacity(0.1) : Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.jade500 : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 20)),
+              const SizedBox(height: 4),
+              Text(label, style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? AppColors.jade500 : Colors.grey[600],
+              )),
+              if (route != null) ...[
+                const SizedBox(height: 2),
+                Text(route.formattedDuration, style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? AppColors.jade500 : Colors.grey[500],
+                )),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedRouteDetail() {
+    List<RouteInfo>? routes;
+    switch (_selectedType) {
+      case RouteType.transit:
+        routes = widget.transitRoutes;
+        break;
+      case RouteType.walking:
+        routes = widget.walkingRoutes;
+        break;
+      case RouteType.driving:
+        routes = widget.drivingRoutes;
+        break;
+      default:
+        routes = null;
+    }
+
+    if (routes == null || routes.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('No routes available', style: TextStyle(color: Colors.grey[500])),
+      );
+    }
+
+    final route = routes.first;
+
+    return Column(
+      children: [
+        // 现有的摘要卡片
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildDetailItem(Icons.timer, route.formattedDuration),
+              _buildDetailItem(Icons.straighten, route.formattedDistance),
+              if (route.taxiFee != null)
+                _buildDetailItem(Icons.attach_money, '¥${route.taxiFee!.toStringAsFixed(0)}'),
+              if (route.transitFee != null)
+                _buildDetailItem(Icons.attach_money, '¥${route.transitFee!.toStringAsFixed(0)}'),
+              // 步骤数可点击展开
+              GestureDetector(
+                onTap: () => setState(() => _showStepDetails = !_showStepDetails),
+                child: Column(
+                  children: [
+                    Icon(
+                      _showStepDetails ? Icons.expand_less : Icons.expand_more,
+                      size: 18, color: AppColors.jade500,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${route.steps.length} steps',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.jade500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 展开的步骤列表
+        if (_showStepDetails && route.steps.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: route.steps.length,
+              itemBuilder: (context, index) {
+                final step = route.steps[index];
+                return _buildStepItem(step, index + 1, route.steps.length);
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: AppColors.jade500),
+        const SizedBox(height: 4),
+        Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  Widget _buildStepItem(RouteStep step, int number, int total) {
+    final isLast = number == total;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 左侧时间轴
+          Column(
+            children: [
+              Container(
+                width: 24, height: 24,
+                decoration: BoxDecoration(
+                  color: isLast ? AppColors.jade500 : Colors.white,
+                  border: Border.all(color: AppColors.jade500, width: 2),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '$number',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: isLast ? Colors.white : AppColors.jade500,
+                    ),
+                  ),
+                ),
+              ),
+              if (!isLast)
+                Container(width: 2, height: 30, color: AppColors.jade500.withOpacity(0.3)),
+            ],
+          ),
+          const SizedBox(width: 10),
+          // 右侧步骤信息
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _getModeName(option.mode),
-                    style: AppTextStyles.h4(
-                      color: isSelected ? AppColors.jade700 : AppColors.gray900,
-                    ),
+                    step.instruction,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        option.duration,
-                        style: AppTextStyles.caption(
-                          color: AppColors.gray600,
-                        ),
-                      ),
-                      if (option.cost != null) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '·',
-                          style: AppTextStyles.caption(
-                            color: AppColors.gray400,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          option.cost!,
-                          style: AppTextStyles.caption(
-                            color: AppColors.gray600,
-                          ),
-                        ),
-                      ],
-                      if (option.distance != null) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '·',
-                          style: AppTextStyles.caption(
-                            color: AppColors.gray400,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          option.distance!,
-                          style: AppTextStyles.caption(
-                            color: AppColors.gray600,
-                          ),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    '${step.formattedDistance} · ${step.formattedDuration}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                   ),
                 ],
               ),
             ),
-
-            // Selection indicator
-            if (isSelected)
-              const Icon(
-                Icons.check_circle,
-                color: AppColors.jade500,
-                size: 24,
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
-  }
-
-  IconData _getModeIcon(RouteMode mode) {
-    switch (mode) {
-      case RouteMode.transit:
-        return Icons.directions_transit;
-      case RouteMode.walking:
-        return Icons.directions_walk;
-      case RouteMode.driving:
-        return Icons.directions_car;
-    }
-  }
-
-  String _getModeName(RouteMode mode) {
-    switch (mode) {
-      case RouteMode.transit:
-        return 'Transit';
-      case RouteMode.walking:
-        return 'Walking';
-      case RouteMode.driving:
-        return 'Driving';
-    }
   }
 }

@@ -5,12 +5,17 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/mountain_silhouette.dart';
+import '../voice/voice_translation_screen.dart';
+import '../../services/backend/auth_service.dart';
+import '../../services/amap_service.dart';
 import '../main/main_screen.dart';
 
 /// Home Dashboard Screen - MVP v2.0
 /// Three core tools: Translated Maps, Voice Translation, AI Trip Planner
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Function(int)? onNavigateToTab;
+
+  const HomeScreen({super.key, this.onNavigateToTab});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,6 +24,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   String _selectedCity = 'BJ'; // Default: Beijing
+  String _userName = 'Traveler';
+  String _currentCity = 'China';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+    _loadCurrentCity();
+  }
 
   @override
   void dispose() {
@@ -26,7 +40,45 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  String _getGreeting() {
+  Future<void> _loadUserInfo() async {
+    try {
+      final profile = await AuthService.getProfile();
+      if (mounted) {
+        setState(() {
+          _userName = profile['username'] ?? profile['display_name'] ?? 'Traveler';
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadCurrentCity() async {
+    try {
+      final amapService = AMapService();
+      await amapService.initialize();
+      final location = await amapService.getLocation();
+      if (location != null && mounted) {
+        // 用经纬度反查城市（简单方案：根据坐标范围判断）
+        final lat = double.tryParse(location['latitude'].toString()) ?? 0;
+        final lng = double.tryParse(location['longitude'].toString()) ?? 0;
+        setState(() {
+          _currentCity = _detectCity(lat, lng);
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _detectCity(double lat, double lng) {
+    // 简单经纬度范围判断
+    if (lat > 39.4 && lat < 40.4 && lng > 115.7 && lng < 117.0) return 'Beijing, China';
+    if (lat > 30.8 && lat < 31.8 && lng > 120.8 && lng < 122.0) return 'Shanghai, China';
+    if (lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0) return 'Guangzhou, China';
+    if (lat > 22.3 && lat < 22.9 && lng > 113.7 && lng < 114.5) return 'Shenzhen, China';
+    if (lat > 30.0 && lat < 31.0 && lng > 103.5 && lng < 104.8) return 'Chengdu, China';
+    if (lat > 33.8 && lat < 34.6 && lng > 108.5 && lng < 109.5) return "Xi'an, China";
+    return 'China';
+  }
+
+  String get _greeting {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good Morning';
     if (hour < 18) return 'Good Afternoon';
@@ -34,22 +86,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToTab(int tabIndex) {
-    // Navigate to specific tab in MainScreen
-    if (context.findAncestorWidgetOfExactType<MainScreen>() != null) {
-      // Use callback or state management to switch tabs
-      // For now, show a snackbar
-      final tabNames = ['Map', 'Voice', 'Planner'];
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Navigate to ${tabNames[tabIndex]} tab')),
-      );
-    }
+    // Use GlobalKey to directly call MainScreen method
+    MainScreen.globalKey.currentState?.switchToTab(tabIndex);
   }
 
   void _navigateToPlannerWithCity(String cityCode) {
     setState(() {
       _selectedCity = cityCode;
     });
-    _navigateToTab(2); // Navigate to Planner tab
+    MainScreen.globalKey.currentState?.switchToTab(2);
+  }
+
+  /// 根据城市名识别城市短码
+  String? _detectCityShort(String cityName) {
+    if (cityName.contains('Guangzhou') || cityName.contains('广州')) return 'GZ';
+    if (cityName.contains('Beijing') || cityName.contains('北京')) return 'BJ';
+    if (cityName.contains('Shanghai') || cityName.contains('上海')) return 'SH';
+    if (cityName.contains('Shenzhen') || cityName.contains('深圳')) return 'SZ';
+    if (cityName.contains('Chengdu') || cityName.contains('成都')) return 'CD';
+    if (cityName.contains("Xi'an") || cityName.contains('西安')) return 'XA';
+    return null;
   }
 
   @override
@@ -187,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Beijing, China',
+                        '📍 $_currentCity',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -201,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Greeting
                   Text(
-                    '${_getGreeting()}, Traveler!',
+                    '$_greeting, $_userName!',
                     style: AppTextStyles.h2(
                       color: Colors.white.withOpacity(0.95),
                     ),
@@ -237,13 +293,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _buildToolCard(
                   icon: Icons.map,
                   title: 'Translated\nMaps',
-                  description: 'Maps in\nyour lang',
+                  description: 'Maps in your language',
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [AppColors.jade600, AppColors.jade400],
                   ),
-                  onTap: () => _navigateToTab(0),
+                  onTap: () => _navigateToTab(1), // Map tab index = 1
                 ).animate().fadeIn(duration: 300.ms, delay: 50.ms).slideY(
                       begin: 0.3,
                       end: 0,
@@ -257,13 +313,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _buildToolCard(
                   icon: Icons.mic,
                   title: 'Voice\nTranslation',
-                  description: 'Speak & be\nunderstood',
+                  description: 'Speak & be understood',
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [AppColors.orange, Color(0xFFF09040)],
                   ),
-                  onTap: () => _navigateToTab(1),
+                  onTap: () {
+                    // Open VoiceTranslationScreen as fullscreen dialog
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const VoiceTranslationScreen(),
+                        fullscreenDialog: true,
+                      ),
+                    );
+                  },
                 ).animate().fadeIn(duration: 300.ms, delay: 100.ms).slideY(
                       begin: 0.3,
                       end: 0,
@@ -277,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _buildToolCard(
                   icon: Icons.event_note,
                   title: 'AI Trip\nPlanner',
-                  description: 'Itinerary\nin seconds',
+                  description: 'Itinerary in seconds',
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -361,9 +426,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   description,
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withOpacity(0.7),
                     height: 1.3,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -380,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: GestureDetector(
         onTap: () => _navigateToTab(2),
         child: Container(
-          height: 80,
+          constraints: const BoxConstraints(minHeight: 90),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -393,33 +460,33 @@ class _HomeScreenState extends State<HomeScreen> {
             boxShadow: const [AppColors.shadowSm],
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
+              Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.auto_awesome, size: 18, color: AppColors.jade600),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Plan Your Next Trip',
-                          style: AppTextStyles.h4(color: AppColors.gray900),
-                        ),
-                      ],
+                    const Text(
+                      '✨ Plan Your Next Trip',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Ask AI: "3 days in Chengdu for food lovers"',
-                      style: AppTextStyles.caption(color: AppColors.gray600),
-                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
                       overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
@@ -445,14 +512,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Supported Cities Pills
   Widget _buildSupportedCities() {
-    final cities = [
-      {'code': 'BJ', 'name': 'Beijing'},
-      {'code': 'SH', 'name': 'Shanghai'},
-      {'code': 'GZ', 'name': 'Guangzhou'},
-      {'code': 'SZ', 'name': 'Shenzhen'},
-      {'code': 'CD', 'name': 'Chengdu'},
-      {'code': 'XA', 'name': 'Xi\'an'},
+    final allCities = [
+      {'short': 'BJ', 'full': 'Beijing'},
+      {'short': 'SH', 'full': 'Shanghai'},
+      {'short': 'GZ', 'full': 'Guangzhou'},
+      {'short': 'SZ', 'full': 'Shenzhen'},
+      {'short': 'CD', 'full': 'Chengdu'},
+      {'short': 'XA', 'full': "Xi'an"},
     ];
+
+    // 把当前城市排到第一位
+    final currentShort = _detectCityShort(_currentCity);
+    if (currentShort != null) {
+      allCities.sort((a, b) {
+        if (a['short'] == currentShort) return -1;
+        if (b['short'] == currentShort) return 1;
+        return 0;
+      });
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,22 +546,21 @@ class _HomeScreenState extends State<HomeScreen> {
           scrollDirection: Axis.horizontal,
           padding: AppSpacing.screenPaddingH,
           child: Row(
-            children: cities.asMap().entries.map((entry) {
+            children: allCities.asMap().entries.map((entry) {
               final index = entry.key;
               final city = entry.value;
-              final isSelected = _selectedCity == city['code'];
+              final isSelected = _selectedCity == city['short'];
 
               return Padding(
-                padding: EdgeInsets.only(right: index < cities.length - 1 ? 10 : 0),
+                padding: EdgeInsets.only(right: index < allCities.length - 1 ? 10 : 0),
                 child: GestureDetector(
-                  onTap: () => _navigateToPlannerWithCity(city['code'] as String),
+                  onTap: () => _navigateToPlannerWithCity(city['short'] as String),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    height: 32,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(
                       color: isSelected ? AppColors.jade500 : AppColors.jade100,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
@@ -495,14 +571,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             ]
                           : null,
                     ),
-                    child: Center(
-                      child: Text(
-                        city['code'] as String,
-                        style: AppTextStyles.caption(
-                          color: isSelected ? Colors.white : AppColors.gray800,
-                        ).copyWith(
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                        ),
+                    child: Text(
+                      city['full'] as String,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? Colors.white : AppColors.gray800,
                       ),
                     ),
                   ),

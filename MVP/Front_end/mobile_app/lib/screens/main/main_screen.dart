@@ -13,23 +13,33 @@ import '../profile/profile_screen.dart';
 /// - Voice标签打开全屏模态框
 /// - 使用IndexedStack保持页面状态
 class MainScreen extends StatefulWidget {
+  static final GlobalKey<MainScreenState> globalKey = GlobalKey<MainScreenState>();
+
   const MainScreen({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<MainScreen> createState() => MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final GlobalKey<MapWithTranslationScreenState> _mapKey = GlobalKey();
+  String? pendingSearchCity;
 
   // v2.0 屏幕列表（不包括Voice，因为它是模态框）
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const MapWithTranslationScreen(),
-    const PlannerHomeScreen(),
-    const Placeholder(), // Voice占位符（实际上打开模态框）
-    const ProfileScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      HomeScreen(onNavigateToTab: _onTabTapped),
+      MapWithTranslationScreen(key: _mapKey),
+      const PlannerHomeScreen(),
+      const Placeholder(), // Voice占位符（实际上打开模态框）
+      const ProfileScreen(),
+    ];
+  }
 
   void _onTabTapped(int index) {
     // Voice标签（index == 3）打开全屏模态框
@@ -46,6 +56,36 @@ class _MainScreenState extends State<MainScreen> {
 
     setState(() {
       _currentIndex = index;
+    });
+  }
+
+  /// 切换到指定 tab
+  void switchToTab(int index) {
+    if (index == 3) {
+      // Voice标签打开全屏模态框
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const VoiceTranslationScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  /// 切换到 Map tab 并执行搜索
+  void switchToMapAndSearch(String query, {String? displayName, String? city}) {
+    setState(() {
+      _currentIndex = 1;  // Map tab index
+    });
+    pendingSearchCity = city;
+    // 直接调 Map 页面的搜索方法
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _mapKey.currentState?.searchFromExternal(query, displayName: displayName);
     });
   }
 

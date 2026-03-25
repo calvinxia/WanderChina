@@ -24,6 +24,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
 
   final VoiceTranslationService _service = VoiceTranslationService();
   late AnimationController _rippleController;
+  final TextEditingController _textController = TextEditingController();
 
   TranslationDirection _direction = TranslationDirection.foreignToChinese;
   AppLanguage _selectedLanguage = AppLanguage.english;
@@ -66,6 +67,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
   @override
   void dispose() {
     _rippleController.dispose();
+    _textController.dispose();
     _service.removeListener(_onServiceStateChanged);
     super.dispose();
   }
@@ -75,21 +77,35 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
   }
 
   Future<void> _handleMicPress() async {
+    debugPrint('🎙️ Long press START - state: ${_service.state}');
     if (_service.state == VoiceServiceState.idle) {
       try {
         await _service.startRecording();
+        debugPrint('🎙️ Recording started successfully');
       } catch (e) {
+        debugPrint('⚠️ Recording failed: $e');
         _showError('麦克风权限未授权');
       }
+    } else {
+      debugPrint('⚠️ Cannot start recording, current state: ${_service.state}');
     }
   }
 
   Future<void> _handleMicRelease() async {
+    debugPrint('🎙️ Long press END - state: ${_service.state}');
     if (_service.state == VoiceServiceState.recording) {
-      await _service.stopAndTranslate(
+      debugPrint('🎙️ Stopping recording and translating...');
+      final result = await _service.stopAndTranslate(
         direction: _direction,
         foreignLanguage: _selectedLanguage,
       );
+      if (result == null) {
+        debugPrint('⚠️ Translation failed or returned null');
+      } else {
+        debugPrint('✅ Translation completed: ${result.originalText} → ${result.translatedText}');
+      }
+    } else {
+      debugPrint('⚠️ Cannot stop recording, current state: ${_service.state}');
     }
   }
 
@@ -104,9 +120,12 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        backgroundColor: Colors.white,
+        appBar: AppBar(
         title: Text(
           'Voice Translation',
           style: AppTextStyles.h4(color: AppColors.gray900),
@@ -119,37 +138,59 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 24),
+      body: Column(
+        children: [
+          // 固定顶部区域
+          SafeArea(
+            bottom: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 24),
 
-            // Direction Toggle
-            _buildDirectionToggle(),
+                // Direction Toggle
+                _buildDirectionToggle(),
 
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Language Selector
-            _buildLanguageSelector(),
+                // Language Selector
+                _buildLanguageSelector(),
 
-            const SizedBox(height: 24),
-
-            // Conversation History
-            Expanded(
-              child: _buildConversationHistory(),
+                const SizedBox(height: 24),
+              ],
             ),
+          ),
 
-            // Quick Phrases
-            _buildQuickPhrases(),
+          // Conversation History（可滚动，占据剩余空间）
+          Expanded(
+            child: _buildConversationHistory(),
+          ),
 
-            const SizedBox(height: 24),
+          // 底部操作区（键盘弹出时自动上移）
+          SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Quick Phrases
+                _buildQuickPhrases(),
 
-            // Mic Button
-            _buildMicButton(),
+                const SizedBox(height: 16),
 
-            const SizedBox(height: 32),
-          ],
-        ),
+                // Text Input
+                _buildTextInput(),
+
+                const SizedBox(height: 16),
+
+                // Mic Button
+                _buildMicButton(),
+
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ],
+      ),
       ),
     );
   }
@@ -253,15 +294,26 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                   ),
                   DropdownMenuItem(
                     value: AppLanguage.french,
-                    child: Text('Français'),
+                    child: Text('Français (coming soon)', style: TextStyle(color: Colors.grey)),
                   ),
                   DropdownMenuItem(
                     value: AppLanguage.spanish,
-                    child: Text('Español'),
+                    child: Text('Español (coming soon)', style: TextStyle(color: Colors.grey)),
                   ),
                 ],
                 onChanged: (value) {
                   if (value != null) {
+                    // FR/ES 暂不支持，显示提示
+                    if (value == AppLanguage.french || value == AppLanguage.spanish) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('French/Spanish translation coming soon — English available now'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      return; // 不切换，保持当前语言
+                    }
+                    // EN 正常切换
                     setState(() => _selectedLanguage = value);
                   }
                 },
@@ -294,10 +346,12 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      reverse: true, // 新消息在底部
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       itemCount: history.length,
       itemBuilder: (context, index) {
-        final result = history[index];
+        // reverse=true时，索引也要反转
+        final result = history[history.length - 1 - index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Column(
@@ -421,11 +475,17 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                 child: GestureDetector(
                   onTap: () async {
                     // Auto-translate and play phrase
-                    await _service.translateQuickPhrase(
+                    debugPrint('📝 Quick Phrase tapped: ${phrases[index]}');
+                    final result = await _service.translateQuickPhrase(
                       phrase: phrases[index],
                       direction: _direction,
                       foreignLanguage: _selectedLanguage,
                     );
+                    if (result != null) {
+                      debugPrint('✅ Quick Phrase translated: ${result.originalText} → ${result.translatedText}');
+                    } else {
+                      debugPrint('⚠️ Quick Phrase translation failed');
+                    }
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -448,15 +508,77 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     );
   }
 
+  Widget _buildTextInput() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _textController,
+                decoration: const InputDecoration(
+                  hintText: 'Type a message...',
+                  hintStyle: TextStyle(color: AppColors.gray400, fontSize: 14),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                textInputAction: TextInputAction.send,
+                onSubmitted: _sendTextMessage,
+              ),
+            ),
+            GestureDetector(
+              onTap: () => _sendTextMessage(_textController.text),
+              child: Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: const BoxDecoration(
+                  color: AppColors.jade500,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendTextMessage(String text) async {
+    if (text.trim().isEmpty) return;
+
+    FocusScope.of(context).unfocus(); // 收键盘
+    _textController.clear();
+
+    final result = await _service.translateQuickPhrase(
+      phrase: text.trim(),
+      direction: _direction,
+      foreignLanguage: _selectedLanguage,
+    );
+
+    if (result != null && mounted) {
+      debugPrint('✅ Text message translated: ${result.originalText} → ${result.translatedText}');
+    } else {
+      debugPrint('⚠️ Text message translation failed');
+    }
+  }
+
   Widget _buildMicButton() {
     final state = _service.state;
 
     return Column(
       children: [
         GestureDetector(
-          onTapDown: (_) => _handleMicPress(),
-          onTapUp: (_) => _handleMicRelease(),
-          onTapCancel: _handleMicRelease,
+          onLongPressStart: (_) => _handleMicPress(),
+          onLongPressEnd: (_) => _handleMicRelease(),
+          onLongPressCancel: _handleMicRelease,
           child: Container(
             width: 80,
             height: 80,

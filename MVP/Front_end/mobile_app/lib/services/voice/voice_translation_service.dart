@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show File, Platform;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -57,25 +57,43 @@ class VoiceTranslationService extends ChangeNotifier {
   Future<void> startRecording() async {
     if (_state != VoiceServiceState.idle) return;
 
-    final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) {
+    try {
+      final hasPermission = await _recorder.hasPermission();
+      if (!hasPermission) {
+        debugPrint('⚠️ Microphone permission denied');
+        _setState(VoiceServiceState.error);
+        throw Exception('麦克风权限未授权');
+      }
+
+      final dir = await getTemporaryDirectory();
+
+      // iOS 用 WAV（PCM），兼容性最好；Android 用 AAC
+      final String ext = Platform.isIOS ? '.wav' : '.m4a';
+      final path = '${dir.path}/wander_voice_${DateTime.now().millisecondsSinceEpoch}$ext';
+
+      final config = Platform.isIOS
+          ? const RecordConfig(
+              encoder: AudioEncoder.wav,     // iOS: PCM/WAV 最稳定
+              sampleRate: 16000,             // 百度 ASR 要求 16kHz
+              numChannels: 1,                // 单声道
+              bitRate: 256000,
+            )
+          : const RecordConfig(
+              encoder: AudioEncoder.aacLc,   // Android: AAC
+              sampleRate: 16000,             // 百度 ASR 要求 16kHz
+              numChannels: 1,                // 单声道
+              bitRate: 128000,
+            );
+
+      debugPrint('🎙️ Config: ${config.encoder}, path: $path');
+      await _recorder.start(config, path: path);
+      debugPrint('🎙️ Recording started, isRecording: ${await _recorder.isRecording()}');
+      _setState(VoiceServiceState.recording);
+    } catch (e) {
+      debugPrint('⚠️ Recording failed: $e');
       _setState(VoiceServiceState.error);
-      throw Exception('麦克风权限未授权');
+      rethrow;
     }
-
-    final dir  = await getTemporaryDirectory();
-    final path =
-        '${dir.path}/wander_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-    await _recorder.start(
-      const RecordConfig(
-        encoder:    AudioEncoder.aacLc,
-        bitRate:    128000,
-        sampleRate: 16000, // 百度ASR推荐
-      ),
-      path: path,
-    );
-    _setState(VoiceServiceState.recording);
   }
 
   Future<VoiceTranslationResult?> stopAndTranslate({
@@ -89,7 +107,28 @@ class VoiceTranslationService extends ChangeNotifier {
 
     try {
       final audioPath = await _recorder.stop();
-      if (audioPath == null) throw Exception('录音文件为空');
+      if (audioPath == null) {
+        throw Exception('录音文件为空');
+      }
+
+      // 检查录音文件大小，防止录音时间太短
+      final file = File(audioPath);
+      if (!await file.exists()) {
+        throw Exception('录音文件不存在');
+      }
+
+      final fileSize = await file.length();
+      debugPrint('Audio file size: $fileSize bytes');
+
+      if (fileSize < 1000) {
+        // 小于 1KB 认为录音太短或无效
+        debugPrint('⚠️ Recording too short or empty ($fileSize bytes)');
+        _setState(VoiceServiceState.idle);
+        try {
+          file.deleteSync();
+        } catch (_) {}
+        throw Exception('录音时间太短，请长按说话');
+      }
 
       // Step 1: 云函数ASR
       final sourceLang = direction == TranslationDirection.foreignToChinese
@@ -219,8 +258,18 @@ class VoiceTranslationService extends ChangeNotifier {
     AppLanguage?   language,
   }) async {
     try {
-      final audioBytes  = await File(audioPath).readAsBytes();
+      // 检查音频文件是否存在
+      final file = File(audioPath);
+      if (!await file.exists()) {
+        debugPrint('⚠️ Audio file not found: $audioPath');
+        return null;
+      }
+
+      final audioBytes  = await file.readAsBytes();
       final base64Audio = base64Encode(audioBytes);
+
+      // 调试信息：音频文件大小
+      debugPrint('Audio file size: ${audioBytes.length} bytes');
 
       final langStr = switch (language) {
         AppLanguage.english  => 'en',
@@ -229,14 +278,23 @@ class VoiceTranslationService extends ChangeNotifier {
         _                    => 'zh',
       };
 
+      // 根据文件扩展名确定格式：iOS 用 wav，Android 用 m4a
+      final format = audioPath.endsWith('.wav') ? 'wav' : 'm4a';
+      debugPrint('🎤 ASR format: $format, language: $langStr');
+
       final result = await ApiClient.post(ApiClient.asrUrl, {
         'audio_base64': base64Audio,
+        'audio_len': audioBytes.length,
         'language': langStr,
-        'format': 'm4a',
+        'format': format,
       });
 
       if (result['recognized_text'] != null) {
         return result['recognized_text'] as String;
+      }
+      // 兼容不同的返回字段名
+      if (result['text'] != null) {
+        return result['text'] as String;
       }
       debugPrint('ASR云函数错误: ${result['error']}');
     } catch (e) {
@@ -266,12 +324,16 @@ class VoiceTranslationService extends ChangeNotifier {
         : targetLang;
 
     try {
+      debugPrint('Translation input: text=$text, source=$sourceLang, target=$targetLangFinal');
+
       final result = await ApiClient.post(ApiClient.translateUrl, {
         'text': text,
         'source_lang': sourceLang,
         'target_lang': targetLangFinal,
         'context': 'voice_travel', // 语音旅行场景
       });
+
+      debugPrint('Translation result: $result');
 
       if (result['translated_text'] != null) {
         return result['translated_text'] as String;
