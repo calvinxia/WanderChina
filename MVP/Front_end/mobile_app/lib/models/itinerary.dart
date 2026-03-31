@@ -237,7 +237,7 @@ class Itinerary {
   final DateTime startDate;
   final DateTime endDate;
   final String? coverImageUrl;
-  final List<ItineraryDay> days;
+  List<ItineraryDay> days; // Remove final to allow activity deletion
   final String status; // draft, planned, ongoing, completed, cancelled
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -246,7 +246,7 @@ class Itinerary {
   final int? likes;
   final int? saves;
 
-  const Itinerary({
+  Itinerary({
     required this.id,
     required this.title,
     this.description,

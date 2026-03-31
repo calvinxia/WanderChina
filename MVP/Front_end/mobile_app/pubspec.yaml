@@ -1,6 +1,6 @@
 name: wanderchina
 description: AI-Powered China Travel Companion - Your ultimate guide to exploring China
-version: 1.0.0+1
+version: 0.1.0+1
 publish_to: 'none'
 
 environment:
@@ -44,7 +44,7 @@ dependencies:
 
   # Icons & Fonts
   cupertino_icons: ^1.0.6
-  google_fonts: ^6.2.1
+  google_fonts: ^8.0.2
   flutter_svg: ^2.0.9
 
   # Networking
@@ -63,6 +63,9 @@ dependencies:
   mobile_scanner: ^3.5.5
   record: ^6.2.0
   amap_flutter_location: ^3.0.0
+
+  # Analytics & Error Tracking
+  sentry_flutter: ^8.3.0
 
 dev_dependencies:
   flutter_test:

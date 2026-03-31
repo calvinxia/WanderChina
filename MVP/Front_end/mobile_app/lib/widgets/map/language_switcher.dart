@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/poi_translation.dart';
+import '../../core/theme/city_theme.dart';
 
 /// Language Switcher with Overlay Toggle
 ///
@@ -12,6 +13,7 @@ class LanguageSwitcher extends StatelessWidget {
   final Function(AppLanguage) onLanguageChanged;
   final bool overlayEnabled;
   final Function(bool) onOverlayToggle;
+  final CityTheme? theme;
 
   const LanguageSwitcher({
     super.key,
@@ -19,10 +21,13 @@ class LanguageSwitcher extends StatelessWidget {
     required this.onLanguageChanged,
     required this.overlayEnabled,
     required this.onOverlayToggle,
+    this.theme,
   });
 
   @override
   Widget build(BuildContext context) {
+    final currentTheme = theme ?? CityTheme.defaultTheme;
+
     return Container(
       height: 44,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -44,11 +49,11 @@ class LanguageSwitcher extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                _buildLanguagePill(context, AppLanguage.english, 'EN'),
+                _buildLanguagePill(context, AppLanguage.english, 'EN', currentTheme),
                 const SizedBox(width: 8),
-                _buildLanguagePill(context, AppLanguage.french, 'FR'),
+                _buildLanguagePill(context, AppLanguage.french, 'FR', currentTheme),
                 const SizedBox(width: 8),
-                _buildLanguagePill(context, AppLanguage.spanish, 'ES'),
+                _buildLanguagePill(context, AppLanguage.spanish, 'ES', currentTheme),
               ],
             ),
           ),
@@ -64,7 +69,7 @@ class LanguageSwitcher extends StatelessWidget {
               Switch(
                 value: overlayEnabled,
                 onChanged: onOverlayToggle,
-                activeColor: AppColors.jade500,
+                activeColor: currentTheme.pillActiveColor,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ],
@@ -74,7 +79,7 @@ class LanguageSwitcher extends StatelessWidget {
     );
   }
 
-  Widget _buildLanguagePill(BuildContext context, AppLanguage language, String label) {
+  Widget _buildLanguagePill(BuildContext context, AppLanguage language, String label, CityTheme theme) {
     final isSelected = selectedLanguage == language;
     final isDisabled = language == AppLanguage.french || language == AppLanguage.spanish;
 
@@ -99,7 +104,7 @@ class LanguageSwitcher extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.jade500 : Colors.transparent,
+            color: isSelected ? theme.pillActiveColor : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Text(

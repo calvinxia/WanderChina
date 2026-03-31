@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:amap_map/amap_map.dart';
@@ -9,6 +10,7 @@ import '../../core/config/backend_config.dart';
 import 'voice_translation_overlay.dart';
 import 'translation_overlay_widget.dart'; // 保留以导入 LabelStyle
 import 'marker_badge_painter.dart';
+import '../../core/theme/city_theme.dart';
 
 class WanderMap extends StatefulWidget {
   final LatLng    initialCenter;
@@ -17,6 +19,7 @@ class WanderMap extends StatefulWidget {
   final LabelStyle labelStyle; // 保留参数以兼容现有代码
   final bool      showTranslationOverlay;
   final bool      showVoiceButton;
+  final CityTheme? cityTheme;
   final void Function(LatLng)?           onMapTap;
   final void Function(POITranslation)?   onPOITap;
   final void Function(CameraPosition)?   onCameraMove;
@@ -29,6 +32,7 @@ class WanderMap extends StatefulWidget {
     this.labelStyle             = LabelStyle.badge, // 保留但不使用
     this.showTranslationOverlay = true,
     this.showVoiceButton        = true,
+    this.cityTheme,
     this.onMapTap,
     this.onPOITap,
     this.onCameraMove,
@@ -244,13 +248,16 @@ class WanderMapState extends State<WanderMap> {
         return bPri.compareTo(aPri);
       });
       final limit = _getMarkerLimit(_currentZoom);
-      final topPOIs = translations.take(limit).toList();
+      final topPOIs = translations.take(limit * 2).toList(); // 取2倍，过滤后大约剩limit个
+
+      // 3.5. 应用最小间距过滤
+      final filteredPOIs = _filterByMinDistance(topPOIs).take(limit).toList();
 
       // 4. 异步生成 Badge Marker（并行渲染所有 badge）
       final markers = <Marker>{};
 
       // 并行渲染所有 badge（比逐个等快）
-      final futures = topPOIs.map((poi) => _buildTranslationMarker(poi));
+      final futures = filteredPOIs.map((poi) => _buildTranslationMarker(poi));
       final markerList = await Future.wait(futures);
       markers.addAll(markerList);
 
@@ -272,12 +279,14 @@ class WanderMapState extends State<WanderMap> {
     if (badgeBytes == null) {
       // 获取设备像素密度
       final dpr = MediaQuery.of(context).devicePixelRatio;
+      final theme = widget.cityTheme ?? CityTheme.defaultTheme;
 
       badgeBytes = await MarkerBadgePainter.renderBadge(
         textEn: poi.localizedName(widget.language),
         textZh: poi.nameZh,
         isHighPriority: isHigh,
         devicePixelRatio: dpr,
+        theme: theme,
       );
 
       _badgeCache[poi.gaodePoiId] = badgeBytes;
@@ -312,10 +321,59 @@ class WanderMapState extends State<WanderMap> {
   /// 根据缩放级别决定显示的 marker 数量
   int _getMarkerLimit(double zoom) {
     if (zoom >= 17) return 15;  // 街道级：多显示
-    if (zoom >= 15) return 12;  // 社区级：标准
+    if (zoom >= 16) return 10;  // zoom 16: 8-10个
+    if (zoom >= 15) return 8;   // zoom 15: 8-10个
     if (zoom >= 13) return 8;   // 城区级：只显示重要的
     return 5;                    // 城市级：只显示地标
   }
+
+  /// 按最小间距过滤 POI (Haversine公式)
+  /// 两个POI坐标距离 < 50m 只保留 priority_score 高的
+  List<POITranslation> _filterByMinDistance(List<POITranslation> pois, {double minDistanceMeters = 50}) {
+    final filtered = <POITranslation>[];
+
+    for (final poi in pois) {
+      bool tooClose = false;
+      for (final existing in filtered) {
+        final distance = _calculateDistance(
+          poi.coordinates.latitude,
+          poi.coordinates.longitude,
+          existing.coordinates.latitude,
+          existing.coordinates.longitude,
+        );
+        if (distance < minDistanceMeters) {
+          // 如果当前POI是高优先级，移除已存在的低优先级POI
+          if (_isHighPriority(poi.categoryEn) && !_isHighPriority(existing.categoryEn)) {
+            filtered.remove(existing);
+            break;
+          }
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) {
+        filtered.add(poi);
+      }
+    }
+
+    return filtered;
+  }
+
+  /// Haversine公式计算两点间距离（米）
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const earthRadius = 6371000.0; // 地球半径（米）
+    final dLat = _degreesToRadians(lat2 - lat1);
+    final dLon = _degreesToRadians(lon2 - lon1);
+
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
+        sin(dLon / 2) * sin(dLon / 2);
+
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _degreesToRadians(double degrees) => degrees * pi / 180;
 
   // ─── build ────────────────────────────────────────────
 

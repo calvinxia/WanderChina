@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/city_theme.dart';
 import '../../services/api_client.dart';
 import '../../core/config/backend_config.dart';
 
@@ -10,6 +11,7 @@ class ActivityDetailSheet extends StatefulWidget {
   final String duration;
   final String cost;
   final String city;
+  final CityTheme? theme;
 
   const ActivityDetailSheet({
     super.key,
@@ -19,6 +21,7 @@ class ActivityDetailSheet extends StatefulWidget {
     required this.duration,
     required this.cost,
     required this.city,
+    this.theme,
   });
 
   @override
@@ -74,14 +77,17 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final currentTheme = widget.theme ?? CityTheme.defaultTheme;
+    final backgroundColor = Color.lerp(Colors.white, currentTheme.pillActiveColor, 0.15)!;
+
     return DraggableScrollableSheet(
       initialChildSize: 0.65,
       minChildSize: 0.4,
       maxChildSize: 0.85,
       builder: (_, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: ListView(
           controller: scrollController,
@@ -93,7 +99,7 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
                 width: 40, height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: widget.theme?.pillActiveColor.withOpacity(0.3) ?? Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -139,7 +145,7 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   widget.nameZh,
-                  style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 15, color: currentTheme.secondaryTextColor),
                 ),
               ),
 
@@ -193,18 +199,19 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
   }
 
   Widget _buildTag(IconData icon, String text) {
+    final tagColor = widget.theme?.pillActiveColor ?? AppColors.jade500;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.jade500.withOpacity(0.1),
+        color: tagColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.jade500),
+          Icon(icon, size: 16, color: tagColor),
           const SizedBox(width: 4),
-          Text(text, style: const TextStyle(fontSize: 13, color: AppColors.jade500, fontWeight: FontWeight.w600)),
+          Text(text, style: TextStyle(fontSize: 13, color: tagColor, fontWeight: FontWeight.w600)),
         ],
       ),
     );

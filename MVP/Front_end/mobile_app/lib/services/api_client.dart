@@ -1,6 +1,8 @@
 // lib/services/api_client.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../core/config/backend_config.dart';
 
 class ApiClient {
@@ -23,20 +25,30 @@ class ApiClient {
     Map<String, dynamic> body, {
     Duration timeout = const Duration(seconds: 15),
   }) async {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      body: json.encode(body),
-    ).timeout(timeout);
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        body: json.encode(body),
+      ).timeout(timeout);
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      // 显式使用 UTF-8 解码，确保中文字符正确处理
-      final responseBody = utf8.decode(response.bodyBytes);
-      return json.decode(responseBody);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // 显式使用 UTF-8 解码，确保中文字符正确处理
+        final responseBody = utf8.decode(response.bodyBytes);
+        return json.decode(responseBody);
+      }
+      throw ApiException(response.statusCode, response.body);
+    } catch (e, stackTrace) {
+      debugPrint('❌ API error: $e');
+      Sentry.captureException(
+        e,
+        stackTrace: stackTrace,
+        hint: Hint.withMap({'url': url, 'body': body}),
+      );
+      rethrow;
     }
-    throw ApiException(response.statusCode, response.body);
   }
 }
 

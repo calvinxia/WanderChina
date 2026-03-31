@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
 import '../../models/poi_translation.dart';
+import '../../core/theme/city_theme.dart';
 
 class POIBottomSheet extends StatelessWidget {
   final POITranslation poi;
   final AppLanguage language;            // 当前语言
   final VoidCallback onDirections;   // 点击 Directions 的回调
   final VoidCallback onClose;
+  final CityTheme? theme;
 
   const POIBottomSheet({
     super.key,
@@ -14,16 +15,20 @@ class POIBottomSheet extends StatelessWidget {
     required this.language,
     required this.onDirections,
     required this.onClose,
+    this.theme,
   });
 
   @override
   Widget build(BuildContext context) {
+    final currentTheme = theme ?? CityTheme.defaultTheme;
+    final bgColor = Color.lerp(Colors.white, currentTheme.pillActiveColor, 0.04)!;
+
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -70,7 +75,7 @@ class POIBottomSheet extends StatelessWidget {
                   icon: const Icon(Icons.directions, size: 20),
                   label: const Text('Directions'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.jade500,
+                    backgroundColor: currentTheme.pillActiveColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -87,10 +92,10 @@ class POIBottomSheet extends StatelessWidget {
                   icon: const Icon(Icons.info_outline, size: 20),
                   label: const Text('Details'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.jade500,
+                    foregroundColor: currentTheme.pillActiveColor,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: const BorderSide(color: AppColors.jade500),
+                    side: BorderSide(color: currentTheme.pillActiveColor),
                   ),
                 ),
               ),

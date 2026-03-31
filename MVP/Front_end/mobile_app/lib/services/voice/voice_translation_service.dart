@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:record/record.dart';
 import '../../models/poi_translation.dart';
 import '../api_client.dart';
+import '../analytics_service.dart';
 
 enum TranslationDirection {
   foreignToChinese, // EN/FR/ES → 中文
@@ -37,6 +38,7 @@ class VoiceTranslationService extends ChangeNotifier {
   factory VoiceTranslationService() => _instance;
   VoiceTranslationService._internal();
 
+  final _analytics = AnalyticsService.instance;
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer   _player   = AudioPlayer();
 
@@ -168,6 +170,12 @@ class VoiceTranslationService extends ChangeNotifier {
         processingTime:  stopwatch.elapsed,
       );
       _history.add(result);
+
+      // Analytics tracking
+      final directionStr = direction == TranslationDirection.foreignToChinese
+          ? 'foreign_to_zh'
+          : 'zh_to_foreign';
+      _analytics.voiceTranslated(directionStr, recognized);
 
       try { File(audioPath).deleteSync(); } catch (_) {}
       return result;

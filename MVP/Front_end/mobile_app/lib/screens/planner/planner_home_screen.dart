@@ -1,12 +1,19 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../services/api_client.dart';
 import '../../services/backend/auth_service.dart';
+import '../../services/analytics_service.dart';
 import '../../core/config/backend_config.dart';
 import '../../models/itinerary.dart';
 import 'itinerary_detail_screen.dart';
+import '../../core/theme/city_theme.dart';
+import '../main/main_screen.dart';
+import '../../widgets/planner/willingness_survey_dialog.dart';
 
 /// Screen 9: AI Trip Planner Home
 ///
@@ -24,12 +31,28 @@ class PlannerHomeScreen extends StatefulWidget {
 }
 
 class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
+  final _analytics = AnalyticsService.instance;
   String? _selectedCity;
   int _selectedDays = 3;
   final Set<String> _selectedInterests = {};
   final TextEditingController _customInput = TextEditingController();
   List<Map<String, dynamic>> _savedTrips = [];
   bool _isLoadingTrips = true;
+  CityTheme? _plannerTheme;
+
+  // Loading animation state
+  bool _isGenerating = false;
+  String _loadingMessage = '';
+  String _funFact = '';
+  int _loadingStep = 0;
+  Timer? _loadingTimer;
+
+  /// Get active theme: use selected city theme if available, otherwise fallback to GPS city theme
+  CityTheme get _activeTheme {
+    if (_plannerTheme != null) return _plannerTheme!;
+    final mainState = context.findAncestorStateOfType<MainScreenState>();
+    return mainState?.cityTheme ?? CityTheme.defaultTheme;
+  }
 
   final List<Map<String, String>> _cities = [
     {'zh': '北京', 'en': 'BJ', 'fullName': 'Beijing'},
@@ -47,6 +70,56 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     'Shopping',
     'Nightlife',
     'History',
+  ];
+
+  // Fun facts for each city (4 facts per city)
+  final Map<String, List<String>> _cityFunFacts = {
+    '北京': [
+      'Beijing has over 3,000 years of history and was the capital of 6 dynasties',
+      'The Forbidden City has 9,999 rooms - just one short of heaven\'s 10,000',
+      'Beijing\'s subway system is the world\'s 2nd busiest with 4 billion rides per year',
+      'Peking Duck was originally a royal dish served only to emperors',
+    ],
+    '上海': [
+      'Shanghai means "upon the sea" and was once a fishing village',
+      'The Bund features 52 buildings in different architectural styles',
+      'Shanghai Tower (632m) is the world\'s 2nd tallest building',
+      'Shanghai Disneyland is the first Disney park in mainland China',
+    ],
+    '广州': [
+      'Guangzhou has been a trading port for over 2,200 years',
+      'Dim sum originated in Guangzhou tea houses along the Silk Road',
+      'Canton Tower (600m) offers the world\'s highest Ferris wheel',
+      'Guangzhou has more than 150 traditional markets',
+    ],
+    '深圳': [
+      'Shenzhen transformed from a fishing village to a megacity in just 40 years',
+      'Shenzhen is called "China\'s Silicon Valley" with Tencent and Huawei HQs',
+      'Window of the World park features 130 world landmarks in miniature',
+      'Shenzhen has over 1,000 parks - more than any other Chinese city',
+    ],
+    '成都': [
+      'Chengdu is home to over 80% of the world\'s wild giant pandas',
+      'Sichuan cuisine has over 5,000 different dishes and 23 unique flavors',
+      'Chengdu was the world\'s first city to use paper money (11th century)',
+      'The city has over 30,000 teahouses - more than any other city globally',
+    ],
+    '西安': [
+      'Xi\'an was China\'s capital for 13 dynasties spanning 1,100 years',
+      'The Terracotta Army has 8,000 soldiers, each with unique facial features',
+      'Xi\'an marks the starting point of the ancient Silk Road',
+      'The city walls are the most complete ancient fortification in China',
+    ],
+  };
+
+  // Loading step messages (6 stages)
+  final List<String> _loadingSteps = [
+    'Analyzing your preferences...',
+    'Finding best attractions...',
+    'Planning optimal routes...',
+    'Calculating travel times...',
+    'Adding local recommendations...',
+    'Finalizing your itinerary...',
   ];
 
   @override
@@ -81,7 +154,45 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
   @override
   void dispose() {
     _customInput.dispose();
+    _loadingTimer?.cancel();
     super.dispose();
+  }
+
+  void _startLoadingAnimation() {
+    setState(() {
+      _isGenerating = true;
+      _loadingStep = 0;
+      _loadingMessage = _loadingSteps[0];
+      final cityFacts = _cityFunFacts[_selectedCity] ?? _cityFunFacts['北京']!;
+      _funFact = cityFacts[0];
+    });
+
+    _loadingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        _loadingStep = (_loadingStep + 1) % _loadingSteps.length;
+        _loadingMessage = _loadingSteps[_loadingStep];
+
+        // Cycle through fun facts
+        final cityFacts = _cityFunFacts[_selectedCity] ?? _cityFunFacts['北京']!;
+        final factIndex = (timer.tick - 1) % cityFacts.length;
+        _funFact = cityFacts[factIndex];
+      });
+    });
+  }
+
+  void _stopLoadingAnimation() {
+    _loadingTimer?.cancel();
+    _loadingTimer = null;
+    if (mounted) {
+      setState(() {
+        _isGenerating = false;
+      });
+    }
   }
 
   @override
@@ -90,10 +201,10 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('Plan Your Trip'),
-          backgroundColor: Colors.white,
+          backgroundColor: Colors.transparent,
           foregroundColor: AppColors.gray900,
           elevation: 0,
           actions: [
@@ -105,7 +216,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             ),
           ],
         ),
-      body: SingleChildScrollView(
+      body: _isGenerating
+          ? _buildGeneratingView()
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,7 +261,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'Or describe in your words',
-                    style: AppTextStyles.caption(color: AppColors.gray600),
+                    style: AppTextStyles.caption(color: _activeTheme.primaryTextColor.withOpacity(0.6)),
                   ),
                 ),
                 const Expanded(child: Divider(color: AppColors.gray300)),
@@ -158,26 +271,31 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             const SizedBox(height: 16),
 
             // Custom Input
-            Container(
-              height: 100,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.gray300),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                controller: _customInput,
-                maxLength: 200,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'e.g. "3 days in Chengdu, love pandas and spicy food, budget traveller"',
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                    color: AppColors.gray400,
-                  ),
-                  border: InputBorder.none,
-                  counterText: '',
+            TextField(
+              controller: _customInput,
+              maxLength: 200,
+              maxLines: 3,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.25),
+                hintText: 'e.g. "3 days in Chengdu, love pandas and spicy food, budget traveller"',
+                hintStyle: TextStyle(
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                  color: _activeTheme.primaryTextColor.withOpacity(0.4),
+                ),
+                counterText: '',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _activeTheme.pillActiveColor),
                 ),
               ),
             ),
@@ -196,10 +314,10 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.jade500,
-                  disabledBackgroundColor: AppColors.gray200,
+                  backgroundColor: _activeTheme.pillActiveColor,
+                  disabledBackgroundColor: _activeTheme.pillActiveColor.withOpacity(0.3),
                   foregroundColor: Colors.white,
-                  disabledForegroundColor: AppColors.gray400,
+                  disabledForegroundColor: _activeTheme.primaryTextColor.withOpacity(0.5),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -366,21 +484,41 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       itemCount: _cities.length,
       itemBuilder: (context, index) {
         final city = _cities[index];
+        final blockTheme = CityTheme.fromCityKey(city['en'] as String);
         final isSelected = _selectedCity == city['zh'];
 
         return GestureDetector(
           onTap: () {
             setState(() {
-              _selectedCity = city['zh'];
+              if (_selectedCity == city['zh']) {
+                // 再次点击 → 取消选择 → 恢复当前定位城市主题
+                _selectedCity = null;
+                _plannerTheme = null;  // null 时 _activeTheme 自动 fallback 到 GPS 城市
+                // 通知 MainScreen 恢复 GPS 主题
+                final mainState = context.findAncestorStateOfType<MainScreenState>();
+                mainState?.loadCityTheme();  // 重新用 GPS 定位
+              } else {
+                // 选择新城市
+                _selectedCity = city['zh'];
+                _plannerTheme = CityTheme.fromCityKey(city['en'] as String);
+                // 通知 MainScreen 切换背景
+                final mainState = context.findAncestorStateOfType<MainScreenState>();
+                mainState?.updateCityTheme(_plannerTheme!);
+              }
             });
           },
           child: Container(
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.jade500 : Colors.white,
-              border: Border.all(
-                color: isSelected ? AppColors.jade500 : AppColors.gray300,
-              ),
+              color: isSelected
+                  ? blockTheme.pillActiveColor.withOpacity(0.2)
+                  : Colors.white.withOpacity(0.25),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected
+                    ? blockTheme.pillActiveColor
+                    : blockTheme.pillActiveColor.withOpacity(0.3),
+                width: isSelected ? 1.5 : 0.5,
+              ),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -388,9 +526,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                 Text(
                   city['zh']!,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : AppColors.gray900,
+                    color: blockTheme.primaryTextColor,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -398,7 +536,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   city['en']!,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isSelected ? Colors.white70 : AppColors.gray600,
+                    color: blockTheme.secondaryTextColor,
                   ),
                 ),
               ],
@@ -427,11 +565,15 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
               child: Container(
                 height: 44,
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.jade500 : Colors.white,
+                  color: isSelected
+                      ? _activeTheme.pillActiveColor
+                      : Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected ? AppColors.jade500 : AppColors.gray300,
+                    color: isSelected
+                        ? _activeTheme.pillActiveColor
+                        : Colors.white.withOpacity(0.3),
                   ),
-                  borderRadius: BorderRadius.circular(22),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -439,7 +581,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : AppColors.gray900,
+                    color: isSelected ? Colors.white : _activeTheme.primaryTextColor,
                   ),
                 ),
               ),
@@ -470,11 +612,11 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.jade100 : Colors.white,
+              color: Colors.white.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected ? AppColors.jade500 : AppColors.gray300,
+                color: Colors.white.withOpacity(0.3),
               ),
-              borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -482,7 +624,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                 Icon(
                   isSelected ? Icons.check_box : Icons.check_box_outline_blank,
                   size: 18,
-                  color: isSelected ? AppColors.jade700 : AppColors.gray400,
+                  color: isSelected ? _activeTheme.pillActiveColor : AppColors.gray400,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -490,7 +632,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isSelected ? AppColors.jade700 : AppColors.gray900,
+                    color: isSelected ? _activeTheme.pillActiveColor : _activeTheme.primaryTextColor,
                   ),
                 ),
               ],
@@ -508,21 +650,18 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     required String date,
     required VoidCallback onTap,
   }) {
+    // Get theme based on trip city
+    final tripCity = city.split(',').first.trim(); // Extract first city if multiple
+    final tripTheme = CityTheme.fromCityKey(_getCityKey(tripCity));
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppColors.gray200),
+          color: Colors.white.withOpacity(0.25),
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
         ),
         child: Row(
           children: [
@@ -530,12 +669,12 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.jade100,
+                color: tripTheme.pillActiveColor.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.calendar_today,
-                color: AppColors.jade500,
+                color: tripTheme.pillActiveColor,
                 size: 24,
               ),
             ),
@@ -581,39 +720,19 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     }
   }
 
-  Future<void> _generatePlan() async {
-    final loadingText = ValueNotifier<String>('AI is planning your trip...');
+  String _getCityKey(String cityName) {
+    if (cityName.contains('Beijing') || cityName.contains('北京')) return 'BJ';
+    if (cityName.contains('Shanghai') || cityName.contains('上海')) return 'SH';
+    if (cityName.contains('Guangzhou') || cityName.contains('广州')) return 'GZ';
+    if (cityName.contains('Shenzhen') || cityName.contains('深圳')) return 'SZ';
+    if (cityName.contains('Chengdu') || cityName.contains('成都')) return 'CD';
+    if (cityName.contains("Xi'an") || cityName.contains('西安')) return 'XA';
+    return 'GZ'; // Default to Guangzhou
+  }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => ValueListenableBuilder<String>(
-        valueListenable: loadingText,
-        builder: (_, text, __) => Center(
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: AppColors.jade500),
-                const SizedBox(height: 16),
-                Text(
-                  text,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.gray600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _generatePlan() async {
+    // Start loading animation
+    _startLoadingAnimation();
 
     try {
       // 将选中的中文城市名转换为英文完整名
@@ -646,8 +765,8 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
 
       if (!mounted) return;
 
-      // 关闭 loading 对话框
-      Navigator.pop(context);
+      // Stop loading animation
+      _stopLoadingAnimation();
 
       // 使用 fromCloudData 解析云函数返回的行程数据
       final itinerary = Itinerary.fromCloudData({
@@ -659,6 +778,13 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       });
 
       debugPrint('🗺️ Itinerary parsed successfully (preview mode): ${itinerary.title}');
+
+      // Analytics tracking
+      _analytics.itineraryGenerated(
+        cityEnglishName,
+        _selectedDays,
+        _selectedInterests.toList(),
+      );
 
       // 导航到行程详情页（预览模式，传入保存所需参数）
       await Navigator.push(
@@ -673,6 +799,12 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           ),
         ),
       );
+
+      // ── 付费意愿调研检查 ──
+      if (mounted) {
+        await _checkAndShowSurvey();
+      }
+
       // 返回后重新加载保存的行程列表
       _loadSavedTrips();
     } catch (e, stackTrace) {
@@ -682,8 +814,8 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
 
       if (!mounted) return;
 
-      // 关闭 loading 对话框
-      Navigator.pop(context);
+      // Stop loading animation
+      _stopLoadingAnimation();
 
       // 收起键盘
       FocusScope.of(context).unfocus();
@@ -697,5 +829,223 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         ),
       );
     }
+  }
+
+  /// 检查是否应弹出付费意愿调研，并在满足条件时弹出
+  Future<void> _checkAndShowSurvey() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 已弹过，不再弹
+    final surveyed = prefs.getBool('wtp_survey_shown') ?? false;
+    if (surveyed) return;
+
+    // 递增生成计数
+    final count = (prefs.getInt('itinerary_generate_count') ?? 0) + 1;
+    await prefs.setInt('itinerary_generate_count', count);
+
+    // 第 2 次生成后弹出
+    if (count < 2) return;
+
+    // 标记已弹出（无论用户是否回答）
+    await prefs.setBool('wtp_survey_shown', true);
+
+    if (!mounted) return;
+
+    // 获取当前城市主题
+    final mainState = context.findAncestorStateOfType<MainScreenState>();
+    final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+
+    // 延迟 500ms 让页面过渡完成后再弹
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => WillingnessSurveyDialog(
+        theme: cityTheme,
+        onResponse: (response) {
+          Navigator.of(ctx).pop();
+          _recordSurveyResponse(response);
+        },
+      ),
+    );
+  }
+
+  /// 记录调研结果 — 本地 + Sentry
+  void _recordSurveyResponse(String response) async {
+    // 1. 本地存储（备份）
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('wtp_survey_response', response);
+
+    // 2. Sentry 上报
+    Sentry.captureMessage(
+      'WTP Survey: $response',
+      level: SentryLevel.info,
+      withScope: (scope) {
+        scope.setTag('survey_type', 'wtp');
+        scope.setTag('survey_response', response);
+      },
+    );
+
+    // 3. 控制台输出
+    debugPrint('💰 [WTP Survey] User responded: $response');
+  }
+
+  Widget _buildGeneratingView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Text(
+            '✨ Creating your perfect itinerary...',
+            style: AppTextStyles.h3(color: AppColors.gray900),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This usually takes 30-60 seconds',
+            style: AppTextStyles.bodySmall(color: AppColors.gray600),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Progress bar
+          LinearProgressIndicator(
+            backgroundColor: _activeTheme.pillActiveColor.withOpacity(0.2),
+            valueColor: AlwaysStoppedAnimation<Color>(_activeTheme.pillActiveColor),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Loading message
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 500),
+            child: Text(
+              _loadingMessage,
+              key: ValueKey<String>(_loadingMessage),
+              style: AppTextStyles.body(color: _activeTheme.pillActiveColor)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Fun fact card
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 500),
+            child: Container(
+              key: ValueKey<String>(_funFact),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _activeTheme.pillActiveColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _activeTheme.pillActiveColor.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    color: _activeTheme.pillActiveColor,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Did you know?',
+                          style: AppTextStyles.caption(
+                            color: _activeTheme.pillActiveColor,
+                          ).copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _funFact,
+                          style: AppTextStyles.bodySmall(color: AppColors.gray700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Skeleton activity cards
+          Text(
+            'Preview',
+            style: AppTextStyles.h4(color: AppColors.gray900),
+          ),
+          const SizedBox(height: 12),
+          ...[1, 2, 3].map((i) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildSkeletonActivityCard(),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonActivityCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Time shimmer
+          Container(
+            width: 80,
+            height: 12,
+            decoration: BoxDecoration(
+              color: _activeTheme.pillActiveColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Title shimmer
+          Container(
+            width: double.infinity,
+            height: 16,
+            decoration: BoxDecoration(
+              color: _activeTheme.pillActiveColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Description shimmer
+          Container(
+            width: double.infinity,
+            height: 12,
+            decoration: BoxDecoration(
+              color: _activeTheme.pillActiveColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 200,
+            height: 12,
+            decoration: BoxDecoration(
+              color: _activeTheme.pillActiveColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

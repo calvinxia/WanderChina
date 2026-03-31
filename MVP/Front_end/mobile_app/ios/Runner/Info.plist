@@ -26,6 +26,20 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>WanderChina needs camera access to take your profile picture</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>WanderChina needs your location to show nearby places and provide navigation</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>WanderChina needs your location to show nearby places and provide navigation</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>WanderChina needs microphone access for voice translation</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>WanderChina needs photo library access to update your profile photo</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>WanderChina needs photo library access to set your profile picture</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>WanderChina uses speech recognition for voice translation</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,20 +80,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- Microphone permission for voice translation -->
-	<key>NSMicrophoneUsageDescription</key>
-	<string>WanderChina needs microphone access for voice translation</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>WanderChina uses speech recognition for voice translation</string>
-	<!-- Location permission for map and nearby places -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>WanderChina needs your location to show nearby places and provide navigation</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>WanderChina needs your location to show nearby places and provide navigation</string>
-	<!-- Photo library permission for profile picture -->
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>WanderChina needs photo library access to set your profile picture</string>
-	<key>NSCameraUsageDescription</key>
-	<string>WanderChina needs camera access to take your profile picture</string>
 </dict>
 </plist>

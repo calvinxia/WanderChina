@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/city_theme.dart';
 import '../../services/backend/auth_service.dart';
 import '../../services/backend/storage_service.dart';
+import '../../widgets/common/city_background.dart';
+import '../main/main_screen.dart';
 
 /// Edit Profile Screen - MVP Simple Version
 ///
@@ -90,14 +92,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cityTheme = context.findAncestorStateOfType<MainScreenState>()?.cityTheme ?? CityTheme.defaultTheme;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Edit Profile'),
-          actions: [
-            TextButton(
-              onPressed: () async {
+      child: CityBackground(
+        theme: cityTheme,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: const Text('Edit Profile'),
+            actions: [
+              TextButton(
+                onPressed: () async {
                 FocusScope.of(context).unfocus();
                 setState(() => _isUploading = true);
 
@@ -140,7 +149,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               },
               child: _isUploading
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Save', style: TextStyle(color: AppColors.jade500)),
+                  : Text('Save', style: TextStyle(color: cityTheme.pillActiveColor)),
             ),
           ],
         ),
@@ -168,7 +177,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppColors.jade500,
+                          color: cityTheme.pillActiveColor,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
@@ -181,18 +190,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 24),
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+                style: TextStyle(color: cityTheme.primaryTextColor),
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  labelStyle: TextStyle(color: cityTheme.primaryTextColor.withOpacity(0.6)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.25),
+                  border: const OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: cityTheme.pillActiveColor, width: 2),
+                  ),
+                ),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _bioController,
-                decoration: const InputDecoration(labelText: 'Bio', border: OutlineInputBorder()),
+                style: TextStyle(color: cityTheme.primaryTextColor),
+                decoration: InputDecoration(
+                  labelText: 'Bio',
+                  labelStyle: TextStyle(color: cityTheme.primaryTextColor.withOpacity(0.6)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.25),
+                  border: const OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: cityTheme.pillActiveColor, width: 2),
+                  ),
+                ),
                 textInputAction: TextInputAction.done,
                 maxLines: 2,
               ),
             ],
           ),
+        ),
         ),
       ),
     );

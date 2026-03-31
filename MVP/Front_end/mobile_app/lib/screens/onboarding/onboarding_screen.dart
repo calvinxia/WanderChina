@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/city_theme.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/app_logo.dart';
@@ -25,6 +28,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  String? _selectedCityKey; // 'BJ', 'SH', 'GZ', 'SZ', 'CD', 'XA'
 
   final List<OnboardingSlide> _slides = [
     OnboardingSlide(
@@ -48,6 +52,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       visualType: OnboardingVisualType.navigation,
       accentColor: AppColors.orange, // #E8723A
     ),
+    OnboardingSlide(
+      title: 'Where Are You\nHeaded?',
+      description:
+          'Pick your first destination — we\'ll customize everything for that city',
+      visualType: OnboardingVisualType.citySelection,
+      accentColor: const Color(0xFF7EC8C8), // 天青色
+    ),
   ];
 
   @override
@@ -62,8 +73,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
   }
 
-  void _nextPage() {
+  void _nextPage() async {
     if (_currentPage < _slides.length - 1) {
+      // 从第 3 屏（index 2）过渡时，尝试 GPS 检测
+      if (_currentPage == 2) {
+        final detected = await _tryDetectCity();
+        if (detected) {
+          // GPS 匹配到六城，跳过第 4 屏直接完成
+          _finishOnboarding();
+          return;
+        }
+      }
+
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -77,10 +98,57 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _finishOnboarding();
   }
 
-  void _finishOnboarding() {
+  void _finishOnboarding() async {
+    // 保存用户选择的目的地城市
+    if (_selectedCityKey != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('destination_city', _selectedCityKey!);
+    }
+
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
+  }
+
+  /// 尝试 GPS 检测，返回 true 表示匹配到六城
+  Future<bool> _tryDetectCity() async {
+    try {
+      // 请求定位权限
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return false; // 权限拒绝，显示第 4 屏
+      }
+
+      // 获取位置（5 秒超时）
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.low,
+      ).timeout(const Duration(seconds: 5));
+
+      final theme = CityTheme.fromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      // 检查是否真的匹配到六城（而不是 fallback 到 defaultTheme）
+      if (theme != CityTheme.defaultTheme ||
+          _isInDefaultCity(position.latitude, position.longitude)) {
+        return true; // 匹配到六城，跳过第 4 屏
+      }
+
+      return false; // 不在六城范围，显示第 4 屏
+    } catch (_) {
+      return false; // GPS 超时或其他错误，显示第 4 屏
+    }
+  }
+
+  bool _isInDefaultCity(double lat, double lng) {
+    return lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0;
   }
 
   @override
@@ -131,6 +199,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// Background layer with INK 900, radial gradient, and mountain silhouettes
   Widget _buildBackgroundLayer() {
     final currentSlide = _slides[_currentPage];
+    // 第 4 屏：如果用户已选城市，用该城市主题色替代默认 accent
+    Color bgAccent = currentSlide.accentColor;
+    if (_currentPage == 3 && _selectedCityKey != null) {
+      bgAccent = CityTheme.fromCityKey(_selectedCityKey!).pillActiveColor;
+    }
 
     return Stack(
       children: [
@@ -145,7 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               center: const Alignment(0, -0.5),
               radius: 1.2,
               colors: [
-                currentSlide.accentColor.withOpacity(0.12),
+                bgAccent.withOpacity(0.12),
                 AppColors.ink900.withOpacity(0),
               ],
               stops: const [0, 0.7],
@@ -354,11 +427,105 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               duration: 500.ms,
               curve: Curves.elasticOut,
             );
+
+      case OnboardingVisualType.citySelection:
+        return _buildCitySelectionGrid(slide, isActive, index);
     }
+  }
+
+  Widget _buildCitySelectionGrid(OnboardingSlide slide, bool isActive, int index) {
+    final cities = [
+      {'key': 'BJ', 'zh': '北京', 'en': 'Beijing', 'emoji': '🏛'},
+      {'key': 'SH', 'zh': '上海', 'en': 'Shanghai', 'emoji': '🌃'},
+      {'key': 'GZ', 'zh': '广州', 'en': 'Guangzhou', 'emoji': '🌺'},
+      {'key': 'SZ', 'zh': '深圳', 'en': 'Shenzhen', 'emoji': '🏙'},
+      {'key': 'CD', 'zh': '成都', 'en': 'Chengdu', 'emoji': '🐼'},
+      {'key': 'XA', 'zh': '西安', 'en': "Xi'an", 'emoji': '⚔️'},
+    ];
+
+    return SizedBox(
+      width: 280,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        alignment: WrapAlignment.center,
+        children: cities.map((city) {
+          final isSelected = _selectedCityKey == city['key'];
+          final cityTheme = CityTheme.fromCityKey(city['key'] as String);
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedCityKey = city['key'] as String;
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 130,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? cityTheme.pillActiveColor.withOpacity(0.20)
+                    : Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected
+                      ? cityTheme.pillActiveColor
+                      : Colors.white.withOpacity(0.15),
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    city['emoji'] as String,
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    city['zh'] as String,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected
+                          ? cityTheme.pillActiveColor
+                          : Colors.white.withOpacity(0.85),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    city['en'] as String,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isSelected
+                          ? cityTheme.pillActiveColor.withOpacity(0.8)
+                          : Colors.white.withOpacity(0.5),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    )
+        .animate(key: ValueKey('visual_$index'))
+        .fadeIn(duration: 500.ms)
+        .scale(
+          begin: const Offset(0.9, 0.9),
+          duration: 400.ms,
+          curve: Curves.easeOut,
+        );
   }
 
   Widget _buildPageIndicators() {
     final currentSlide = _slides[_currentPage];
+    Color indicatorColor = currentSlide.accentColor;
+    if (_currentPage == 3 && _selectedCityKey != null) {
+      indicatorColor = CityTheme.fromCityKey(_selectedCityKey!).pillActiveColor;
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -371,7 +538,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           height: 8,
           decoration: BoxDecoration(
             color: _currentPage == index
-                ? currentSlide.accentColor.withOpacity(0.90)
+                ? indicatorColor.withOpacity(0.90)
                 : Colors.white.withOpacity(0.25),
             borderRadius: BorderRadius.circular(4),
           ),
@@ -382,19 +549,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildNextButton() {
     final currentSlide = _slides[_currentPage];
+    final isLastPage = _currentPage == _slides.length - 1;
+    final canProceed = !isLastPage || _selectedCityKey != null;
+
+    // 第 4 屏选中城市后，按钮颜色跟随城市主题
+    Color buttonColor = currentSlide.accentColor;
+    if (isLastPage && _selectedCityKey != null) {
+      buttonColor = CityTheme.fromCityKey(_selectedCityKey!).pillActiveColor;
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
-      child: PrimaryButton(
-        text: _currentPage == _slides.length - 1 ? 'Get Started' : 'Next',
-        onPressed: _nextPage,
-        isFullWidth: true,
-        size: ButtonSize.large,
-        backgroundColor: currentSlide.accentColor,
-        textColor: AppColors.ink900,
-        icon: _currentPage == _slides.length - 1
-            ? Icons.arrow_forward
-            : Icons.navigate_next,
+      child: AnimatedOpacity(
+        opacity: canProceed ? 1.0 : 0.4,
+        duration: const Duration(milliseconds: 200),
+        child: PrimaryButton(
+          text: isLastPage ? 'Get Started' : 'Next',
+          onPressed: canProceed ? _nextPage : () {},
+          isFullWidth: true,
+          size: ButtonSize.large,
+          backgroundColor: buttonColor,
+          textColor: isLastPage ? Colors.white : AppColors.ink900,
+          icon: isLastPage ? Icons.arrow_forward : Icons.navigate_next,
+        ),
       ),
     );
   }
@@ -405,6 +582,7 @@ enum OnboardingVisualType {
   logo,
   translation,
   navigation,
+  citySelection,
 }
 
 /// Onboarding slide data model

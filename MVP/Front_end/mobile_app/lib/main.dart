@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/amap_config.dart';
 import 'core/config/backend_config.dart';
@@ -97,9 +98,19 @@ void main() async {
 
   debugPrint('🎉 应用服务初始化完成！\n');
 
-  runApp(
-    const ProviderScope(
-      child: WanderChinaApp(),
+  // 7. 初始化 Sentry
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+      options.tracesSampleRate = 0.3;
+      options.environment = 'beta';
+      options.release = 'wanderchina@1.0.0+1';
+      options.debug = false;
+    },
+    appRunner: () => runApp(
+      const ProviderScope(
+        child: WanderChinaApp(),
+      ),
     ),
   );
 }

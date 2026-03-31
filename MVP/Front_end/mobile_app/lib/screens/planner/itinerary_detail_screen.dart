@@ -7,9 +7,12 @@ import '../../widgets/planner/transit_connector.dart';
 import '../../widgets/planner/ai_chat_input.dart';
 import '../../widgets/planner/activity_detail_sheet.dart';
 import '../../services/api_client.dart';
+import '../../services/analytics_service.dart';
 import '../../core/config/backend_config.dart';
 import '../../services/backend/auth_service.dart';
 import '../main/main_screen.dart';
+import '../../core/theme/city_theme.dart';
+import '../../widgets/common/city_background.dart';
 
 /// Screen 10: AI-Generated Itinerary Detail Page
 ///
@@ -42,9 +45,16 @@ class ItineraryDetailScreen extends StatefulWidget {
 
 class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
     with SingleTickerProviderStateMixin {
+  final _analytics = AnalyticsService.instance;
   late TabController _tabController;
   bool _isSaved = false;
   bool _isSaving = false;
+  late CityTheme _itineraryTheme;
+
+  // AI editing state
+  bool _isModifying = false;
+  String _modifyingMessage = '';
+  final List<String> _chatHistory = [];
 
   @override
   void initState() {
@@ -55,6 +65,19 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
     );
     // 检查是否已保存：有 tripId 且不是 preview_ 开头
     _isSaved = widget.tripId != null && !widget.tripId!.startsWith('preview_');
+    // 根据行程目的地检测城市主题
+    _itineraryTheme = _detectTheme();
+  }
+
+  CityTheme _detectTheme() {
+    final dest = widget.itinerary.destination.toLowerCase();
+    if (dest.contains('beijing') || dest.contains('北京')) return CityTheme.beijing;
+    if (dest.contains('shanghai') || dest.contains('上海')) return CityTheme.shanghai;
+    if (dest.contains('guangzhou') || dest.contains('广州')) return CityTheme.guangzhou;
+    if (dest.contains('shenzhen') || dest.contains('深圳')) return CityTheme.shenzhen;
+    if (dest.contains('chengdu') || dest.contains('成都')) return CityTheme.chengdu;
+    if (dest.contains("xi'an") || dest.contains('西安')) return CityTheme.xian;
+    return CityTheme.defaultTheme;
   }
 
   @override
@@ -65,41 +88,76 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _isSaved,
-      onPopInvoked: (bool didPop) async {
-        if (didPop) return;
+    return CityBackground(
+      theme: _itineraryTheme,
+      child: PopScope(
+        canPop: _isSaved,
+        onPopInvoked: (bool didPop) async {
+          if (didPop) return;
 
-        final discard = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Discard itinerary?'),
-            content: const Text('This trip has not been saved. Are you sure you want to leave?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
+          final discard = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: Color.lerp(Colors.white, _itineraryTheme.pillActiveColor, 0.08),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text('Discard itinerary?', style: TextStyle(color: _itineraryTheme.primaryTextColor)),
+              content: Text(
+                'This trip has not been saved. Are you sure you want to leave?',
+                style: TextStyle(color: _itineraryTheme.secondaryTextColor),
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Discard', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-        );
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text('Cancel', style: TextStyle(color: _itineraryTheme.pillActiveColor)),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Discard', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+          );
 
-        if (discard == true && context.mounted) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+          if (discard == true && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.gray900),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () async {
+            if (!_isSaved) {
+              final discard = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: Color.lerp(Colors.white, _itineraryTheme.pillActiveColor, 0.08),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  title: Text('Discard itinerary?', style: TextStyle(color: _itineraryTheme.primaryTextColor)),
+                  content: Text(
+                    'This trip has not been saved. Are you sure you want to leave?',
+                    style: TextStyle(color: _itineraryTheme.secondaryTextColor),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text('Cancel', style: TextStyle(color: _itineraryTheme.pillActiveColor)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Discard', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              if (discard == true && mounted) Navigator.pop(context);
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
         title: Text(
           '${widget.itinerary.destination} · ${widget.itinerary.totalDays} Days',
@@ -109,16 +167,16 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           if (!_isSaved)
             TextButton.icon(
               onPressed: (_isSaving || _isSaved) ? null : _saveTrip,
-              icon: const Icon(Icons.bookmark_add, color: AppColors.jade500, size: 20),
+              icon: Icon(Icons.bookmark_add, color: _itineraryTheme.pillActiveColor, size: 20),
               label: Text(
                 _isSaving ? 'Saving...' : 'Save',
-                style: const TextStyle(color: AppColors.jade500, fontWeight: FontWeight.w600),
+                style: TextStyle(color: _itineraryTheme.pillActiveColor, fontWeight: FontWeight.w600),
               ),
             )
           else
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.bookmark, color: AppColors.jade500, size: 24),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Icon(Icons.bookmark, color: _itineraryTheme.pillActiveColor, size: 24),
             ),
           IconButton(
             icon: const Icon(Icons.share_outlined, color: AppColors.gray700),
@@ -133,38 +191,43 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            decoration: const BoxDecoration(
-              color: AppColors.jade50,
+            decoration: BoxDecoration(
+              color: _itineraryTheme.pillActiveColor.withOpacity(0.1),
               border: Border(
-                bottom: BorderSide(color: AppColors.gray200, width: 1),
+                bottom: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
               ),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
                 '✨ Generated by AI',
-                style: TextStyle(color: AppColors.jade500, fontSize: 14),
+                style: TextStyle(color: _itineraryTheme.pillActiveColor, fontSize: 14),
               ),
             ),
           ),
 
           // Day Tab Bar
           Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.25),
               border: Border(
-                bottom: BorderSide(color: AppColors.gray200, width: 1),
+                bottom: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
               ),
             ),
             child: TabBar(
               controller: _tabController,
               isScrollable: widget.itinerary.days.length > 3,
-              labelColor: AppColors.jade500,
-              unselectedLabelColor: AppColors.gray600,
-              labelStyle: AppTextStyles.body(color: AppColors.jade500).copyWith(
+              labelColor: _itineraryTheme.pillActiveColor,
+              unselectedLabelColor: _itineraryTheme.secondaryTextColor,
+              labelStyle: TextStyle(
+                color: _itineraryTheme.pillActiveColor,
                 fontWeight: FontWeight.w600,
+                fontSize: 15,
               ),
-              unselectedLabelStyle: AppTextStyles.body(color: AppColors.gray600),
-              indicatorColor: AppColors.jade500,
+              unselectedLabelStyle: TextStyle(
+                color: _itineraryTheme.secondaryTextColor,
+                fontSize: 15,
+              ),
+              indicatorColor: _itineraryTheme.pillActiveColor,
               indicatorWeight: 2,
               tabs: widget.itinerary.days.map((day) {
                 return Tab(text: 'Day ${day.dayNumber}');
@@ -182,38 +245,135 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
             ),
           ),
 
+          // Chat History + Loading State (above AiChatInput)
+          if (_chatHistory.isNotEmpty || _isModifying)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 80),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                border: Border(
+                  top: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
+                ),
+              ),
+              child: ListView.builder(
+                reverse: true,
+                shrinkWrap: true,
+                itemCount: _chatHistory.length + (_isModifying ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (_isModifying && index == 0) {
+                    // Loading 状态
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _itineraryTheme.pillActiveColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _modifyingMessage,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _itineraryTheme.pillActiveColor,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final msgIndex = _isModifying ? index - 1 : index;
+                  final reversedIndex = _chatHistory.length - 1 - msgIndex;
+                  if (reversedIndex < 0 || reversedIndex >= _chatHistory.length) {
+                    return const SizedBox();
+                  }
+                  final msg = _chatHistory[reversedIndex];
+                  final isUser = msg.startsWith('You:');
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isUser
+                            ? _itineraryTheme.pillActiveColor.withOpacity(0.08)
+                            : Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isUser
+                              ? _itineraryTheme.pillActiveColor.withOpacity(0.15)
+                              : Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 角色标签
+                          Text(
+                            isUser ? 'You' : 'AI',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isUser
+                                  ? _itineraryTheme.pillActiveColor
+                                  : _itineraryTheme.secondaryTextColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          // 消息内容（去掉 "You: " / "AI: " 前缀）
+                          Text(
+                            msg.replaceFirst(RegExp(r'^(You|AI): '), ''),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _itineraryTheme.primaryTextColor.withOpacity(0.85),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
           // AI Chat Input (fixed at bottom)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: const Border(
-                top: BorderSide(color: AppColors.gray200, width: 1),
+              color: Colors.white.withOpacity(0.25),
+              border: Border(
+                top: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
             ),
             child: AiChatInput(
-              onSend: (text) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('AI itinerary editing coming in next update')),
-                );
-              },
-              placeholder: 'e.g. "add more food stops"',
+              theme: _itineraryTheme,
+              onSend: _isModifying ? (text) {} : (text) => _modifyItinerary(text),
+              placeholder: _isModifying ? 'AI is updating...' : 'e.g. "add more food stops"',
             ),
           ),
         ],
       ),
+        ),
       ),
     );
   }
 
   Widget _buildDayContent(ItineraryDay day) {
+    // Show skeleton screens during AI modification
+    if (_isModifying) {
+      return _buildModifyingSkeletonView();
+    }
+
+    // Limit activities to max 10 to prevent UI issues
+    final activities = day.activities.take(10).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -229,18 +389,20 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           ],
 
           // Activities with Transit Connectors
-          ...List.generate(day.activities.length, (index) {
-            final activity = day.activities[index];
-            final isLast = index == day.activities.length - 1;
+          ...List.generate(activities.length, (index) {
+            final activity = activities[index];
+            final isLast = index == activities.length - 1;
 
             return Column(
               children: [
                 ActivityCard(
                   activity: activity,
+                  theme: _itineraryTheme,
                   onNavigate: () => _handleNavigate(activity),
                   onDetails: () => _showActivityDetail(activity.toJson()),
+                  onDelete: () => _deleteActivity(day.dayNumber, index),
                 ),
-                if (!isLast) _buildTransitConnector(activity, day.activities[index + 1]),
+                if (!isLast) _buildTransitConnector(activity, activities[index + 1]),
               ],
             );
           }),
@@ -250,11 +412,11 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           // Add Stop Button
           OutlinedButton.icon(
             onPressed: _handleAddStop,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Add Stop'),
+            icon: Icon(Icons.add, size: 18, color: _itineraryTheme.pillActiveColor),
+            label: Text('Add Stop', style: TextStyle(color: _itineraryTheme.pillActiveColor)),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.jade500,
-              side: const BorderSide(color: AppColors.jade500),
+              foregroundColor: _itineraryTheme.pillActiveColor,
+              side: BorderSide(color: _itineraryTheme.pillActiveColor),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -271,7 +433,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
             child: ElevatedButton(
               onPressed: _handleViewOnMap,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.jade500,
+                backgroundColor: _itineraryTheme.pillActiveColor,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -339,6 +501,10 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
     final nameZh = activity.notes ?? activity.location ?? '';
     final nameEn = activity.title;
     debugPrint('🧭 Navigate tapped: nameZh=$nameZh, nameEn=$nameEn, city=${widget.itinerary.destination}');
+
+    // Analytics tracking
+    _analytics.poiNavigate(nameEn.isNotEmpty ? nameEn : nameZh);
+
     // 搜索用中文（精确匹配），搜索框显示英文（用户可读）
     final searchQuery = nameZh.isNotEmpty ? nameZh : nameEn;
     final displayName = nameEn.isNotEmpty ? nameEn : nameZh;
@@ -356,6 +522,9 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
     final nameZh = activity['name_zh'] ?? activity['notes'] ?? activity['location'] ?? '';
     final nameEn = activity['name'] ?? activity['title'] ?? '';
 
+    // Analytics tracking
+    _analytics.poiDetailViewed(nameEn.isNotEmpty ? nameEn : nameZh);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -367,6 +536,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
         duration: activity['duration'] ?? '',
         cost: activity['cost'] ?? '',
         city: widget.itinerary.destination,
+        theme: _itineraryTheme,
       ),
     );
   }
@@ -392,6 +562,13 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           _isSaved = true;
           _isSaving = false;
         });
+
+        // Analytics tracking
+        _analytics.itinerarySaved(
+          widget.itinerary.destination,
+          widget.itinerary.days.length,
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Trip saved to My Trips!')),
         );
@@ -426,6 +603,228 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
       const SnackBar(content: Text('View on map functionality coming soon')),
     );
     // TODO: Navigate to Map tab with all itinerary points
+  }
+
+  Map<String, dynamic> _buildItineraryJsonForModify() {
+    // 构建精简的行程 JSON（DeepSeek 能理解的原始格式）
+    final days = widget.itinerary.days.map((day) {
+      return {
+        'day_number': day.dayNumber,
+        'title': day.title ?? '',
+        'city': widget.itinerary.destination,
+        'summary': day.notes ?? '',
+        'activities': day.activities.map((activity) {
+          final hour = activity.startTime.hour.toString().padLeft(2, '0');
+          final minute = activity.startTime.minute.toString().padLeft(2, '0');
+          final durationHours = activity.duration.inMinutes / 60;
+
+          return {
+            'time': '$hour:$minute',
+            'name': activity.title,
+            'name_zh': activity.notes ?? activity.location ?? '',
+            'duration': durationHours >= 1
+                ? '${durationHours.toStringAsFixed(durationHours == durationHours.toInt() ? 0 : 1)} hrs'
+                : '${activity.duration.inMinutes} min',
+            'cost': activity.estimatedCost != null ? '¥${activity.estimatedCost!.toStringAsFixed(0)}' : '¥0',
+            'description': activity.description ?? '',
+          };
+        }).toList(),
+      };
+    }).toList();
+
+    return {'days': days};
+  }
+
+  Future<void> _modifyItinerary(String instruction) async {
+    if (instruction.trim().isEmpty) return;
+
+    setState(() {
+      _isModifying = true;
+      _modifyingMessage = 'AI is updating your itinerary...';
+      _chatHistory.add('You: $instruction');
+    });
+
+    // Analytics tracking
+    _analytics.itineraryModified(instruction);
+
+    try {
+      // 把当前行程转为 DeepSeek 能理解的 JSON
+      final currentJson = _buildItineraryJsonForModify();
+
+      final result = await ApiClient.post(
+        ApiClient.generateItineraryUrl,
+        {
+          'action': 'modify',
+          'itinerary': currentJson,
+          'instruction': instruction,
+          'language': 'english',
+        },
+        timeout: const Duration(seconds: 60),
+      );
+
+      final modifiedJson = result['itinerary'];
+      if (modifiedJson != null && mounted) {
+        // 解析修改后的行程
+        final newItinerary = Itinerary.fromCloudData({
+          ...modifiedJson,
+          'title': widget.itinerary.title,
+          'cities': [widget.itinerary.destination],
+          'duration_days': widget.itinerary.days.length,
+          'trip_id': widget.tripId,
+        });
+
+        setState(() {
+          _chatHistory.add('AI: Itinerary updated ✓');
+          _isModifying = false;
+          _modifyingMessage = '';
+        });
+
+        // 替换当前行程 — 需要重建页面
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ItineraryDetailScreen(
+                itinerary: newItinerary,
+                tripId: widget.tripId,
+                cities: widget.cities,
+                days: widget.days,
+                interests: widget.interests,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Modify itinerary error: $e');
+      if (mounted) {
+        setState(() {
+          _chatHistory.add('AI: Sorry, update failed. Try again.');
+          _isModifying = false;
+          _modifyingMessage = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update itinerary: $e')),
+        );
+      }
+    }
+  }
+
+  void _deleteActivity(int dayNumber, int activityIndex) {
+    setState(() {
+      final dayIndex = widget.itinerary.days.indexWhere((d) => d.dayNumber == dayNumber);
+      if (dayIndex >= 0) {
+        final updatedActivities = List<Activity>.from(widget.itinerary.days[dayIndex].activities);
+        if (activityIndex < updatedActivities.length) {
+          updatedActivities.removeAt(activityIndex);
+          // 需要重建 ItineraryDay（因为 activities 是 final）
+          final updatedDay = ItineraryDay(
+            id: widget.itinerary.days[dayIndex].id,
+            dayNumber: widget.itinerary.days[dayIndex].dayNumber,
+            date: widget.itinerary.days[dayIndex].date,
+            title: widget.itinerary.days[dayIndex].title,
+            activities: updatedActivities,
+            notes: widget.itinerary.days[dayIndex].notes,
+          );
+          widget.itinerary.days[dayIndex] = updatedDay;
+          // 标记为未保存
+          _isSaved = false;
+        }
+      }
+    });
+  }
+
+  Widget _buildModifyingSkeletonView() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          _modifyingMessage,
+          style: TextStyle(
+            fontSize: 14,
+            color: _itineraryTheme.pillActiveColor,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            backgroundColor: _itineraryTheme.pillActiveColor.withOpacity(0.15),
+            valueColor: AlwaysStoppedAnimation(_itineraryTheme.pillActiveColor),
+            minHeight: 3,
+          ),
+        ),
+        const SizedBox(height: 20),
+        // 只显示 2 个骨架卡片（不是 4 个），减少高度
+        ...List.generate(2, (i) => _buildSkeletonCard()),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 50,
+            height: 12,
+            decoration: BoxDecoration(
+              color: _itineraryTheme.pillActiveColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 200,
+            height: 16,
+            decoration: BoxDecoration(
+              color: _itineraryTheme.pillActiveColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: 120,
+            height: 12,
+            decoration: BoxDecoration(
+              color: _itineraryTheme.pillActiveColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                width: 70,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: _itineraryTheme.pillActiveColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                width: 55,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: _itineraryTheme.pillActiveColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

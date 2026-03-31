@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../../core/theme/city_theme.dart';
 
 /// 将翻译文字渲染为 PNG badge 图片,用于自定义 Marker icon
 class MarkerBadgePainter {
@@ -11,20 +12,21 @@ class MarkerBadgePainter {
   /// [textZh] 中文名(副文字,较小)
   /// [isHighPriority] 是否高优先级(景点/地铁)
   /// [devicePixelRatio] 设备像素密度(通常 2.0 或 3.0)
+  /// [theme] 城市主题，用于配置颜色
   static Future<Uint8List> renderBadge({
     required String textEn,
     required String textZh,
     bool isHighPriority = false,
     double devicePixelRatio = 2.0,
+    CityTheme? theme,
   }) async {
+    final currentTheme = theme ?? CityTheme.defaultTheme;
     // ── 尺寸计算 ──
     // 先测量文字宽度来决定 badge 宽度
-    const enFontSizeHigh = 13.0;
-    const enFontSizeLow = 11.0;
-    final enFontSize = isHighPriority ? enFontSizeHigh : enFontSizeLow;
+    const enFontSize = 12.0;
     const zhFontSize = 10.0;
     final maxTextWidth = _measureTextWidth(textEn, enFontSize)
-        .clamp(60.0, 180.0); // 最小 60,最大 180
+        .clamp(60.0, 200.0); // 最小 60,最大 200
 
     final badgeWidth = maxTextWidth + 24; // 左右 padding 各 12
     const badgeHeight = 42.0; // 固定高度:英文行 + 中文行
@@ -41,12 +43,12 @@ class MarkerBadgePainter {
 
     canvas.scale(devicePixelRatio);
 
-    // 颜色定义
-    const bgColor = Colors.white;
-    final borderColor = isHighPriority
-        ? const Color(0xFFE8723A)  // Orange
-        : const Color(0xFF9E9E9E); // Gray 500
+    // 颜色定义 - 使用城市主题色
+    final bgColor = Color.lerp(Colors.white, currentTheme.pillActiveColor, 0.08)!.withOpacity(0.85);
+    final borderColor = currentTheme.pillActiveColor;
     final shadowColor = Colors.black.withOpacity(0.15);
+    final enTextColor = currentTheme.primaryTextColor;
+    final zhTextColor = currentTheme.secondaryTextColor;
 
     // ── 阴影 ──
     final shadowPaint = Paint()
@@ -58,7 +60,7 @@ class MarkerBadgePainter {
     );
     canvas.drawRRect(shadowRect.shift(const Offset(0, 1)), shadowPaint);
 
-    // ── 白色背景圆角矩形 ──
+    // ── 背景圆角矩形 ──
     final bgPaint = Paint()..color = bgColor;
     final bgRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, badgeWidth, badgeHeight),
@@ -66,33 +68,31 @@ class MarkerBadgePainter {
     );
     canvas.drawRRect(bgRect, bgPaint);
 
-    // ── 左侧色条(3px 宽) ──
-    final accentPaint = Paint()..color = borderColor;
-    final accentRect = RRect.fromRectAndCorners(
-      const Rect.fromLTWH(0, 0, 3, badgeHeight),
-      topLeft: const Radius.circular(6),
-      bottomLeft: const Radius.circular(6),
-    );
-    canvas.drawRRect(accentRect, accentPaint);
+    // ── 边框 ──
+    final borderPaint = Paint()
+      ..color = borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+    canvas.drawRRect(bgRect, borderPaint);
 
     // ── 英文文字(主) ──
     _drawText(
       canvas,
-      textEn.length > 20 ? '${textEn.substring(0, 18)}...' : textEn, // 截断
+      textEn.length > 22 ? '${textEn.substring(0, 20)}...' : textEn, // 截断
       const Offset(10, 5),
       enFontSize,
-      const Color(0xFF1A1A1A), // 近黑
+      enTextColor,
       FontWeight.w600,
       badgeWidth - 14,
     );
 
-    // ── 中文文字(副,灰色) ──
+    // ── 中文文字(副) ──
     _drawText(
       canvas,
-      textZh.length > 12 ? '${textZh.substring(0, 10)}...' : textZh,
+      textZh.length > 14 ? '${textZh.substring(0, 12)}...' : textZh,
       const Offset(10, 23),
       zhFontSize,
-      const Color(0xFF757575), // Gray 600
+      zhTextColor,
       FontWeight.w400,
       badgeWidth - 14,
     );

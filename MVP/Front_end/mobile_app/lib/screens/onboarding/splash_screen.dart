@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../services/backend/auth_service.dart';
@@ -53,7 +52,11 @@ class _SplashScreenState extends State<SplashScreen> {
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          gradient: AppColors.heroGradient,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0D0D1A), Color(0xFF1A1A35), Color(0xFF2A2A4A)],
+          ),
         ),
         child: SafeArea(
           child: Column(
@@ -90,11 +93,11 @@ class _SplashScreenState extends State<SplashScreen> {
         width: 120,
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFF1A1A35),
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.3),
+              color: const Color(0xFFE8D5B0).withOpacity(0.3),
               blurRadius: 30,
               offset: const Offset(0, 10),
             ),
@@ -126,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen> {
       children: [
         Text(
           'WanderChina',
-          style: AppTextStyles.h1(color: AppColors.primary),
+          style: AppTextStyles.h1(color: const Color(0xFFE8D5B0)),
           textAlign: TextAlign.center,
         )
             .animate()
@@ -145,7 +148,7 @@ class _SplashScreenState extends State<SplashScreen> {
         AppSpacing.gapHeightS,
         Text(
           'Discover China Your Way',
-          style: AppTextStyles.body(color: AppColors.gray700),
+          style: AppTextStyles.body(color: Colors.white.withOpacity(0.6)),
           textAlign: TextAlign.center,
         )
             .animate()
@@ -171,7 +174,7 @@ class _SplashScreenState extends State<SplashScreen> {
       height: 24,
       child: CircularProgressIndicator(
         strokeWidth: 2.5,
-        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8D5B0)),
       ),
     )
         .animate(

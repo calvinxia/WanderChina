@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../services/backend/auth_service.dart';
+import '../../services/analytics_service.dart';
 import '../../services/api_client.dart';
 import '../../core/config/backend_config.dart';
 import '../../services/amap_service.dart';
@@ -9,6 +10,8 @@ import '../../models/itinerary.dart';
 import '../auth/login_screen.dart';
 import '../planner/itinerary_detail_screen.dart';
 import 'edit_profile_screen.dart';
+import '../../core/theme/city_theme.dart';
+import '../main/main_screen.dart';
 
 /// Screen 12: Profile / Me Page
 ///
@@ -26,6 +29,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
+  final _analytics = AnalyticsService.instance;
   late TabController _tabController;
   Map<String, dynamic>? _userProfile;
   bool _isLoadingProfile = true;
@@ -117,10 +121,14 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Get city theme from MainScreen
+    final mainState = context.findAncestorStateOfType<MainScreenState>();
+    final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
         title: const Text('My Profile'),
@@ -156,15 +164,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: OutlinedButton(
                       onPressed: _handleEditProfile,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.jade500,
-                        side: const BorderSide(color: AppColors.jade500, width: 1.5),
+                        foregroundColor: cityTheme.pillActiveColor,
+                        side: BorderSide(color: cityTheme.pillActiveColor, width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(22),
                         ),
                       ),
                       child: Text(
                         'Edit Profile',
-                        style: AppTextStyles.button(color: AppColors.jade500),
+                        style: AppTextStyles.button(color: cityTheme.pillActiveColor),
                       ),
                     ),
                   ),
@@ -181,13 +189,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   child: TabBar(
                     controller: _tabController,
-                    labelColor: AppColors.jade500,
+                    labelColor: cityTheme.pillActiveColor,
                     unselectedLabelColor: AppColors.gray600,
-                    labelStyle: AppTextStyles.body(color: AppColors.jade500).copyWith(
+                    labelStyle: TextStyle(
+                      color: cityTheme.pillActiveColor,
                       fontWeight: FontWeight.w600,
+                      fontSize: 15,
                     ),
-                    unselectedLabelStyle: AppTextStyles.body(color: AppColors.gray600),
-                    indicatorColor: AppColors.jade500,
+                    unselectedLabelStyle: const TextStyle(
+                      color: AppColors.gray600,
+                      fontSize: 15,
+                    ),
+                    indicatorColor: cityTheme.pillActiveColor,
                     indicatorWeight: 2,
                     tabs: const [
                       Tab(text: 'Trips'),
@@ -216,6 +229,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () async {
+                        // Analytics tracking
+                        _analytics.clearUser();
+                        _analytics.track('logout');
+
                         await AuthService.logout();
                         if (mounted) {
                           Navigator.of(context).pushAndRemoveUntil(
@@ -273,16 +290,22 @@ class _ProfileScreenState extends State<ProfileScreen>
         const SizedBox(height: 8),
 
         // Location
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.location_on, size: 16, color: AppColors.jade500),
-            const SizedBox(width: 4),
-            Text(
-              '📍 $_currentCity',
-              style: AppTextStyles.caption(color: AppColors.jade500),
-            ),
-          ],
+        Builder(
+          builder: (context) {
+            final mainState = context.findAncestorStateOfType<MainScreenState>();
+            final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.location_on, size: 16, color: cityTheme.pillActiveColor),
+                const SizedBox(width: 4),
+                Text(
+                  '📍 $_currentCity',
+                  style: AppTextStyles.caption(color: cityTheme.pillActiveColor),
+                ),
+              ],
+            );
+          }
         ),
       ],
     );
@@ -352,17 +375,30 @@ class _ProfileScreenState extends State<ProfileScreen>
     final title = trip['title'] ?? 'My Trip';
     final createdAt = _formatDate(trip['created_at']);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ListTile(
-        leading: const Icon(Icons.calendar_today, color: AppColors.jade500),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(createdAt, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton(
-              onPressed: () async {
+    // Get theme based on trip's city
+    final tripCity = (trip['cities'] as List?)?.first ?? '';
+    final tripTheme = CityTheme.fromCityKey(_getCityKey(tripCity));
+
+    return Builder(
+      builder: (context) {
+        final cityTheme = tripTheme;
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          color: Colors.white.withOpacity(0.25),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.white.withOpacity(0.3)),
+          ),
+          child: ListTile(
+            leading: Icon(Icons.calendar_today, color: cityTheme.pillActiveColor),
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(createdAt, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () async {
                 try {
                   final detail = await ApiClient.post(BackendConfig.tripUrl, {
                     'action': 'get',
@@ -400,11 +436,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                   }
                 }
               },
-              child: const Text('View', style: TextStyle(color: AppColors.jade500)),
+              child: Text('View', style: TextStyle(color: cityTheme.pillActiveColor)),
             ),
           ],
         ),
       ),
+    );
+      }
     );
   }
 
@@ -428,6 +466,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     } catch (e) {
       return 'Unknown date';
     }
+  }
+
+  String _getCityKey(String cityName) {
+    if (cityName.contains('Beijing') || cityName.contains('北京')) return 'BJ';
+    if (cityName.contains('Shanghai') || cityName.contains('上海')) return 'SH';
+    if (cityName.contains('Guangzhou') || cityName.contains('广州')) return 'GZ';
+    if (cityName.contains('Shenzhen') || cityName.contains('深圳')) return 'SZ';
+    if (cityName.contains('Chengdu') || cityName.contains('成都')) return 'CD';
+    if (cityName.contains("Xi'an") || cityName.contains('西安')) return 'XA';
+    return 'GZ'; // Default to Guangzhou
   }
 
   Widget _buildSavedPlacesTab() {

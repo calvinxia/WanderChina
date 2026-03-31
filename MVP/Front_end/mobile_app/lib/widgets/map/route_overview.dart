@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/route_planning_service.dart';
+import '../../core/theme/city_theme.dart';
 
 class RouteOverviewPanel extends StatefulWidget {
   final String originName;       // "My Location"
@@ -12,6 +13,7 @@ class RouteOverviewPanel extends StatefulWidget {
   final List<RouteInfo>? walkingRoutes;
   final List<RouteInfo>? drivingRoutes;
   final bool isLoading;
+  final CityTheme? theme;
 
   const RouteOverviewPanel({
     super.key,
@@ -24,6 +26,7 @@ class RouteOverviewPanel extends StatefulWidget {
     this.walkingRoutes,
     this.drivingRoutes,
     this.isLoading = false,
+    this.theme,
   });
 
   @override
@@ -36,12 +39,15 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final currentTheme = widget.theme ?? CityTheme.defaultTheme;
+    final bgColor = Color.lerp(Colors.white, currentTheme.pillActiveColor, 0.05)!;
+
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -60,17 +66,17 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
           const SizedBox(height: 16),
 
           // 三种出行方式 tab
-          _buildRouteTypeTabs(),
+          _buildRouteTypeTabs(currentTheme),
           const SizedBox(height: 12),
 
           // 当前选中方式的路线详情
           if (widget.isLoading)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(color: AppColors.jade500),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: currentTheme.pillActiveColor),
             )
           else
-            _buildSelectedRouteDetail(),
+            _buildSelectedRouteDetail(currentTheme),
 
           const SizedBox(height: 12),
 
@@ -80,7 +86,7 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
             child: ElevatedButton(
               onPressed: () => widget.onRouteSelected(_selectedType),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.jade500,
+                backgroundColor: currentTheme.pillActiveColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -134,19 +140,19 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
     );
   }
 
-  Widget _buildRouteTypeTabs() {
+  Widget _buildRouteTypeTabs(CityTheme theme) {
     return Row(
       children: [
-        _buildTab(RouteType.transit, '🚇', 'Transit', widget.transitRoutes),
+        _buildTab(RouteType.transit, '🚇', 'Transit', widget.transitRoutes, theme),
         const SizedBox(width: 8),
-        _buildTab(RouteType.walking, '🚶', 'Walk', widget.walkingRoutes),
+        _buildTab(RouteType.walking, '🚶', 'Walk', widget.walkingRoutes, theme),
         const SizedBox(width: 8),
-        _buildTab(RouteType.driving, '🚗', 'Drive', widget.drivingRoutes),
+        _buildTab(RouteType.driving, '🚗', 'Drive', widget.drivingRoutes, theme),
       ],
     );
   }
 
-  Widget _buildTab(RouteType type, String emoji, String label, List<RouteInfo>? routes) {
+  Widget _buildTab(RouteType type, String emoji, String label, List<RouteInfo>? routes, CityTheme theme) {
     final isSelected = _selectedType == type;
     final route = (routes != null && routes.isNotEmpty) ? routes.first : null;
 
@@ -156,10 +162,10 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.jade500.withOpacity(0.1) : Colors.grey[100],
+            color: isSelected ? theme.pillActiveColor.withOpacity(0.1) : Colors.grey[100],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? AppColors.jade500 : Colors.transparent,
+              color: isSelected ? theme.pillActiveColor : Colors.transparent,
               width: 1.5,
             ),
           ),
@@ -170,13 +176,13 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
               Text(label, style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppColors.jade500 : Colors.grey[600],
+                color: isSelected ? theme.pillActiveColor : Colors.grey[600],
               )),
               if (route != null) ...[
                 const SizedBox(height: 2),
                 Text(route.formattedDuration, style: TextStyle(
                   fontSize: 11,
-                  color: isSelected ? AppColors.jade500 : Colors.grey[500],
+                  color: isSelected ? theme.pillActiveColor : Colors.grey[500],
                 )),
               ],
             ],
@@ -186,7 +192,7 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
     );
   }
 
-  Widget _buildSelectedRouteDetail() {
+  Widget _buildSelectedRouteDetail(CityTheme theme) {
     List<RouteInfo>? routes;
     switch (_selectedType) {
       case RouteType.transit:
@@ -223,12 +229,12 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildDetailItem(Icons.timer, route.formattedDuration),
-              _buildDetailItem(Icons.straighten, route.formattedDistance),
+              _buildDetailItem(Icons.timer, route.formattedDuration, theme),
+              _buildDetailItem(Icons.straighten, route.formattedDistance, theme),
               if (route.taxiFee != null)
-                _buildDetailItem(Icons.attach_money, '¥${route.taxiFee!.toStringAsFixed(0)}'),
+                _buildDetailItem(Icons.attach_money, '¥${route.taxiFee!.toStringAsFixed(0)}', theme),
               if (route.transitFee != null)
-                _buildDetailItem(Icons.attach_money, '¥${route.transitFee!.toStringAsFixed(0)}'),
+                _buildDetailItem(Icons.attach_money, '¥${route.transitFee!.toStringAsFixed(0)}', theme),
               // 步骤数可点击展开
               GestureDetector(
                 onTap: () => setState(() => _showStepDetails = !_showStepDetails),
@@ -236,12 +242,12 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
                   children: [
                     Icon(
                       _showStepDetails ? Icons.expand_less : Icons.expand_more,
-                      size: 18, color: AppColors.jade500,
+                      size: 18, color: theme.pillActiveColor,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${route.steps.length} steps',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.jade500),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.pillActiveColor),
                     ),
                   ],
                 ),
@@ -260,7 +266,7 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
               itemCount: route.steps.length,
               itemBuilder: (context, index) {
                 final step = route.steps[index];
-                return _buildStepItem(step, index + 1, route.steps.length);
+                return _buildStepItem(step, index + 1, route.steps.length, theme);
               },
             ),
           ),
@@ -268,17 +274,17 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
     );
   }
 
-  Widget _buildDetailItem(IconData icon, String text) {
+  Widget _buildDetailItem(IconData icon, String text, CityTheme theme) {
     return Column(
       children: [
-        Icon(icon, size: 18, color: AppColors.jade500),
+        Icon(icon, size: 18, color: theme.pillActiveColor),
         const SizedBox(height: 4),
         Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
       ],
     );
   }
 
-  Widget _buildStepItem(RouteStep step, int number, int total) {
+  Widget _buildStepItem(RouteStep step, int number, int total, CityTheme theme) {
     final isLast = number == total;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -291,8 +297,8 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
               Container(
                 width: 24, height: 24,
                 decoration: BoxDecoration(
-                  color: isLast ? AppColors.jade500 : Colors.white,
-                  border: Border.all(color: AppColors.jade500, width: 2),
+                  color: isLast ? theme.pillActiveColor : Colors.white,
+                  border: Border.all(color: theme.pillActiveColor, width: 2),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -301,13 +307,13 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: isLast ? Colors.white : AppColors.jade500,
+                      color: isLast ? Colors.white : theme.pillActiveColor,
                     ),
                   ),
                 ),
               ),
               if (!isLast)
-                Container(width: 2, height: 30, color: AppColors.jade500.withOpacity(0.3)),
+                Container(width: 2, height: 30, color: theme.pillActiveColor.withOpacity(0.3)),
             ],
           ),
           const SizedBox(width: 10),

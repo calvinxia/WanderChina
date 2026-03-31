@@ -9,12 +9,15 @@ import '../../widgets/map/route_overview.dart';
 import '../../models/poi_translation.dart';
 import '../../models/poi.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/city_theme.dart';
 import '../../services/poi_service.dart';
 import '../../services/route_planning_service.dart';
 import '../../services/amap_service.dart';
 import '../../services/api_client.dart';
+import '../../services/analytics_service.dart';
 import '../../core/config/backend_config.dart';
 import '../voice/voice_translation_screen.dart';
+import '../main/main_screen.dart';
 
 /// Map Screen with Translation - MVP v2.0
 ///
@@ -41,6 +44,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   final TextEditingController _searchController = TextEditingController();
+  final _analytics = AnalyticsService.instance;
 
   late AppLanguage _currentLanguage;
   bool _showTranslationOverlay = true;
@@ -175,9 +179,13 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
 
     try {
       // 城市名中英映射
-      final cityZh = _mapCityToZh(city);
+      final cityZh = city != null ? _mapCityToZh(city) : null;
 
       final keyword = query.trim();
+
+      // Analytics tracking
+      _analytics.searchPoi(keyword, city: cityZh);
+
       final results = await _poiService.searchByKeyword(
         keyword: keyword,
         city: cityZh,  // ← 传城市（中文）
@@ -224,7 +232,8 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     }
   }
 
-  /// 即时翻译链路：高德查坐标 → DeepSeek 翻译 → 写入 DB → 移动地图
+  /// 即时翻译链路：高德查坐标 → DeepSeek 翻译 → 写入 DB
+  /// 使用乐观更新：先移动地图，后台翻译
   Future<void> _onTheFlyTranslate(String nameZh, {String? city, String? displayName}) async {
     try {
       // Step 1: 调 poi_photo 获取坐标 + poi_id
@@ -250,7 +259,18 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
       }
       debugPrint('🔄 Got POI: id=$poiId, lat=$lat, lng=$lng');
 
-      // Step 2: 调 deepseek_translate 翻译中文名
+      // Step 2: 乐观更新 — 立刻移动地图，不等翻译
+      if (mounted) {
+        _mapKey.currentState?.moveTo(LatLng(lat, lng), zoom: 16.0);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Translating "${displayName ?? nameZh}"...'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Step 3: 后台继续翻译
       debugPrint('🔄 Step 2: Translating via DeepSeek...');
       final nameEn = displayName ?? nameZh;  // 如果已有英文名就直接用
       String translatedName = nameEn;
@@ -265,7 +285,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
         debugPrint('🔄 Translated: $nameZh → $translatedName');
       }
 
-      // Step 3: 调 translate_db_write 存入 DB + Redis
+      // Step 4: 调 translate_db_write 存入 DB + Redis
       debugPrint('🔄 Step 3: Saving to DB...');
       await ApiClient.post(BackendConfig.dbWriteUrl, {
         'action': 'save',
@@ -279,12 +299,13 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
       });
       debugPrint('🔄 Saved to DB ✅');
 
-      // Step 4: 移动地图到该位置
+      // Step 5: 翻译完成后更新提示
       if (mounted) {
-        _mapKey.currentState?.moveTo(LatLng(lat, lng), zoom: 16.0);
-
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Found "$translatedName" — translated and saved')),
+          SnackBar(
+            content: Text('Found "$translatedName" — translated and saved'),
+            duration: const Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -409,11 +430,23 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     debugPrint('🛣️ Route selected: $type');
 
     List<RouteInfo>? routes;
+    String routeMode;
     switch (type) {
-      case RouteType.transit: routes = _transitRoutes; break;
-      case RouteType.walking: routes = _walkingRoutes; break;
-      case RouteType.driving: routes = _drivingRoutes; break;
-      default: routes = null;
+      case RouteType.transit:
+        routes = _transitRoutes;
+        routeMode = 'transit';
+        break;
+      case RouteType.walking:
+        routes = _walkingRoutes;
+        routeMode = 'walk';
+        break;
+      case RouteType.driving:
+        routes = _drivingRoutes;
+        routeMode = 'drive';
+        break;
+      default:
+        routes = null;
+        routeMode = 'unknown';
     }
 
     debugPrint('🛣️ Routes available: ${routes?.length ?? 0}');
@@ -424,6 +457,9 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     }
 
     if (_selectedPOI == null) return;
+
+    // Analytics tracking
+    _analytics.routePlanned(routeMode, _selectedPOI!.localizedName(AppLanguage.english));
 
     final route = routes.first;
     debugPrint('🛣️ Polyline points: ${route.polyline.length}');
@@ -470,28 +506,31 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
   // Step 4.7: 选择起点对话框
   Future<void> _showOriginPicker() async {
     final controller = TextEditingController();
+    final cityTheme = context.findAncestorStateOfType<MainScreenState>()?.cityTheme ?? CityTheme.defaultTheme;
+    final dialogBg = Color.lerp(Colors.white, cityTheme.pillActiveColor, 0.05)!;
 
     final result = await showDialog<LatLng>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Set Starting Point'),
+        backgroundColor: dialogBg,
+        title: Text('Set Starting Point', style: TextStyle(color: cityTheme.primaryTextColor)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // 使用当前位置按钮
             ListTile(
-              leading: const Icon(Icons.my_location, color: AppColors.jade500),
-              title: const Text('Use Current Location'),
+              leading: Icon(Icons.my_location, color: cityTheme.pillActiveColor),
+              title: Text('Use Current Location', style: TextStyle(color: cityTheme.primaryTextColor)),
               onTap: () => Navigator.pop(ctx, _currentLocation),
             ),
             const Divider(),
             // 使用地图中心点
             ListTile(
-              leading: const Icon(Icons.center_focus_strong, color: AppColors.jade500),
-              title: const Text('Use Map Center'),
+              leading: Icon(Icons.center_focus_strong, color: cityTheme.pillActiveColor),
+              title: Text('Use Map Center', style: TextStyle(color: cityTheme.primaryTextColor)),
               subtitle: Text(
                 'Lat: ${_currentCenter?.latitude.toStringAsFixed(4)}, Lng: ${_currentCenter?.longitude.toStringAsFixed(4)}',
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                style: TextStyle(fontSize: 11, color: cityTheme.secondaryTextColor.withOpacity(0.7)),
               ),
               onTap: () => Navigator.pop(ctx, _currentCenter),
             ),
@@ -499,12 +538,20 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             // 搜索地点
             TextField(
               controller: controller,
+              style: TextStyle(color: cityTheme.primaryTextColor),
               decoration: InputDecoration(
                 hintText: 'Search a place...',
+                hintStyle: TextStyle(color: cityTheme.secondaryTextColor.withOpacity(0.5)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.3),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: cityTheme.pillActiveColor, width: 2),
+                ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.search),
+                  icon: Icon(Icons.search, color: cityTheme.pillActiveColor),
                   onPressed: () async {
                     final keyword = controller.text.trim();
                     if (keyword.isEmpty) return;
@@ -562,6 +609,9 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get city theme from MainScreen
+    final cityTheme = context.findAncestorStateOfType<MainScreenState>()?.cityTheme ?? CityTheme.defaultTheme;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -575,6 +625,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             language: _currentLanguage,
             showTranslationOverlay: _showTranslationOverlay,
             showVoiceButton: false, // We use custom Voice FAB
+            cityTheme: cityTheme,
             onPOITap: _handlePOITap,
             // Fix-2: 点击空白处收回 POI Bottom Sheet 和搜索结果
             onMapTap: (latLng) {
@@ -602,6 +653,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                   controller: _searchController,
                   onTap: _handleSearchTap,
                   onSearch: _handleSearch,
+                  theme: cityTheme,
                   onClear: () {
                     // 清除搜索结果列表
                     setState(() {
@@ -617,6 +669,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                   onLanguageChanged: _handleLanguageChanged,
                   overlayEnabled: _showTranslationOverlay,
                   onOverlayToggle: _handleOverlayToggle,
+                  theme: cityTheme,
                 ),
               ],
             ),
@@ -634,7 +687,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 300),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Color.lerp(Colors.white, cityTheme.pillActiveColor, 0.05)!.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ListView.separated(
@@ -648,7 +701,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                         dense: true,
                         leading: Icon(
                           _getCategoryIcon(poi.category.value),
-                          color: AppColors.jade500,
+                          color: cityTheme.pillActiveColor,
                           size: 20,
                         ),
                         title: Text(
@@ -688,7 +741,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                     heroTag: 'gps',
                     onPressed: () => _fetchCurrentLocation(),
                     backgroundColor: Colors.white,
-                    child: const Icon(Icons.my_location, color: AppColors.jade500),
+                    child: Icon(Icons.my_location, color: cityTheme.pillActiveColor),
                   ),
                   const SizedBox(height: 12),
 
@@ -765,6 +818,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                 language: _currentLanguage,
                 onDirections: () => _requestRoutes(_selectedPOI!),
                 onClose: () => setState(() => _showPOISheet = false),
+                theme: cityTheme,
               ),
             ),
 
@@ -782,6 +836,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                 isLoading: _isLoadingRoutes,
                 onRouteSelected: _onRouteSelected,
                 onClose: () => _clearRouteState(),
+                theme: cityTheme,
               ),
             ),
         ],

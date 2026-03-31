@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/city_theme.dart';
 
 /// AI Chat Input Widget - allows users to ask AI to adjust the itinerary
 ///
 /// Specifications from FLUTTER_UI_REDESIGN_INSTRUCTIONS.md:
 /// - Height: 52px
-/// - Background: Jade 50
-/// - Border: 1px Jade 200
+/// - Background: 25% transparent white
+/// - Border: themed color
 /// - Placeholder: "Ask AI to adjust..."
-/// - Send icon: Jade 500
+/// - Send icon: themed color
 class AiChatInput extends StatefulWidget {
   final Function(String) onSend;
   final String? placeholder;
+  final CityTheme theme;
 
   const AiChatInput({
     super.key,
     required this.onSend,
+    required this.theme,
     this.placeholder,
   });
 
@@ -55,52 +58,66 @@ class _AiChatInputState extends State<AiChatInput> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      constraints: const BoxConstraints(
+        minHeight: 52,
+        maxHeight: 120, // 最多展开到 120px（约 4 行）
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.jade50,
-        border: Border.all(color: AppColors.jade200),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withOpacity(0.25),
+        border: Border.all(color: widget.theme.pillActiveColor.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end, // 图标底部对齐
         children: [
           // AI icon
-          const Icon(
-            Icons.auto_awesome,
-            size: 20,
-            color: AppColors.jade500,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Icon(
+              Icons.auto_awesome,
+              size: 20,
+              color: widget.theme.pillActiveColor,
+            ),
           ),
           const SizedBox(width: 8),
 
-          // Text input
+          // Text input — 多行
           Expanded(
             child: TextField(
               controller: _controller,
               style: AppTextStyles.body(color: AppColors.gray900),
+              maxLines: 4, // 最多 4 行
+              minLines: 1, // 最少 1 行
+              textInputAction: TextInputAction.newline,
+              keyboardType: TextInputType.multiline,
               decoration: InputDecoration(
                 hintText: widget.placeholder ?? 'Ask AI to adjust...',
                 hintStyle: AppTextStyles.body(color: AppColors.gray400).copyWith(
                   fontStyle: FontStyle.italic,
                 ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                isDense: true,
               ),
-              onSubmitted: (_) => _handleSend(),
             ),
           ),
 
           const SizedBox(width: 8),
 
           // Send button
-          IconButton(
-            onPressed: _hasText ? _handleSend : null,
-            icon: Icon(
-              Icons.send,
-              size: 20,
-              color: _hasText ? AppColors.jade500 : AppColors.gray300,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: IconButton(
+              onPressed: _hasText ? _handleSend : null,
+              icon: Icon(
+                Icons.send,
+                size: 20,
+                color: _hasText ? widget.theme.pillActiveColor : AppColors.gray300,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
         ],
       ),

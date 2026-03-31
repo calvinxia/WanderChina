@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/city_theme.dart';
 
 /// Map Search Bar - Top overlay search input
 ///
@@ -12,6 +13,7 @@ class MapSearchBar extends StatefulWidget {
   final VoidCallback? onClear;  // 清除按钮回调
   final bool enabled;
   final TextEditingController? controller;  // 支持外部传入 controller
+  final CityTheme? theme;
 
   const MapSearchBar({
     super.key,
@@ -20,6 +22,7 @@ class MapSearchBar extends StatefulWidget {
     this.onClear,
     this.enabled = true,
     this.controller,
+    this.theme,
   });
 
   @override
@@ -38,6 +41,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
     _controller = widget.controller ?? TextEditingController();
     _hasText = _controller.text.isNotEmpty;
     _controller.addListener(_onTextChanged);
+    _focusNode.addListener(() => setState(() {})); // Rebuild on focus change
   }
 
   @override
@@ -60,12 +64,16 @@ class _MapSearchBarState extends State<MapSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final currentTheme = widget.theme ?? CityTheme.defaultTheme;
+    final searchBarBg = Color.lerp(Colors.white, currentTheme.pillActiveColor, 0.05)!.withOpacity(0.9);
+
     return Container(
       height: 48,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: searchBarBg,
         borderRadius: BorderRadius.circular(24),
+        border: _focusNode.hasFocus ? Border.all(color: currentTheme.pillActiveColor, width: 2) : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -99,7 +107,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
                         },
                       )
                     : IconButton(
-                        icon: const Icon(Icons.search, size: 18, color: AppColors.gray600),
+                        icon: Icon(Icons.search, size: 18, color: currentTheme.pillActiveColor),
                         onPressed: () {
                           FocusScope.of(context).unfocus();
                           if (_controller.text.isNotEmpty && widget.onSearch != null) {

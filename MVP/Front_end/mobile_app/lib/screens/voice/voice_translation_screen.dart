@@ -3,6 +3,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/poi_translation.dart';
 import '../../services/voice/voice_translation_service.dart';
+import '../../core/theme/city_theme.dart';
+import '../../widgets/common/city_background.dart';
+import '../main/main_screen.dart';
 
 /// Screen 11: 语音翻译全屏页面
 ///
@@ -120,17 +123,22 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-        title: Text(
-          'Voice Translation',
-          style: AppTextStyles.h4(color: AppColors.gray900),
-        ),
-        backgroundColor: Colors.white,
+    final mainState = MainScreen.globalKey.currentState;
+    final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+
+    return CityBackground(
+      theme: cityTheme,
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+          title: Text(
+            'Voice Translation',
+            style: AppTextStyles.h4(color: AppColors.gray900),
+          ),
+          backgroundColor: Colors.transparent,
         foregroundColor: AppColors.gray900,
         elevation: 0,
         leading: IconButton(
@@ -138,12 +146,12 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
-        children: [
-          // 固定顶部区域
-          SafeArea(
-            bottom: false,
-            child: Column(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // 固定顶部区域
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 24),
@@ -159,17 +167,17 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                 const SizedBox(height: 24),
               ],
             ),
-          ),
 
-          // Conversation History（可滚动，占据剩余空间）
-          Expanded(
-            child: _buildConversationHistory(),
-          ),
+            // Conversation History（可滚动，占据剩余空间） — 键盘弹出时隐藏
+            if (MediaQuery.of(context).viewInsets.bottom == 0)
+              Expanded(
+                child: _buildConversationHistory(),
+              )
+            else
+              const Spacer(),
 
-          // 底部操作区（键盘弹出时自动上移）
-          SafeArea(
-            top: false,
-            child: Column(
+            // 底部操作区（键盘弹出时自动上移）
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Quick Phrases
@@ -188,22 +196,27 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                 const SizedBox(height: 16),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+        ),
       ),
     );
   }
 
   Widget _buildDirectionToggle() {
+    final mainState = context.findAncestorStateOfType<MainScreenState>();
+    final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _buildDirectionPill(
-            label: '${_getLanguageCode(_selectedLanguage)} → 中',
+            label: '${_getLanguageCode(_selectedLanguage)} → CN',
             isActive: _direction == TranslationDirection.foreignToChinese,
+            cityTheme: cityTheme,
             onTap: () {
               setState(() {
                 _direction = TranslationDirection.foreignToChinese;
@@ -214,7 +227,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
           // Swap button to toggle direction
           IconButton(
             icon: const Icon(Icons.swap_horiz),
-            color: AppColors.jade500,
+            color: cityTheme.pillActiveColor,
             onPressed: () {
               setState(() {
                 _direction = _direction == TranslationDirection.foreignToChinese
@@ -226,8 +239,9 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
           ),
           const SizedBox(width: 16),
           _buildDirectionPill(
-            label: '中 → ${_getLanguageCode(_selectedLanguage)}',
+            label: 'CN → ${_getLanguageCode(_selectedLanguage)}',
             isActive: _direction == TranslationDirection.chineseToForeign,
+            cityTheme: cityTheme,
             onTap: () {
               setState(() {
                 _direction = TranslationDirection.chineseToForeign;
@@ -242,6 +256,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
   Widget _buildDirectionPill({
     required String label,
     required bool isActive,
+    required CityTheme cityTheme,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
@@ -250,7 +265,10 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         width: 140,
         height: 40,
         decoration: BoxDecoration(
-          color: isActive ? AppColors.jade500 : AppColors.gray100,
+          color: isActive ? cityTheme.pillActiveColor : Colors.white.withOpacity(0.25),
+          border: Border.all(
+            color: isActive ? cityTheme.pillActiveColor : Colors.white.withOpacity(0.3),
+          ),
           borderRadius: BorderRadius.circular(20),
         ),
         alignment: Alignment.center,
@@ -259,7 +277,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isActive ? Colors.white : AppColors.gray600,
+            color: isActive ? Colors.white : cityTheme.pillActiveColor,
           ),
         ),
       ),
@@ -280,7 +298,8 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
             height: 36,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gray300),
+              color: Colors.white.withOpacity(0.25),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButtonHideUnderline(
@@ -329,6 +348,9 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     final history = _service.history;
 
     if (history.isEmpty) {
+      final mainState = context.findAncestorStateOfType<MainScreenState>();
+      final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -338,7 +360,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
             Text(
               'Tap and hold the mic button\nto start translating',
               textAlign: TextAlign.center,
-              style: AppTextStyles.body(color: AppColors.gray500),
+              style: AppTextStyles.body(color: cityTheme.primaryTextColor.withOpacity(0.7)),
             ),
           ],
         ),
@@ -490,9 +512,9 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.gray100,
+                      color: Colors.white.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.gray300),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
                     ),
                     child: Text(
                       phrases[index],
@@ -509,13 +531,16 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
   }
 
   Widget _buildTextInput() {
+    final mainState = context.findAncestorStateOfType<MainScreenState>();
+    final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.gray50,
+          color: Colors.white.withOpacity(0.25),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.gray200),
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
         ),
         child: Row(
           children: [
@@ -538,8 +563,8 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                 width: 36,
                 height: 36,
                 margin: const EdgeInsets.only(right: 6),
-                decoration: const BoxDecoration(
-                  color: AppColors.jade500,
+                decoration: BoxDecoration(
+                  color: cityTheme.pillActiveColor,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),

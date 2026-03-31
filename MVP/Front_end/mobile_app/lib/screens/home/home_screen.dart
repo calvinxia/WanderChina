@@ -9,6 +9,7 @@ import '../voice/voice_translation_screen.dart';
 import '../../services/backend/auth_service.dart';
 import '../../services/amap_service.dart';
 import '../main/main_screen.dart';
+import '../../core/theme/city_theme.dart';
 
 /// Home Dashboard Screen - MVP v2.0
 /// Three core tools: Translated Maps, Voice Translation, AI Trip Planner
@@ -97,26 +98,43 @@ class _HomeScreenState extends State<HomeScreen> {
     MainScreen.globalKey.currentState?.switchToTab(2);
   }
 
-  /// 根据城市名识别城市短码
-  String? _detectCityShort(String cityName) {
-    if (cityName.contains('Guangzhou') || cityName.contains('广州')) return 'GZ';
-    if (cityName.contains('Beijing') || cityName.contains('北京')) return 'BJ';
-    if (cityName.contains('Shanghai') || cityName.contains('上海')) return 'SH';
-    if (cityName.contains('Shenzhen') || cityName.contains('深圳')) return 'SZ';
-    if (cityName.contains('Chengdu') || cityName.contains('成都')) return 'CD';
-    if (cityName.contains("Xi'an") || cityName.contains('西安')) return 'XA';
-    return null;
+  /// Generate three colors for Quick Tools based on city theme
+  /// Returns [darkBase, warmShift, coolShift]
+  List<Color> _getQuickToolColors(CityTheme cityTheme) {
+    final baseColor = cityTheme.pillActiveColor;
+    final hslColor = HSLColor.fromColor(baseColor);
+
+    // Dark version of base color (reduce lightness by 10%)
+    final darkBase = hslColor
+        .withLightness((hslColor.lightness - 0.1).clamp(0.0, 1.0))
+        .toColor();
+
+    // Warm shift (+30° hue)
+    final warmShift = hslColor
+        .withHue((hslColor.hue + 30) % 360)
+        .toColor();
+
+    // Cool shift (-30° hue)
+    final coolShift = hslColor
+        .withHue((hslColor.hue - 30) % 360)
+        .toColor();
+
+    return [darkBase, warmShift, coolShift];
   }
 
   @override
   Widget build(BuildContext context) {
+    // Get city theme from MainScreen
+    final mainState = context.findAncestorStateOfType<MainScreenState>();
+    final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
           // Custom Header with INK 900 background + Mountain Silhouette
-          _buildCustomHeader(),
+          _buildCustomHeader(cityTheme),
 
           SliverToBoxAdapter(
             child: Column(
@@ -125,17 +143,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 AppSpacing.gapHeightL,
 
                 // Quick Tools Section - 3 gradient cards
-                _buildQuickToolsSection(),
+                _buildQuickToolsSection(cityTheme),
 
                 AppSpacing.gapHeightXL,
 
                 // Plan Your Next Trip AI Entry
-                _buildAIPlannerEntry(),
+                _buildAIPlannerEntry(cityTheme),
 
                 AppSpacing.gapHeightXL,
 
                 // Supported Cities Pills
-                _buildSupportedCities(),
+                _buildSupportedCities(context, cityTheme),
 
                 AppSpacing.gapHeightXXL,
               ],
@@ -146,21 +164,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Custom Header with INK 900 gradient, mountain silhouette, and WW logo
-  Widget _buildCustomHeader() {
+  /// Custom Header with transparent background and city theme colors
+  Widget _buildCustomHeader(CityTheme cityTheme) {
     return SliverToBoxAdapter(
       child: Stack(
         children: [
-          // Background layer
+          // Background layer - transparent
           Container(
             height: 200,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment(0.2, -1),
-                end: Alignment(-0.2, 1),
-                colors: [AppColors.ink900, AppColors.ink700],
-              ),
-            ),
+            color: Colors.transparent,
           ),
 
           // Mountain silhouette
@@ -188,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       // Menu icon
                       IconButton(
-                        icon: const Icon(Icons.menu, color: Colors.white, size: 24),
+                        icon: Icon(Icons.menu, color: cityTheme.primaryTextColor, size: 24),
                         onPressed: () {},
                       ),
 
@@ -198,14 +210,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             'WanderChina',
                             style: AppTextStyles.h4(
-                              color: Colors.white.withOpacity(0.95),
+                              color: cityTheme.primaryTextColor,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const AppLogo(
+                          AppLogo(
                             size: 40,
-                            backgroundColor: AppColors.logoDark,
-                            strokeColor: AppColors.logoBiscuit,
+                            backgroundColor: cityTheme.badgeBackground,
+                            strokeColor: cityTheme.badgeTextColor,
                           ),
                         ],
                       ),
@@ -214,16 +226,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.search, color: Colors.white, size: 24),
+                            icon: Icon(Icons.search, color: cityTheme.primaryTextColor, size: 24),
                             onPressed: () {},
                           ),
                           const SizedBox(width: 4),
                           GestureDetector(
                             onTap: () {},
-                            child: const CircleAvatar(
+                            child: CircleAvatar(
                               radius: 16,
-                              backgroundColor: AppColors.jade500,
-                              child: Icon(Icons.person, color: Colors.white, size: 18),
+                              backgroundColor: cityTheme.pillActiveColor,
+                              child: const Icon(Icons.person, color: Colors.white, size: 18),
                             ),
                           ),
                         ],
@@ -239,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icon(
                         Icons.location_on,
                         size: 16,
-                        color: Colors.white.withOpacity(0.75),
+                        color: cityTheme.locationTextColor,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -247,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.75),
+                          color: cityTheme.locationTextColor,
                         ),
                       ),
                     ],
@@ -258,8 +270,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   // Greeting
                   Text(
                     '$_greeting, $_userName!',
-                    style: AppTextStyles.h2(
-                      color: Colors.white.withOpacity(0.95),
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: cityTheme.primaryTextColor,
                     ),
                   ),
                 ],
@@ -272,7 +286,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Quick Tools Section - 3 gradient cards (Map / Voice / Planner)
-  Widget _buildQuickToolsSection() {
+  Widget _buildQuickToolsSection(CityTheme cityTheme) {
+    final colors = _getQuickToolColors(cityTheme);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -288,16 +304,16 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: AppSpacing.screenPaddingH,
           child: Row(
             children: [
-              // Map Card
+              // Map Card - uses colors[0] (dark base)
               Expanded(
                 child: _buildToolCard(
                   icon: Icons.map,
                   title: 'Translated\nMaps',
                   description: 'Maps in your language',
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.jade600, AppColors.jade400],
+                    colors: [colors[0], colors[0].withOpacity(0.8)],
                   ),
                   onTap: () => _navigateToTab(1), // Map tab index = 1
                 ).animate().fadeIn(duration: 300.ms, delay: 50.ms).slideY(
@@ -308,16 +324,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
               ),
               const SizedBox(width: 10),
-              // Voice Card
+              // Voice Card - uses colors[1] (warm shift)
               Expanded(
                 child: _buildToolCard(
                   icon: Icons.mic,
                   title: 'Voice\nTranslation',
                   description: 'Speak & be understood',
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.orange, Color(0xFFF09040)],
+                    colors: [colors[1], colors[1].withOpacity(0.8)],
                   ),
                   onTap: () {
                     // Open VoiceTranslationScreen as fullscreen dialog
@@ -337,16 +353,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
               ),
               const SizedBox(width: 10),
-              // Planner Card
+              // Planner Card - uses colors[2] (cool shift)
               Expanded(
                 child: _buildToolCard(
                   icon: Icons.event_note,
                   title: 'AI Trip\nPlanner',
                   description: 'Itinerary in seconds',
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.ink600, AppColors.ink500],
+                    colors: [colors[2], colors[2].withOpacity(0.8)],
                   ),
                   onTap: () => _navigateToTab(2),
                 ).animate().fadeIn(duration: 300.ms, delay: 150.ms).slideY(
@@ -441,7 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Plan Your Next Trip AI Entry Card
-  Widget _buildAIPlannerEntry() {
+  Widget _buildAIPlannerEntry(CityTheme cityTheme) {
     return Padding(
       padding: AppSpacing.screenPaddingH,
       child: GestureDetector(
@@ -450,14 +466,9 @@ class _HomeScreenState extends State<HomeScreen> {
           constraints: const BoxConstraints(minHeight: 90),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.jade50, Colors.white],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(color: AppColors.jade200, width: 1),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [AppColors.shadowSm],
+            color: Colors.white.withOpacity(0.25),
+            border: Border.all(color: Colors.white.withOpacity(0.3)),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
@@ -490,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.jade500,
+                  color: cityTheme.pillActiveColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -510,9 +521,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Supported Cities Pills
-  Widget _buildSupportedCities() {
-    final allCities = [
+  /// Supported Cities Pills - 2x3 Grid with individual city theme colors
+  Widget _buildSupportedCities(BuildContext context, CityTheme cityTheme) {
+    final cities = [
       {'short': 'BJ', 'full': 'Beijing'},
       {'short': 'SH', 'full': 'Shanghai'},
       {'short': 'GZ', 'full': 'Guangzhou'},
@@ -520,16 +531,6 @@ class _HomeScreenState extends State<HomeScreen> {
       {'short': 'CD', 'full': 'Chengdu'},
       {'short': 'XA', 'full': "Xi'an"},
     ];
-
-    // 把当前城市排到第一位
-    final currentShort = _detectCityShort(_currentCity);
-    if (currentShort != null) {
-      allCities.sort((a, b) {
-        if (a['short'] == currentShort) return -1;
-        if (b['short'] == currentShort) return 1;
-        return 0;
-      });
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,53 +543,42 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         AppSpacing.gapHeightM,
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
+        Padding(
           padding: AppSpacing.screenPaddingH,
-          child: Row(
-            children: allCities.asMap().entries.map((entry) {
-              final index = entry.key;
-              final city = entry.value;
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: cities.map((city) {
+              final pillTheme = CityTheme.fromCityKey(city['short'] as String);
               final isSelected = _selectedCity == city['short'];
-
-              return Padding(
-                padding: EdgeInsets.only(right: index < allCities.length - 1 ? 10 : 0),
-                child: GestureDetector(
-                  onTap: () => _navigateToPlannerWithCity(city['short'] as String),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.jade500 : AppColors.jade100,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: AppColors.jade500.withOpacity(0.3),
-                                offset: const Offset(0, 2),
-                                blurRadius: 6,
-                              )
-                            ]
-                          : null,
+              return GestureDetector(
+                onTap: () => _navigateToPlannerWithCity(city['short'] as String),
+                child: Container(
+                  width: (MediaQuery.of(context).size.width - 40 - 20) / 3,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? pillTheme.pillActiveColor.withOpacity(0.2)
+                        : Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? pillTheme.pillActiveColor
+                          : pillTheme.pillActiveColor.withOpacity(0.3),
+                      width: isSelected ? 1.5 : 0.5,
                     ),
+                  ),
+                  child: Center(
                     child: Text(
-                      city['full'] as String,
+                      city['full']!,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                        color: isSelected ? Colors.white : AppColors.gray800,
+                        color: pillTheme.pillActiveColor,
                       ),
                     ),
                   ),
-                )
-                    .animate()
-                    .fadeIn(duration: 300.ms, delay: (50 * index).ms)
-                    .slideX(
-                      begin: 0.2,
-                      end: 0,
-                      duration: 300.ms,
-                      delay: (50 * index).ms,
-                    ),
+                ),
               );
             }).toList(),
           ),
