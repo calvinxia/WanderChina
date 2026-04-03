@@ -88,7 +88,7 @@ class _VoiceFABState extends State<VoiceFAB>
               ),
               child: Center(
                 child: Text(
-                  '${widget.fromLanguage} → ${widget.toLanguage}',
+                  '${widget.fromLanguage}-${widget.toLanguage}',
                   style: AppTextStyles.caption(
                     color: AppColors.gray900,
                   ).copyWith(fontSize: 11, fontWeight: FontWeight.w600),

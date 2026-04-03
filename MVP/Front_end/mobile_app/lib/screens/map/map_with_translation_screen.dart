@@ -613,9 +613,9 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     final cityTheme = context.findAncestorStateOfType<MainScreenState>()?.cityTheme ?? CityTheme.defaultTheme;
 
     return GestureDetector(
+      behavior: HitTestBehavior.translucent,
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        body: Stack(
+      child: Stack(
         children: [
           // 1. Base map layer with translation overlay
           WanderMap(
@@ -644,34 +644,41 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             },
           ),
 
-          // 2. Top UI controls
-          SafeArea(
-            child: Column(
-              children: [
-                // Search bar
-                MapSearchBar(
-                  controller: _searchController,
-                  onTap: _handleSearchTap,
-                  onSearch: _handleSearch,
-                  theme: cityTheme,
-                  onClear: () {
-                    // 清除搜索结果列表
-                    setState(() {
-                      _showSearchResults = false;
-                      _searchResults = [];
-                    });
-                  },
-                ),
+          // 2. Top UI controls — 固定在顶部，不占满全屏
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Search bar
+                  MapSearchBar(
+                    controller: _searchController,
+                    onTap: _handleSearchTap,
+                    onSearch: _handleSearch,
+                    theme: cityTheme,
+                    onClear: () {
+                      // 清除搜索结果列表
+                      setState(() {
+                        _showSearchResults = false;
+                        _searchResults = [];
+                      });
+                    },
+                  ),
 
-                // Language switcher + overlay toggle
-                LanguageSwitcher(
-                  selectedLanguage: _currentLanguage,
-                  onLanguageChanged: _handleLanguageChanged,
-                  overlayEnabled: _showTranslationOverlay,
-                  onOverlayToggle: _handleOverlayToggle,
-                  theme: cityTheme,
-                ),
-              ],
+                  // Language switcher + overlay toggle
+                  LanguageSwitcher(
+                    selectedLanguage: _currentLanguage,
+                    onLanguageChanged: _handleLanguageChanged,
+                    overlayEnabled: _showTranslationOverlay,
+                    onOverlayToggle: _handleOverlayToggle,
+                    theme: cityTheme,
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -730,11 +737,11 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             ),
 
           // 3. Map controls (right side)
-          SafeArea(
-            child: Positioned(
-              right: 16,
-              top: 140,
-              child: Column(
+          Positioned(
+            right: 16,
+            top: 140,
+            child: SafeArea(
+              child: Column(mainAxisSize: MainAxisSize.min,
                 children: [
                   // GPS recenter button
                   FloatingActionButton.small(
@@ -840,7 +847,6 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
               ),
             ),
         ],
-      ),
       ),
     );
   }

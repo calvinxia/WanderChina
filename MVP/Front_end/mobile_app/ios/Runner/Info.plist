@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>WanderChina needs camera access to take your profile picture</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
