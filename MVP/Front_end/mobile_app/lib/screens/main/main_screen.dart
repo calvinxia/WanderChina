@@ -177,10 +177,10 @@ class MainScreenState extends State<MainScreen> {
     final isMapPage = _currentIndex == 1;
 
     return Scaffold(
-      backgroundColor: isMapPage ? Colors.white : Colors.transparent,
+      backgroundColor: Colors.transparent,
       body: CityBackground(
         theme: _cityTheme,
-        enabled: !isMapPage,  // Map 页面时不渲染渐变和剪影
+        enabled: !isMapPage,
         child: IndexedStack(index: _currentIndex, children: _screens),
       ),
       bottomNavigationBar: AppBottomNavigation(

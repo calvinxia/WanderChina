@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:amap_map/amap_map.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/amap_config.dart';
 import 'core/config/backend_config.dart';
@@ -15,6 +17,13 @@ import 'screens/onboarding/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // AMap 地图隐私合规 + API Key（必须在 runApp 之前）
+  AMapInitializer.updatePrivacyAgree(AMapPrivacyStatement(
+    hasContains: true,
+    hasShow: true,
+    hasAgree: true,
+  ));
 
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
@@ -120,6 +129,12 @@ class WanderChinaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 初始化 AMap 地图 SDK（API Key 从 .env 编译时注入，不硬编码）
+    AMapInitializer.init(context, apiKey: AMapApiKey(
+      iosKey: const String.fromEnvironment('AMAP_KEY_IOS'),
+      androidKey: const String.fromEnvironment('AMAP_KEY_ANDROID'),
+    ));
+
     return MaterialApp(
       title: 'WanderChina',
       debugShowCheckedModeBanner: false,

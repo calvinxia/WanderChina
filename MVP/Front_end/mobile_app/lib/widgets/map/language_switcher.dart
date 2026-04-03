@@ -70,6 +70,7 @@ class LanguageSwitcher extends StatelessWidget {
                 value: overlayEnabled,
                 onChanged: onOverlayToggle,
                 activeColor: currentTheme.pillActiveColor,
+                activeTrackColor: currentTheme.pillActiveColor.withOpacity(0.4),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ],
