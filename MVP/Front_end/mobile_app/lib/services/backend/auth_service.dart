@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 // lib/services/backend/auth_service.dart
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../api_client.dart';
+import '../subscription_service.dart';
 
 class AuthService {
   static String? _currentUserId;
@@ -61,7 +63,51 @@ class AuthService {
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
     await _saveSession();
+    SubscriptionService.instance.updateFromServer(result);
     return result;
+  }
+
+  /// Apple Sign-In 登录
+  ///
+  /// ⚠️ 关键：使用 userIdentifier 作为主键，不依赖 email
+  /// Apple 首次登录返回 email，后续返回 relay email 或不返回
+  /// 返回 null 表示用户取消，throw Exception 表示技术错误
+  static Future<Map<String, dynamic>?> signInWithApple() async {
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // 使用 userIdentifier (稳定) 而不是 email (不稳定)
+      final result = await ApiClient.post(ApiClient.authUrl, {
+        'action': 'apple_sign_in',
+        'apple_user_id': credential.userIdentifier,  // 主键
+        'id_token': credential.identityToken,
+        'email': credential.email,  // 可能为 null
+        'given_name': credential.givenName,  // 可能为 null
+        'family_name': credential.familyName,  // 可能为 null
+      });
+
+      _currentUserId = result['user_id'];
+      _currentToken = result['token'];
+      await _saveSession();
+      SubscriptionService.instance.updateFromServer(result);
+      return result;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      // User cancelled authorization
+      if (e.code == AuthorizationErrorCode.canceled) {
+        debugPrint('[AUTH] Apple Sign-In cancelled by user');
+        return null;
+      }
+      debugPrint('[AUTH] Apple Sign-In authorization error: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[AUTH] Apple Sign-In failed: $e');
+      rethrow;
+    }
   }
 
   /// 获取用户资料

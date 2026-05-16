@@ -6,6 +6,8 @@ import '../../services/voice/voice_translation_service.dart';
 import '../../core/theme/city_theme.dart';
 import '../../widgets/common/city_background.dart';
 import '../main/main_screen.dart';
+import '../../utils/quota_helper.dart';
+import '../../services/backend/auth_service.dart';
 
 /// Screen 11: 语音翻译全屏页面
 ///
@@ -81,6 +83,17 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
 
   Future<void> _handleMicPress() async {
     debugPrint('🎙️ Long press START - state: ${_service.state}');
+
+    // Quota check
+    final mainState = MainScreen.globalKey.currentState;
+    final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
+    if (!await requireQuotaCheck(
+      context,
+      'voice_translate',
+      cityTheme,
+      userId: AuthService.currentUserId,
+    )) return;
+
     if (_service.state == VoiceServiceState.idle) {
       try {
         await _service.startRecording();

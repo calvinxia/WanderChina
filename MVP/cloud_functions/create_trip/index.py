@@ -9,6 +9,7 @@ import os
 import sys
 import uuid
 import json
+import time
 
 # 导入共享模块（符合 cloud_functions_order 要求）
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -30,6 +31,7 @@ def main_handler(event, context):
             user_id = body.get('user_id')         # UUID 或 None
             device_id = body.get('device_id')       # 匿名用户
             title = body.get('title', 'My Trip')
+            description = body.get('description')
             cities = body.get('cities', [])
             duration_days = body.get('duration_days', 1)
             itinerary_json = body.get('itinerary')  # DeepSeek 生成的完整行程
@@ -44,11 +46,11 @@ def main_handler(event, context):
 
             cursor.execute("""
                 INSERT INTO trips
-                (id, user_id, device_id, title, cities, duration_days,
+                (id, user_id, device_id, title, description, cities, duration_days,
                  itinerary_json, interests, budget_level, start_date, end_date, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'draft')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'draft')
                 RETURNING id, created_at
-            """, (trip_id, user_id, device_id, title, cities, duration_days,
+            """, (trip_id, user_id, device_id, title, description, cities, duration_days,
                   json.dumps(itinerary_json) if itinerary_json else None,
                   interests, budget_level, start_date, end_date))
 
@@ -197,6 +199,13 @@ def main_handler(event, context):
                 f"UPDATE trips SET {', '.join(updates)}, updated_at = NOW() WHERE id = %s",
                 params
             )
+
+            if body.get('instruction'):
+                cursor.execute("""
+                    UPDATE trips SET edit_history = COALESCE(edit_history, '[]'::jsonb) || %s::jsonb
+                    WHERE id = %s
+                """, (json.dumps([{'instruction': body['instruction'], 'ts': time.strftime('%Y-%m-%d %H:%M:%S')}]), trip_id))
+
             conn.commit()
             cursor.close()
 

@@ -4,7 +4,7 @@
 DeepSeek 翻译云函数
 - 支持 Prompt Caching（节省 90% 输入成本）
 - MVP 仅支持 en/fr/es 三语种
-- 成本精确计算（基于 V3.2 USD 定价 × 汇率）
+- 成本精确计算（基于 V4 USD 定价 × 汇率）
 """
 import os
 import sys
@@ -14,17 +14,18 @@ import requests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from shared.db_helper import json_response, parse_body
 
-# DeepSeek V3.2 定价（USD → RMB）
+# DeepSeek V4 定价（USD → RMB）
 USD_TO_CNY = 7.2
 PRICE_INPUT_CACHED = 0.028 * USD_TO_CNY / 1_000_000     # $0.028/1M → ≈¥0.20/M
-PRICE_INPUT_UNCACHED = 0.28 * USD_TO_CNY / 1_000_000    # $0.28/1M  → ≈¥2.02/M
-PRICE_OUTPUT = 0.42 * USD_TO_CNY / 1_000_000             # $0.42/1M  → ≈¥3.02/M
+PRICE_INPUT_UNCACHED = 0.14 * USD_TO_CNY / 1_000_000    # $0.14/1M  → ≈¥1.00/M
+PRICE_OUTPUT = 0.28 * USD_TO_CNY / 1_000_000             # $0.28/1M  → ≈¥2.01/M
 
 # 固定 System Prompt（提高缓存命中率）
 SYSTEM_PROMPTS = {
     'en': 'Translate the following Chinese text to English. Output only the translation, no explanations.',
     'fr': 'Translate the following Chinese text to French. Output only the translation, no explanations.',
     'es': 'Translate the following Chinese text to Spanish. Output only the translation, no explanations.',
+    'zh': 'Translate the following text to Chinese. Output only the translation, no explanations.',
 }
 
 SUPPORTED_LANGS = list(SYSTEM_PROMPTS.keys())
@@ -41,7 +42,7 @@ def translate_with_deepseek(text, target_lang):
     }
 
     payload = {
-        'model': 'deepseek-chat',
+        'model': 'deepseek-v4-flash',
         'messages': [
             {'role': 'system', 'content': SYSTEM_PROMPTS[target_lang]},
             {'role': 'user', 'content': text}
@@ -49,6 +50,7 @@ def translate_with_deepseek(text, target_lang):
         'temperature': 0.3,
         'max_tokens': 100,
         'top_p': 0.9
+        'thinking': {'type': 'disabled'}  # 显式关闭
     }
 
     try:

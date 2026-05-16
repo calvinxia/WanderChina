@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../services/backend/auth_service.dart';
 import '../main/main_screen.dart';
 
@@ -66,6 +67,70 @@ class _SignupScreenState extends State<SignupScreen> {
         });
       }
     }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        category: 'auth',
+        message: 'apple_sign_in_attempt',
+      ));
+
+      final result = await AuthService.signInWithApple();
+
+      // User cancelled - silent return
+      if (result == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint('🔐 Apple Sign-In error: $e');
+      await Sentry.addBreadcrumb(Breadcrumb(
+        category: 'auth',
+        message: 'apple_sign_in_failed',
+        data: {'error': e.toString()},
+      ));
+      await Sentry.captureException(e, stackTrace: StackTrace.current);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showVpnAwareErrorDialog(
+          title: 'Sign in failed',
+          body: 'If you\'re in mainland China:\n'
+                '• Make sure your VPN is on\n'
+                '• Try Smart Mode or Split Tunnel\n'
+                '• Or use Email sign-up instead',
+        );
+      }
+    }
+  }
+
+  void _showVpnAwareErrorDialog({required String title, required String body}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -224,7 +289,39 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+
+                // Divider
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('or', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13)),
+                    ),
+                    Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // Apple Sign-In
+                // TODO: v0.2 上线前补 Apple 官方图标 asset
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : _signInWithApple,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white.withOpacity(0.8),
+                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Continue with Apple', style: TextStyle(fontSize: 15)),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
 
                 // Login link
                 Row(

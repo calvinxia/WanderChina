@@ -18,6 +18,10 @@ class ApiClient {
   static String get routeUrl => BackendConfig.routeUrl;
   static String get generateItineraryUrl => BackendConfig.generateItineraryUrl;
   static String get poiPhotoUrl => BackendConfig.poiPhotoUrl;
+  static String get getFeatureFlagsUrl => BackendConfig.getFeatureFlagsUrl;
+  static String get checkUserQuotaUrl => BackendConfig.checkUserQuotaUrl;
+  static String get purchaseVerifyUrl => BackendConfig.purchaseVerifyUrl;
+  static String get incrementVoiceUsageUrl => BackendConfig.incrementVoiceUsageUrl;
 
   /// 通用 POST 请求
   static Future<Map<String, dynamic>> post(

@@ -12,6 +12,8 @@ import 'services/amap_service.dart'
 import 'services/map_translation_service.dart';
 import 'services/voice/voice_translation_service.dart';
 import 'services/backend/auth_service.dart';
+import 'services/purchase_service.dart';
+import 'services/subscription_service.dart';
 import 'core/services/language_manager.dart';
 import 'screens/onboarding/splash_screen.dart';
 
@@ -105,9 +107,21 @@ void main() async {
     debugPrint('❌ 恢复 session 失败: $e');
   }
 
+  // 7. 读取本地订阅缓存（离线也能拿到订阅状态）
+  await SubscriptionService.instance.loadCachedState();
+  debugPrint('✅ 订阅状态缓存已读取');
+
+  // 8. 初始化 IAP 购买服务
+  try {
+    await PurchaseService.instance.initialize();
+    debugPrint('✅ IAP 购买服务初始化成功');
+  } catch (e) {
+    debugPrint('❌ IAP 购买服务初始化失败: $e');
+  }
+
   debugPrint('🎉 应用服务初始化完成！\n');
 
-  // 7. 初始化 Sentry
+  // 9. 初始化 Sentry
   await SentryFlutter.init(
     (options) {
       options.dsn = const String.fromEnvironment('SENTRY_DSN', defaultValue: '');

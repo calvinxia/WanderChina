@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//Users/calvinxia/Desktop/China Travel/WanderChina/**)"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}

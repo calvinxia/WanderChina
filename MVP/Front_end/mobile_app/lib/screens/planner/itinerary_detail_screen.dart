@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -13,6 +14,7 @@ import '../../services/backend/auth_service.dart';
 import '../main/main_screen.dart';
 import '../../core/theme/city_theme.dart';
 import '../../widgets/common/city_background.dart';
+import '../../utils/quota_helper.dart';
 
 /// Screen 10: AI-Generated Itinerary Detail Page
 ///
@@ -637,6 +639,14 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
   Future<void> _modifyItinerary(String instruction) async {
     if (instruction.trim().isEmpty) return;
+
+    // AI Edit Quota Check
+    if (!await requireQuotaCheck(
+      context,
+      'ai_edit',
+      _itineraryTheme,
+      userId: AuthService.currentUserId,
+    )) return;
 
     setState(() {
       _isModifying = true;

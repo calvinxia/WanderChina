@@ -226,7 +226,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
           _showSearchResults = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Search failed: $e')),
+          const SnackBar(content: Text('Search temporarily unavailable, please try again')),
         );
       }
     }

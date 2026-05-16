@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:record/record.dart';
 import '../../models/poi_translation.dart';
 import '../api_client.dart';
+import '../backend/auth_service.dart';
 import '../analytics_service.dart';
 
 enum TranslationDirection {
@@ -178,6 +179,10 @@ class VoiceTranslationService extends ChangeNotifier {
       _analytics.voiceTranslated(directionStr, recognized);
 
       try { File(audioPath).deleteSync(); } catch (_) {}
+
+      // Step 5: 翻译成功，累加配额（fire-and-forget）
+      _incrementUsage();
+
       return result;
     } catch (e) {
       debugPrint('⚠️ 语音翻译链路失败: $e');
@@ -249,6 +254,9 @@ class VoiceTranslationService extends ChangeNotifier {
       );
       _history.add(result);
 
+      // 翻译成功，累加配额
+      _incrementUsage();
+
       return result;
     } catch (e) {
       debugPrint('⚠️ 快捷短语翻译失败: $e');
@@ -256,6 +264,25 @@ class VoiceTranslationService extends ChangeNotifier {
       await Future.delayed(const Duration(seconds: 2));
       _setState(VoiceServiceState.idle);
       return null;
+    }
+  }
+
+  // ─── 配额累加 ──────────────────────────────────────────
+
+  /// 翻译成功后累加配额（fire-and-forget，失败不影响用户体验）
+  Future<void> _incrementUsage() async {
+    try {
+      final userId = AuthService.currentUserId;
+      if (userId == null) return;
+
+      await ApiClient.post(
+        ApiClient.incrementVoiceUsageUrl,
+        {'user_id': userId},
+        timeout: const Duration(seconds: 5),
+      );
+      debugPrint('📊 Voice usage incremented');
+    } catch (e) {
+      debugPrint('⚠️ Voice usage increment failed: $e');
     }
   }
 

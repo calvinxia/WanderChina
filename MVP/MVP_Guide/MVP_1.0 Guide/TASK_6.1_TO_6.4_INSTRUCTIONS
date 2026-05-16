@@ -1,0 +1,227 @@
+任务: Task 6.1-6.4 — increment_voice_translate_usage 云函数 + Flutter 语音翻译链路集成
+
+=== 背景 ===
+语音翻译配额系统的最后一环：翻译成功后累加 usage_quota 表的 used_count。
+- check_user_quota 在翻译前检查配额（已完成）
+- increment_voice_translate_usage 在翻译成功后扣减配额（本任务）
+- "完成才扣"原则：翻译失败不累加
+
+=== 前置事实 ===
+- Flutter 3.41.4，CardThemeData/DialogThemeData，google_fonts: ^8.0.2
+- voice_translation_service.dart 路径: lib/services/voice/voice_translation_service.dart
+- 两个翻译方法需要集成: stopAndTranslate() 和 translateQuickPhrase()
+- ApiClient URL getter 模式: BackendConfig.xxxUrl → ApiClient.xxxUrl
+- AuthService.currentUserId 获取当前用户 ID
+
+---
+
+## Task 6.1: 创建 increment_voice_translate_usage 云函数
+
+文件: cloud_functions/increment_voice_translate_usage/index.py
+
+```python
+# increment_voice_translate_usage/index.py
+# -*- coding: utf-8 -*-
+"""
+语音翻译配额累加云函数（VPC 函数）
+翻译成功后由前端调用，UPSERT usage_quota 表
+跨日自动重置 used_count
+"""
+import os
+import sys
+import json
+
+sys.path.insert(0, os.path.dirname(__file__) or '.')
+from shared.db_helper import get_db_connection, json_response, parse_body
+
+
+def main_handler(event, context):
+    try:
+        body = parse_body(event)
+        user_id = body.get('user_id')
+
+        if not user_id:
+            return json_response(400, {'error': 'Missing user_id'})
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # UPSERT: 首次=1, 同日=+1, 跨日=重置为1
+        cursor.execute("""
+            INSERT INTO usage_quota (user_id, feature, used_count, last_reset_at)
+            VALUES (%s, 'voice_translate', 1, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id, feature) DO UPDATE
+            SET used_count = CASE
+                    WHEN usage_quota.last_reset_at::date < CURRENT_DATE
+                    THEN 1
+                    ELSE usage_quota.used_count + 1
+                END,
+                last_reset_at = CASE
+                    WHEN usage_quota.last_reset_at::date < CURRENT_DATE
+                    THEN CURRENT_TIMESTAMP
+                    ELSE usage_quota.last_reset_at
+                END
+            RETURNING used_count
+        """, (user_id,))
+
+        used_count = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+
+        print(f"[VOICE_USAGE] user={user_id}, used_today={used_count}")
+
+        return json_response(200, {
+            'success': True,
+            'used_today': used_count,
+        })
+
+    except Exception as e:
+        print(f"[VOICE_USAGE ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return json_response(500, {'error': str(e)})
+```
+
+文件: cloud_functions/increment_voice_translate_usage/requirements.txt
+
+```
+psycopg2-binary==2.9.9
+```
+
+---
+
+## Task 6.2: 打包指引（输出给用户，不执行部署）
+
+输出以下打包命令给用户：
+
+```bash
+cd ~/Projects/WanderChina/MVP/cloud_functions/increment_voice_translate_usage
+mkdir -p shared
+cp ../shared/db_helper.py shared/
+cp ../shared/__init__.py shared/
+pip download psycopg2-binary==2.9.9 --platform manylinux2014_x86_64 --python-version 39 --only-binary=:all: -d /tmp/deps
+unzip -o /tmp/deps/psycopg2_binary*.whl -d .
+zip -r ../increment_voice_translate_usage.zip . -x '*.pyc' '__pycache__/*' '*.dist-info/*'
+```
+
+部署配置：
+- 函数名: increment_voice_translate_usage
+- 运行环境: Python 3.9
+- 执行方法: index.main_handler
+- 内存: 128MB
+- 超时: 5s
+- 网络: VPC（与 PostgreSQL 同 VPC，不需要公网）
+- 触发方式: 函数 URL
+
+🛑 CHECKPOINT: 输出打包命令 + 部署配置后停下，等用户确认部署成功并提供函数 URL。
+
+---
+
+## Task 6.3: Flutter 语音翻译链路集成
+
+用户提供函数 URL 后，执行以下步骤：
+
+### Step 1: 添加 URL 配置
+
+1. `lib/core/config/backend_config.dart` 加一行：
+```dart
+static const String incrementVoiceUsageUrl = String.fromEnvironment('INCREMENT_VOICE_USAGE_URL');
+```
+
+2. `lib/services/api_client.dart` 加一行 getter：
+```dart
+static String get incrementVoiceUsageUrl => BackendConfig.incrementVoiceUsageUrl;
+```
+
+3. 提醒用户在 `.env` 文件加一行：
+```
+INCREMENT_VOICE_USAGE_URL=<用户提供的函数URL>
+```
+
+### Step 2: 修改 voice_translation_service.dart
+
+添加一个私有方法用于累加配额：
+
+```dart
+import '../api_client.dart';
+import '../backend/auth_service.dart';
+
+/// 翻译成功后累加配额（fire-and-forget，失败不影响用户体验）
+Future<void> _incrementUsage() async {
+  try {
+    final userId = AuthService.currentUserId;
+    if (userId == null) return;
+
+    await ApiClient.post(
+      ApiClient.incrementVoiceUsageUrl,
+      {'user_id': userId},
+      timeout: const Duration(seconds: 5),
+    );
+    debugPrint('📊 Voice usage incremented');
+  } catch (e) {
+    // 累加失败不影响用户体验，仅打日志
+    debugPrint('⚠️ Voice usage increment failed: $e');
+  }
+}
+```
+
+### Step 3: 在 stopAndTranslate() 成功路径末尾调用
+
+在 `stopAndTranslate()` 方法中，`_history.add(result);` 之后、`return result;` 之前，加一行：
+
+```dart
+_history.add(result);
+
+// Step 5: 翻译成功，累加配额（fire-and-forget）
+_incrementUsage();
+
+return result;
+```
+
+⚠️ 注意：
+- 用 `_incrementUsage()` 不用 `await _incrementUsage()`，fire-and-forget 不阻塞返回
+- 只在成功路径加，catch 块里不加（翻译失败不扣配额）
+
+### Step 4: 在 translateQuickPhrase() 成功路径末尾同样调用
+
+在 `translateQuickPhrase()` 方法中，`_history.add(result);` 之后、`return result;` 之前，加同样一行：
+
+```dart
+_history.add(result);
+
+// 翻译成功，累加配额
+_incrementUsage();
+
+return result;
+```
+
+### Step 5: 确认 import
+
+确保 voice_translation_service.dart 顶部有：
+```dart
+import '../api_client.dart';
+import '../backend/auth_service.dart';
+```
+
+如果已有则不重复加。注意路径是否正确（voice_translation_service.dart 在 lib/services/voice/ 下，所以 api_client 路径是 `../api_client.dart`）。
+
+---
+
+## Task 6.4: 验证
+
+1. `flutter analyze` — 无新增 error
+2. 输出所有修改的 diff 给用户审阅
+3. 不要跑 `flutter run`
+
+输出以下内容：
+1. cloud_functions/increment_voice_translate_usage/index.py 完整内容
+2. lib/core/config/backend_config.dart diff
+3. lib/services/api_client.dart diff
+4. lib/services/voice/voice_translation_service.dart diff
+
+🛑 CHECKPOINT: 用户审阅通过 + 部署云函数 + .env 填入 URL 后，再进行真机测试。
+
+真机测试验证点：
+- 完成一次中→英语音翻译，PostgreSQL 查 usage_quota 表确认 used_count=1
+- 再做一次，确认 used_count=2
+- 翻译中途失败（比如说话太短），确认 used_count 不变

@@ -1,13 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../services/backend/auth_service.dart';
+import '../../services/purchase_service.dart';
+import '../../services/subscription_service.dart';
+import '../../services/app_event_bus.dart';
 import '../../services/analytics_service.dart';
 import '../../services/api_client.dart';
 import '../../core/config/backend_config.dart';
 import '../../services/amap_service.dart';
 import '../../models/itinerary.dart';
 import '../auth/login_screen.dart';
+import '../auth/delete_account_screen.dart';
 import '../planner/itinerary_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../core/theme/city_theme.dart';
@@ -36,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   List<Map<String, dynamic>> _userTrips = [];
   bool _isLoadingTrips = true;
   String _currentCity = 'China';
+  StreamSubscription? _subEventSub;
 
   @override
   void initState() {
@@ -44,6 +50,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     _loadProfile();
     _loadTrips();
     _loadCurrentCity();
+    // [PB4] SubscriptionService 是全局单例，setState 仅触发 build 重读最新状态
+    _subEventSub = AppEventBus.instance.on<PurchaseSuccessEvent>().listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _loadProfile() async {
@@ -115,6 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   void dispose() {
+    _subEventSub?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -251,6 +262,59 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
                 ),
+
+                // 订阅状态卡片
+                _buildSubscriptionCard(),
+
+                // Restore Purchases
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.restore),
+                  title: const Text('Restore Purchases'),
+                  onTap: () async {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                    );
+
+                    try {
+                      await PurchaseService.instance.restorePurchases();
+                      await Future.delayed(const Duration(seconds: 2));
+                    } finally {
+                      if (context.mounted) Navigator.of(context).pop();
+                    }
+
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('If you have a valid purchase, your subscription has been restored.'),
+                        ),
+                      );
+                    }
+                  },
+                ),
+
+                // Delete Account Text Link
+                const SizedBox(height: 24),
+                Center(
+                  child: TextButton(
+                    onPressed: _confirmDeleteAccount,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.gray600,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                    ),
+                    child: const Text(
+                      'Delete Account',
+                      style: TextStyle(
+                        fontSize: 13,
+                        decoration: TextDecoration.underline,
+                        decorationColor: AppColors.gray600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ),
     );
@@ -524,5 +588,98 @@ class _ProfileScreenState extends State<ProfileScreen>
       MaterialPageRoute(builder: (_) => const EditProfileScreen()),
     );
     _loadProfile();  // 返回后重新加载
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account?'),
+        content: const Text(
+          'This will permanently delete your account and all your data. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const DeleteAccountScreen()),
+      );
+    }
+  }
+
+  Widget _buildSubscriptionCard() {
+    final sub = SubscriptionService.instance;
+    final isPremium = sub.isPremium;
+
+    // 跟随 city theme（和 paywall_dialog 一致）
+    final mainState = MainScreen.globalKey.currentState;
+    final cityTheme = mainState?.cityTheme;
+    final activeColor = cityTheme?.pillActiveColor ?? const Color(0xFF2D6A4F);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isPremium
+            ? activeColor.withOpacity(0.08)
+            : const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isPremium
+              ? activeColor.withOpacity(0.3)
+              : const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isPremium ? Icons.workspace_premium_rounded : Icons.lock_outline,
+            color: isPremium ? activeColor : Colors.grey,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isPremium ? 'Trip Pass Active' : 'Free Plan',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isPremium ? activeColor : const Color(0xFF424242),
+                  ),
+                ),
+                if (isPremium && sub.premiumExpiresAt != null)
+                  Text(
+                    'Active until ${sub.premiumExpiresAt!.toString().substring(0, 10)}',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                if (!isPremium)
+                  Text(
+                    'Upgrade for unlimited features',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

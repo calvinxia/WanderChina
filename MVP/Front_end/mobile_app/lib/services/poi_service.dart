@@ -118,7 +118,7 @@ class POIService {
 
     } catch (e) {
       debugPrint('❌ 关键词搜索失败: $e');
-      return [];
+      rethrow;
     }
   }
 

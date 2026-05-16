@@ -288,3 +288,29 @@ Business Doc/
 Android key store file.rtf
 *.keystore
 *.jks
+
+# Secrets - NEVER commit
+AuthKey_*.p8
+**/google-services.json
+**/GoogleService-Info.plist
+.zshrc
+.env
+
+# Python dependencies (pip install -t . artifacts)
+**/cloud_functions/**/*.dist-info/
+**/cloud_functions/**/certifi/
+**/cloud_functions/**/charset_normalizer/
+**/cloud_functions/**/cryptography/
+**/cloud_functions/**/idna/
+**/cloud_functions/**/jwt/
+**/cloud_functions/**/pycparser/
+**/cloud_functions/**/redis/
+**/cloud_functions/**/requests/
+**/cloud_functions/**/urllib3/
+**/cloud_functions/**/psycopg2/
+**/cloud_functions/**/psycopg2_binary*/
+**/cloud_functions/**/typing_extensions*
+**/cloud_functions/**/async_timeout*/
+**/cloud_functions/**/bin/
+**/cloud_functions/**/cffi/
+*.backup

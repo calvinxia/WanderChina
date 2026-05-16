@@ -14,6 +14,7 @@ import 'itinerary_detail_screen.dart';
 import '../../core/theme/city_theme.dart';
 import '../main/main_screen.dart';
 import '../../widgets/planner/willingness_survey_dialog.dart';
+import '../../utils/quota_helper.dart';
 
 /// Screen 9: AI Trip Planner Home
 ///
@@ -731,8 +732,21 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
   }
 
   Future<void> _generatePlan() async {
+    // Quota check
+    if (!await requireQuotaCheck(
+      context,
+      'itinerary',
+      _activeTheme,
+      userId: AuthService.currentUserId,
+    )) return;
+
+    final stopwatch = Stopwatch()..start();
+
     // Start loading animation
     _startLoadingAnimation();
+
+    final t1 = stopwatch.elapsedMilliseconds;
+    debugPrint('⏱️ UI loading started: ${t1}ms');
 
     try {
       // 将选中的中文城市名转换为英文完整名
@@ -754,6 +768,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         },
         timeout: const Duration(seconds: 75),  // 云函数 60s + 网络延迟
       );
+
+      final t2 = stopwatch.elapsedMilliseconds;
+      debugPrint('⏱️ Cloud function returned: ${t2}ms');
 
       debugPrint('🗺️ generate_itinerary response: $genResponse');
       debugPrint('🗺️ response type: ${genResponse.runtimeType}');
@@ -799,6 +816,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           ),
         ),
       );
+
+      final t3 = stopwatch.elapsedMilliseconds;
+      debugPrint('⏱️ Parse + navigate completed: ${t3}ms');
 
       // ── 付费意愿调研检查 ──
       if (mounted) {

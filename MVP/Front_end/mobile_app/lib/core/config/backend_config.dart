@@ -15,6 +15,10 @@ class BackendConfig {
   static const String routeUrl = String.fromEnvironment('ROUTE_URL');
   static const String generateItineraryUrl = String.fromEnvironment('GENERATE_ITINERARY_URL');
   static const String poiPhotoUrl = String.fromEnvironment('POI_PHOTO_URL');
+  static const String getFeatureFlagsUrl = String.fromEnvironment('GET_FEATURE_FLAGS_URL');
+  static const String checkUserQuotaUrl = String.fromEnvironment('CHECK_USER_QUOTA_URL');
+  static const String purchaseVerifyUrl = String.fromEnvironment('PURCHASE_VERIFY_URL');
+  static const String incrementVoiceUsageUrl = String.fromEnvironment('INCREMENT_VOICE_USAGE_URL');
 
   // ===== COS 公开信息 =====
   static const String cosStaticUrl = String.fromEnvironment('COS_STATIC_URL');
