@@ -306,18 +306,22 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 20),
 
                 // Apple Sign-In
-                // TODO: v0.2 上线前补 Apple 官方图标 asset
                 SizedBox(
                   width: double.infinity,
                   height: 52,
-                  child: OutlinedButton(
+                  child: OutlinedButton.icon(
                     onPressed: _isLoading ? null : _signInWithApple,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white.withOpacity(0.8),
                       side: BorderSide(color: Colors.white.withOpacity(0.2)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Continue with Apple', style: TextStyle(fontSize: 15)),
+                    icon: Image.asset(
+                      'assets/icons/oauth/apple_logo_white.png',
+                      width: 20,
+                      height: 20,
+                    ),
+                    label: const Text('Continue with Apple', style: TextStyle(fontSize: 15)),
                   ),
                 ),
 

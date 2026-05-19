@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 行程创建与管理云函数
-操作: create（创建行程）、get（获取行程）、list（列出用户行程）、update（更新行程）
+操作: create（创建行程）、get（获取行程）、list（列出用户行程）、update（更新行程）、 delete（删除行程）
 Flutter 端负责调用 DeepSeek 生成行程 JSON，本函数仅负责持久化存储
 """
 import os
@@ -210,12 +210,45 @@ def main_handler(event, context):
             cursor.close()
 
             return json_response(200, {'success': True, 'trip_id': trip_id})
+        
+        # ===== 删除行程 =====
+        elif action == 'delete':
+            trip_id = body.get('trip_id')
+            user_id = body.get('user_id')
+            if not trip_id or not user_id:
+                cursor.close()
+                return json_response(400, {'error': 'Missing trip_id or user_id'})
+
+            # 先删 trip_days（外键依赖）
+            cursor.execute("DELETE FROM trip_days WHERE trip_id = %s", (trip_id,))
+
+            # 再删 trip（加 user_id 校验，防删别人的）
+            cursor.execute(
+                "DELETE FROM trips WHERE id = %s AND user_id = %s RETURNING id",
+                (trip_id, user_id)
+            )
+            deleted = cursor.fetchone()
+
+            if not deleted:
+                conn.rollback()
+                cursor.close()
+                return json_response(404, {'error': 'Trip not found or not owned by user'})
+
+            # trips_count 减 1
+            cursor.execute("""
+                UPDATE users SET trips_count = GREATEST(trips_count - 1, 0)
+                WHERE id = %s
+            """, (user_id,))
+
+            conn.commit()
+            cursor.close()
+            return json_response(200, {'success': True, 'deleted_trip_id': trip_id})
 
         else:
             cursor.close()
             return json_response(400, {
                 'error': f'Unknown action: {action}. '
-                         f'Supported: create, get, list, update'
+                         f'Supported: create, get, list, update, delete'
             })
 
     except Exception as e:

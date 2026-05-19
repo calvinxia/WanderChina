@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -15,6 +14,7 @@ import '../main/main_screen.dart';
 import '../../core/theme/city_theme.dart';
 import '../../widgets/common/city_background.dart';
 import '../../utils/quota_helper.dart';
+import '../../widgets/soft_login_sheet.dart';
 
 /// Screen 10: AI-Generated Itinerary Detail Page
 ///
@@ -49,6 +49,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
     with SingleTickerProviderStateMixin {
   final _analytics = AnalyticsService.instance;
   late TabController _tabController;
+  late Itinerary _itinerary;
   bool _isSaved = false;
   bool _isSaving = false;
   late CityTheme _itineraryTheme;
@@ -57,12 +58,14 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
   bool _isModifying = false;
   String _modifyingMessage = '';
   final List<String> _chatHistory = [];
+  Set<String> _recentlyChangedIds = {};
 
   @override
   void initState() {
     super.initState();
+    _itinerary = widget.itinerary;
     _tabController = TabController(
-      length: widget.itinerary.days.length,
+      length: _itinerary.days.length,
       vsync: this,
     );
     // 检查是否已保存：有 tripId 且不是 preview_ 开头
@@ -72,7 +75,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
   }
 
   CityTheme _detectTheme() {
-    final dest = widget.itinerary.destination.toLowerCase();
+    final dest = _itinerary.destination.toLowerCase();
     if (dest.contains('beijing') || dest.contains('北京')) return CityTheme.beijing;
     if (dest.contains('shanghai') || dest.contains('上海')) return CityTheme.shanghai;
     if (dest.contains('guangzhou') || dest.contains('广州')) return CityTheme.guangzhou;
@@ -128,7 +131,9 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           backgroundColor: Colors.transparent,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
             elevation: 0,
+            scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.gray900),
           onPressed: () async {
@@ -162,7 +167,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           },
         ),
         title: Text(
-          '${widget.itinerary.destination} · ${widget.itinerary.totalDays} Days',
+          '${_itinerary.destination} · ${_itinerary.totalDays} Days',
           style: AppTextStyles.h4(color: AppColors.gray900),
         ),
         actions: [
@@ -217,7 +222,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
             ),
             child: TabBar(
               controller: _tabController,
-              isScrollable: widget.itinerary.days.length > 3,
+              isScrollable: _itinerary.days.length > 3,
               labelColor: _itineraryTheme.pillActiveColor,
               unselectedLabelColor: _itineraryTheme.secondaryTextColor,
               labelStyle: TextStyle(
@@ -231,7 +236,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
               ),
               indicatorColor: _itineraryTheme.pillActiveColor,
               indicatorWeight: 2,
-              tabs: widget.itinerary.days.map((day) {
+              tabs: _itinerary.days.map((day) {
                 return Tab(text: 'Day ${day.dayNumber}');
               }).toList(),
             ),
@@ -241,7 +246,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: widget.itinerary.days.map((day) {
+              children: _itinerary.days.map((day) {
                 return _buildDayContent(day);
               }).toList(),
             ),
@@ -347,17 +352,30 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
           // AI Chat Input (fixed at bottom)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.25),
               border: Border(
                 top: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
               ),
             ),
-            child: AiChatInput(
-              theme: _itineraryTheme,
-              onSend: _isModifying ? (text) {} : (text) => _modifyItinerary(text),
-              placeholder: _isModifying ? 'AI is updating...' : 'e.g. "add more food stops"',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '✏️ Type below to edit your itinerary with AI',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                AiChatInput(
+                  theme: _itineraryTheme,
+                  onSend: _isModifying ? (text) {} : (text) => _modifyItinerary(text),
+                  placeholder: _isModifying ? 'AI is updating...' : 'e.g. "add more food stops"',
+                ),
+              ],
             ),
           ),
         ],
@@ -385,7 +403,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           if (day.title != null) ...[
             Text(
               '${day.title}',
-              style: AppTextStyles.h3(color: AppColors.gray900),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: AppColors.gray900),
             ),
             const SizedBox(height: 16),
           ],
@@ -397,67 +415,26 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
             return Column(
               children: [
-                ActivityCard(
-                  activity: activity,
-                  theme: _itineraryTheme,
-                  onNavigate: () => _handleNavigate(activity),
-                  onDetails: () => _showActivityDetail(activity.toJson()),
-                  onDelete: () => _deleteActivity(day.dayNumber, index),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  decoration: BoxDecoration(
+                    border: _recentlyChangedIds.contains(activity.id)
+                        ? Border.all(color: _itineraryTheme.pillActiveColor, width: 2)
+                        : null,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ActivityCard(
+                    activity: activity,
+                    theme: _itineraryTheme,
+                    onNavigate: () => _handleNavigate(activity),
+                    onDetails: () => _showActivityDetail(activity.toJson()),
+                    onDelete: () => _deleteActivity(day.dayNumber, index),
+                  ),
                 ),
                 if (!isLast) _buildTransitConnector(activity, activities[index + 1]),
               ],
             );
           }),
-
-          const SizedBox(height: 16),
-
-          // Add Stop Button
-          OutlinedButton.icon(
-            onPressed: _handleAddStop,
-            icon: Icon(Icons.add, size: 18, color: _itineraryTheme.pillActiveColor),
-            label: Text('Add Stop', style: TextStyle(color: _itineraryTheme.pillActiveColor)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _itineraryTheme.pillActiveColor,
-              side: BorderSide(color: _itineraryTheme.pillActiveColor),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // View on Map Button
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _handleViewOnMap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _itineraryTheme.pillActiveColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.map_outlined, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'View on Map',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
 
           const SizedBox(height: 16),
         ],
@@ -469,29 +446,26 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
     // Calculate time difference between activities
     final durationMinutes = to.startTime.difference(from.endTime).inMinutes;
 
-    // If no gap or invalid time difference, show simple separator
+    // If no gap or invalid time difference, show blank spacing
     if (durationMinutes <= 0) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Center(child: Icon(Icons.more_vert, color: Colors.grey, size: 20)),
-      );
+      return const SizedBox(height: 16);
     }
 
     // Show time gap between activities
-    if (durationMinutes <= 15) {
+    if (durationMinutes <= 30) {
       return TransitConnector(
-        transitText: '$durationMinutes min gap',
+        transitText: '$durationMinutes min 🚶',
         icon: Icons.access_time,
       );
     } else if (durationMinutes <= 60) {
       return TransitConnector(
-        transitText: '$durationMinutes min gap',
+        transitText: '$durationMinutes min 🚕',
         icon: Icons.access_time,
       );
     } else {
       final hours = (durationMinutes / 60).floor();
       final mins = durationMinutes % 60;
-      final timeText = mins > 0 ? '${hours}h ${mins}m gap' : '${hours}h gap';
+      final timeText = mins > 0 ? '${hours}h ${mins}m 🚕' : '${hours}h 🚕';
       return TransitConnector(
         transitText: timeText,
         icon: Icons.schedule,
@@ -502,21 +476,23 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
   void _handleNavigate(Activity activity) {
     final nameZh = activity.notes ?? activity.location ?? '';
     final nameEn = activity.title;
-    debugPrint('🧭 Navigate tapped: nameZh=$nameZh, nameEn=$nameEn, city=${widget.itinerary.destination}');
+    debugPrint('🧭 Navigate tapped: nameZh=$nameZh, nameEn=$nameEn, city=${_itinerary.destination}');
 
     // Analytics tracking
     _analytics.poiNavigate(nameEn.isNotEmpty ? nameEn : nameZh);
 
     // 搜索用中文（精确匹配），搜索框显示英文（用户可读）
     final searchQuery = nameZh.isNotEmpty ? nameZh : nameEn;
+    final fallbackQuery = nameEn.isNotEmpty ? nameEn : null;
     final displayName = nameEn.isNotEmpty ? nameEn : nameZh;
 
-    // 返回 MainScreen 并切换到 Map tab + 自动搜索
+    // itinerary_detail 压在 MainScreen 上，需要 pop 才能看到 Map tab
     Navigator.of(context).popUntil((route) => route.isFirst);
     MainScreen.globalKey.currentState?.switchToMapAndSearch(
       searchQuery,
       displayName: displayName,
-      city: widget.itinerary.destination,
+      city: _itinerary.destination,
+      fallbackQuery: fallbackQuery,
     );
   }
 
@@ -536,8 +512,8 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
         nameZh: nameZh,
         description: activity['description'] ?? '',
         duration: activity['duration'] ?? '',
-        cost: activity['cost'] ?? '',
-        city: widget.itinerary.destination,
+        cost: activity['estimatedCost'] != null ? '¥${activity['estimatedCost']}' : '',
+        city: _itinerary.destination,
         theme: _itineraryTheme,
       ),
     );
@@ -546,16 +522,16 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
   Future<void> _saveTrip() async {
     if (_isSaved || _isSaving) return;  // 防重复点击
     debugPrint('💾 Saving trip, user_id: ${AuthService.currentUserId}');
-    debugPrint('💾 Itinerary days: ${widget.itinerary.toJson()['days']?.map((d) => d['day_number'])}');
+    debugPrint('💾 Itinerary days: ${_itinerary.toJson()['days']?.map((d) => d['day_number'])}');
     setState(() => _isSaving = true);
     try {
       await ApiClient.post(BackendConfig.tripUrl, {
         'action': 'create',
-        'cities': widget.cities ?? [widget.itinerary.destination],
-        'days': widget.itinerary.days.length,  // 用实际天数，不依赖 widget.days
+        'cities': widget.cities ?? [_itinerary.destination],
+        'days': _itinerary.days.length,  // 用实际天数，不依赖 widget.days
         'interests': widget.interests ?? [],
-        'title': widget.itinerary.title,
-        'itinerary': widget.itinerary.toJson(),
+        'title': _itinerary.title,
+        'itinerary': _itinerary.toJson(),
         'user_id': AuthService.currentUserId,
       });
 
@@ -567,8 +543,8 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
         // Analytics tracking
         _analytics.itinerarySaved(
-          widget.itinerary.destination,
-          widget.itinerary.days.length,
+          _itinerary.destination,
+          _itinerary.days.length,
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -609,11 +585,11 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
   Map<String, dynamic> _buildItineraryJsonForModify() {
     // 构建精简的行程 JSON（DeepSeek 能理解的原始格式）
-    final days = widget.itinerary.days.map((day) {
+    final days = _itinerary.days.map((day) {
       return {
         'day_number': day.dayNumber,
         'title': day.title ?? '',
-        'city': widget.itinerary.destination,
+        'city': _itinerary.destination,
         'summary': day.notes ?? '',
         'activities': day.activities.map((activity) {
           final hour = activity.startTime.hour.toString().padLeft(2, '0');
@@ -640,6 +616,8 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
   Future<void> _modifyItinerary(String instruction) async {
     if (instruction.trim().isEmpty) return;
 
+    // 软登录检查：匿名用户弹注册引导
+    if (!await requireLogin(context, 'ai_edit', theme: _itineraryTheme)) return;
     // AI Edit Quota Check
     if (!await requireQuotaCheck(
       context,
@@ -677,33 +655,26 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
         // 解析修改后的行程
         final newItinerary = Itinerary.fromCloudData({
           ...modifiedJson,
-          'title': widget.itinerary.title,
-          'cities': [widget.itinerary.destination],
-          'duration_days': widget.itinerary.days.length,
+          'title': _itinerary.title,
+          'cities': [_itinerary.destination],
+          'duration_days': _itinerary.days.length,
           'trip_id': widget.tripId,
         });
+
+        // 找出变更的 activity ids，高亮 2 秒
+        final changedIds = _findChangedActivities(_itinerary, newItinerary);
 
         setState(() {
           _chatHistory.add('AI: Itinerary updated ✓');
           _isModifying = false;
           _modifyingMessage = '';
+          _itinerary = newItinerary;
+          _recentlyChangedIds = changedIds;
         });
 
-        // 替换当前行程 — 需要重建页面
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ItineraryDetailScreen(
-                itinerary: newItinerary,
-                tripId: widget.tripId,
-                cities: widget.cities,
-                days: widget.days,
-                interests: widget.interests,
-              ),
-            ),
-          );
-        }
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _recentlyChangedIds = {});
+        });
       }
     } catch (e) {
       debugPrint('❌ Modify itinerary error: $e');
@@ -722,26 +693,40 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
   void _deleteActivity(int dayNumber, int activityIndex) {
     setState(() {
-      final dayIndex = widget.itinerary.days.indexWhere((d) => d.dayNumber == dayNumber);
+      final dayIndex = _itinerary.days.indexWhere((d) => d.dayNumber == dayNumber);
       if (dayIndex >= 0) {
-        final updatedActivities = List<Activity>.from(widget.itinerary.days[dayIndex].activities);
+        final updatedActivities = List<Activity>.from(_itinerary.days[dayIndex].activities);
         if (activityIndex < updatedActivities.length) {
           updatedActivities.removeAt(activityIndex);
           // 需要重建 ItineraryDay（因为 activities 是 final）
           final updatedDay = ItineraryDay(
-            id: widget.itinerary.days[dayIndex].id,
-            dayNumber: widget.itinerary.days[dayIndex].dayNumber,
-            date: widget.itinerary.days[dayIndex].date,
-            title: widget.itinerary.days[dayIndex].title,
+            id: _itinerary.days[dayIndex].id,
+            dayNumber: _itinerary.days[dayIndex].dayNumber,
+            date: _itinerary.days[dayIndex].date,
+            title: _itinerary.days[dayIndex].title,
             activities: updatedActivities,
-            notes: widget.itinerary.days[dayIndex].notes,
+            notes: _itinerary.days[dayIndex].notes,
           );
-          widget.itinerary.days[dayIndex] = updatedDay;
+          _itinerary.days[dayIndex] = updatedDay;
           // 标记为未保存
           _isSaved = false;
         }
       }
     });
+  }
+
+  Set<String> _findChangedActivities(Itinerary oldItin, Itinerary newItin) {
+    final oldNames = {
+      for (final day in oldItin.days)
+        for (final act in day.activities) act.title,
+    };
+    final changed = <String>{};
+    for (final day in newItin.days) {
+      for (final act in day.activities) {
+        if (!oldNames.contains(act.title)) changed.add(act.id);
+      }
+    }
+    return changed;
   }
 
   Widget _buildModifyingSkeletonView() {

@@ -161,14 +161,27 @@ class MainScreenState extends State<MainScreen> {
   }
 
   /// 切换到 Map tab 并执行搜索
-  void switchToMapAndSearch(String query, {String? displayName, String? city}) {
+  void switchToMapAndSearch(String query, {String? displayName, String? city, String? fallbackQuery}) {
     setState(() {
       _currentIndex = 1;  // Map tab index
     });
     pendingSearchCity = city;
     // 直接调 Map 页面的搜索方法
     Future.delayed(const Duration(milliseconds: 300), () {
-      _mapKey.currentState?.searchFromExternal(query, displayName: displayName);
+      _mapKey.currentState?.searchFromExternal(query, displayName: displayName, fallbackQuery: fallbackQuery);
+    });
+  }
+
+  /// 只切到 Map tab + 触发搜索，不 pop 任何 route。
+  /// 保留其他 tab（如 Planner）的导航栈完整。
+  /// ⚠️ 当前未使用：itinerary_detail 压在 MainScreen 上，不 pop 看不到 Map tab。
+  /// 预留给未来嵌套 Navigator 改造（各 tab 独立导航栈）后启用。
+  void switchToMapTabAndSearch(String query, {String? displayName, String? city, String? fallbackQuery}) {
+    setState(() => _currentIndex = 1);
+    pendingSearchCity = city;
+    // addPostFrameCallback 确保 tab 切换完成后再搜索
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mapKey.currentState?.searchFromExternal(query, displayName: displayName, city: city, fallbackQuery: fallbackQuery);
     });
   }
 

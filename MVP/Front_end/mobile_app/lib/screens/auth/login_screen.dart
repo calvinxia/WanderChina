@@ -6,7 +6,8 @@ import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final bool fromSoftLogin;
+  const LoginScreen({super.key, this.fromSoftLogin = false});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -44,10 +45,14 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await AuthService.login(email: email, password: password);
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
-          (route) => false,
-        );
+        if (widget.fromSoftLogin) {
+          Navigator.of(context).pop(true);
+        } else {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+            (route) => false,
+          );
+        }
       }
     } catch (e) {
       debugPrint('🔐 Login error: $e');
@@ -81,10 +86,14 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
-          (route) => false,
-        );
+        if (widget.fromSoftLogin) {
+          Navigator.of(context).pop(true);
+        } else {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+            (route) => false,
+          );
+        }
       }
     } catch (e) {
       debugPrint('🔐 Apple Sign-In error: $e');
@@ -282,18 +291,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
 
                 // Apple Sign-In
-                // TODO: v0.2 上线前补 Apple 官方图标 asset
                 SizedBox(
                   width: double.infinity,
                   height: 52,
-                  child: OutlinedButton(
+                  child: OutlinedButton.icon(
                     onPressed: _isLoading ? null : _signInWithApple,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white.withOpacity(0.8),
                       side: BorderSide(color: Colors.white.withOpacity(0.2)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Continue with Apple', style: TextStyle(fontSize: 15)),
+                    icon: Image.asset(
+                      'assets/icons/oauth/apple_logo_white.png',
+                      width: 20,
+                      height: 20,
+                    ),
+                    label: const Text('Continue with Apple', style: TextStyle(fontSize: 15)),
                   ),
                 ),
 

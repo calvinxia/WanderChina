@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 import '../../widgets/map/wander_map.dart';
 import '../../widgets/map/map_search_bar.dart';
@@ -98,12 +100,12 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
   }
 
   /// 从外部调用的搜索方法（供 MainScreen 使用）
-  void searchFromExternal(String query, {String? displayName, String? city}) {
+  void searchFromExternal(String query, {String? displayName, String? city, String? fallbackQuery}) {
     // 搜索框显示英文名（用户可读）
     _searchController.text = displayName ?? query;
 
     // 后台用中文名搜索（精确匹配）
-    _handleSearch(query, city: city, displayName: displayName);
+    _handleSearch(query, city: city, displayName: displayName, fallbackQuery: fallbackQuery);
   }
 
   /// 映射英文城市名到中文
@@ -171,7 +173,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
   }
 
   // Fix-7.A: 搜索POI功能
-  Future<void> _handleSearch(String query, {String? city, String? displayName}) async {
+  Future<void> _handleSearch(String query, {String? city, String? displayName, String? fallbackQuery}) async {
     if (query.trim().isEmpty) return;
 
     FocusScope.of(context).unfocus(); // 收键盘
@@ -186,10 +188,31 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
       // Analytics tracking
       _analytics.searchPoi(keyword, city: cityZh);
 
-      final results = await _poiService.searchByKeyword(
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'poi',
+        message: 'search_poi called',
+        data: {'keyword': keyword, 'city': cityZh ?? ''},
+      ));
+
+      final rawResults = await _poiService.searchByKeyword(
         keyword: keyword,
-        city: cityZh,  // ← 传城市（中文）
+        city: cityZh,
       );
+      final results = List.of(rawResults);
+
+      // 结果太少且有备选关键词 → 再搜一次，合并去重
+      if (results.length <= 1 && fallbackQuery != null && fallbackQuery != keyword) {
+        debugPrint('🔍 Primary search got ${results.length} results, trying fallback: $fallbackQuery');
+        final fallbackResults = await _poiService.searchByKeyword(
+          keyword: fallbackQuery,
+          city: cityZh,
+        );
+        final existingIds = results.map((r) => r.id).toSet();
+        for (final r in fallbackResults) {
+          if (!existingIds.contains(r.id)) results.add(r);
+        }
+        debugPrint('🔍 After fallback: ${results.length} results');
+      }
 
       if (mounted) {
         // 诊断日志
@@ -226,7 +249,10 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
           _showSearchResults = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Search temporarily unavailable, please try again')),
+          SnackBar(
+            content: Text('POI search failed: ${e.toString().substring(0, e.toString().length.clamp(0, 80))}'),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     }
@@ -277,6 +303,11 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
 
       if (displayName == null || displayName == nameZh) {
         // 需要翻译
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'poi',
+          message: 'translate called',
+          data: {'name_zh': nameZh},
+        ));
         final transResult = await ApiClient.post(BackendConfig.translateUrl, {
           'text': nameZh,
           'target_lang': 'en',
@@ -285,9 +316,14 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
         debugPrint('🔄 Translated: $nameZh → $translatedName');
       }
 
-      // Step 4: 调 translate_db_write 存入 DB + Redis
-      debugPrint('🔄 Step 3: Saving to DB...');
-      await ApiClient.post(BackendConfig.dbWriteUrl, {
+      // Step 4: 调 translate_db_write 存入 DB + Redis（fire-and-forget，不阻塞 UI）
+      debugPrint('🔄 Step 3: Saving to DB (fire-and-forget)...');
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'poi',
+        message: 'db_write called',
+        data: {'poi_id': poiId, 'name_zh': nameZh, 'name_en': translatedName},
+      ));
+      unawaited(ApiClient.post(BackendConfig.dbWriteUrl, {
         'action': 'save',
         'poi_id': poiId,
         'name_zh': nameZh,
@@ -296,15 +332,17 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
         'longitude': lng,
         'city': _mapCityToZh(city ?? ''),
         'category_zh': poiInfo['category'] ?? '',
-      });
-      debugPrint('🔄 Saved to DB ✅');
+      }).catchError((e) {
+        debugPrint('⚠️ DB write failed (non-blocking): $e');
+        return <String, dynamic>{};
+      }));
 
       // Step 5: 翻译完成后更新提示
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Found "$translatedName" — translated and saved'),
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -312,7 +350,10 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
       debugPrint('🔄 On-the-fly translate failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${displayName ?? nameZh}" translation failed')),
+          SnackBar(
+            content: Text('Translation failed: ${e.toString().substring(0, e.toString().length.clamp(0, 80))}'),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     }
@@ -538,6 +579,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             // 搜索地点
             TextField(
               controller: controller,
+              cursorColor: cityTheme.pillActiveColor,
               style: TextStyle(color: cityTheme.primaryTextColor),
               decoration: InputDecoration(
                 hintText: 'Search a place...',
@@ -618,7 +660,8 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
       child: Stack(
         children: [
           // 1. Base map layer with translation overlay
-          WanderMap(
+          RepaintBoundary(
+            child: WanderMap(
             key: _mapKey,
             initialCenter: _initialCenter,
             initialZoom: 15.0,
@@ -641,8 +684,18 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             onCameraMove: (pos) {
               _currentZoom = pos.zoom;
               _currentCenter = pos.target;
+              Sentry.addBreadcrumb(Breadcrumb(
+                category: 'poi',
+                message: 'map_camera_move',
+                data: {
+                  'lat': pos.target.latitude,
+                  'lng': pos.target.longitude,
+                  'zoom': pos.zoom,
+                },
+              ));
             },
           ),
+          ), // RepaintBoundary
 
           // 2. Top UI controls — 固定在顶部，不占满全屏
           Positioned(

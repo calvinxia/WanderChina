@@ -90,6 +90,7 @@ flutter:
     - assets/animations/
     - assets/illustrations/
     - assets/map/
+    - assets/icons/oauth/
 
   # Fonts (using Google Fonts at runtime）
 

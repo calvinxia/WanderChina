@@ -130,8 +130,93 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
+  Widget _buildAnonymousProfile() {
+    final color = MainScreen.globalKey.currentState?.cityTheme.pillActiveColor
+        ?? const Color(0xFF2D6A4F);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_outline, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              const Text(
+                'Sign in for the full experience',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Save trips, sync across devices, and unlock premium features',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  icon: Image.asset(
+                    'assets/icons/oauth/apple_logo_white.png',
+                    width: 20,
+                    height: 20,
+                  ),
+                  label: const Text('Continue with Apple'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    try {
+                      await AuthService.signInWithApple();
+                      if (mounted) setState(() {});
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Sign in failed: $e')),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  icon: Icon(Icons.email_outlined, color: color),
+                  label: Text('Continue with Email', style: TextStyle(color: color)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: color),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 匿名用户显示登录引导页
+    if (AuthService.isAnonymous) {
+      return _buildAnonymousProfile();
+    }
+
     // Get city theme from MainScreen
     final mainState = context.findAncestorStateOfType<MainScreenState>();
     final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
@@ -634,14 +719,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isPremium
-            ? activeColor.withOpacity(0.08)
-            : const Color(0xFFF5F5F5),
+        color: activeColor.withOpacity(isPremium ? 0.08 : 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isPremium
-              ? activeColor.withOpacity(0.3)
-              : const Color(0xFFE0E0E0),
+          color: activeColor.withOpacity(isPremium ? 0.3 : 0.2),
           width: 1,
         ),
       ),
@@ -649,7 +730,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         children: [
           Icon(
             isPremium ? Icons.workspace_premium_rounded : Icons.lock_outline,
-            color: isPremium ? activeColor : Colors.grey,
+            color: activeColor,
             size: 28,
           ),
           const SizedBox(width: 12),
@@ -662,7 +743,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: isPremium ? activeColor : const Color(0xFF424242),
+                    color: activeColor,
                   ),
                 ),
                 if (isPremium && sub.premiumExpiresAt != null)
@@ -673,7 +754,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 if (!isPremium)
                   Text(
                     'Upgrade for unlimited features',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                   ),
               ],
             ),

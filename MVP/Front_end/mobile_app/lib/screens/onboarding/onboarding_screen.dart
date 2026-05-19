@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +11,8 @@ import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/mountain_silhouette.dart';
 import '../../widgets/onboarding_illustrations.dart';
-import '../auth/login_screen.dart';
+import '../../services/backend/auth_service.dart';
+import '../main/main_screen.dart';
 
 /// WanderChina Onboarding Screen - MVP v2.0
 ///
@@ -99,15 +101,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _finishOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+
     // 保存用户选择的目的地城市
     if (_selectedCityKey != null) {
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setString('destination_city', _selectedCityKey!);
     }
 
+    // 标记 Onboarding 已完成（下次启动跳过）
+    await prefs.setBool('onboarding_done', true);
+
+    // 匿名登录，进 MainScreen（失败也进，离线模式）
+    String? deviceId = prefs.getString('device_id');
+    if (deviceId == null) {
+      final random = Random.secure();
+      deviceId = List.generate(32, (_) => random.nextInt(16).toRadixString(16)).join();
+      await prefs.setString('device_id', deviceId);
+    }
+    await AuthService.anonymousAuth(deviceId);
+
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
     );
   }
 

@@ -1,5 +1,7 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../services/backend/auth_service.dart';
@@ -38,11 +40,41 @@ class _SplashScreenState extends State<SplashScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
       );
-    } else {
+      return;
+    }
+
+    // session 不存在/已过期 — 检查是否首次安装
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+
+    if (!mounted) return;
+
+    if (!onboardingDone) {
+      // 首次安装 → 走 Onboarding（完成后会设 onboarding_done + 匿名登录）
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
+      return;
     }
+
+    // 已完成 Onboarding 但 session 过期 → 匿名登录，直接进 MainScreen
+    final deviceId = await _getOrCreateDeviceId(prefs);
+    await AuthService.anonymousAuth(deviceId);
+    // 绝不出现白屏：无论 anonymousAuth 成功失败都进 MainScreen
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+    );
+  }
+
+  Future<String> _getOrCreateDeviceId(SharedPreferences prefs) async {
+    String? deviceId = prefs.getString('device_id');
+    if (deviceId == null) {
+      final random = Random.secure();
+      deviceId = List.generate(32, (_) => random.nextInt(16).toRadixString(16)).join();
+      await prefs.setString('device_id', deviceId);
+    }
+    return deviceId;
   }
 
   @override

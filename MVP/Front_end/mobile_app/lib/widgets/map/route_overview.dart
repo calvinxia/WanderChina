@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/route_planning_service.dart';
+import '../../services/deeplink_service.dart';
 import '../../core/theme/city_theme.dart';
 
 class RouteOverviewPanel extends StatefulWidget {
@@ -80,6 +81,39 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
 
           const SizedBox(height: 12),
 
+          // DiDi 打车按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.local_taxi, size: 20),
+                label: const Text('Ride with DiDi'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: currentTheme.pillActiveColor,
+                  side: BorderSide(color: currentTheme.pillActiveColor),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  final destName = widget.destinationName;
+                  final success = await DeeplinkService.openDidi(destName);
+                  if (context.mounted) {
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Destination copied! Paste it in DiDi\'s search bar')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please install DiDi to use ride hailing')),
+                      );
+                    }
+                  }
+                },
+              ),
+            ),
+          ),
+
           // 开始导航按钮
           SizedBox(
             width: double.infinity,
@@ -147,7 +181,7 @@ class _RouteOverviewPanelState extends State<RouteOverviewPanel> {
         const SizedBox(width: 8),
         _buildTab(RouteType.walking, '🚶', 'Walk', widget.walkingRoutes, theme),
         const SizedBox(width: 8),
-        _buildTab(RouteType.driving, '🚗', 'Drive', widget.drivingRoutes, theme),
+        _buildTab(RouteType.driving, '🚕', 'Cab', widget.drivingRoutes, theme),
       ],
     );
   }

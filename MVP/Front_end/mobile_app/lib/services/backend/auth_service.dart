@@ -8,9 +8,12 @@ import '../subscription_service.dart';
 class AuthService {
   static String? _currentUserId;
   static String? _currentToken;
+  static String? _loginType;  // 'anonymous' | 'registered'
 
   static String? get currentUserId => _currentUserId;
   static bool get isLoggedIn => _currentToken != null;
+  static bool get isRegistered => _loginType == 'registered';
+  static bool get isAnonymous => _loginType == 'anonymous';
 
   /// 匿名认证（App 首次启动时调用）
   static Future<bool> anonymousAuth(String deviceId, {String lang = 'en'}) async {
@@ -22,6 +25,7 @@ class AuthService {
       });
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
+      _loginType = 'anonymous';
       await _saveSession();
       return true;
     } catch (e) {
@@ -46,6 +50,7 @@ class AuthService {
     });
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
+    _loginType = 'registered';
     await _saveSession();
     return result;
   }
@@ -62,6 +67,7 @@ class AuthService {
     });
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
+    _loginType = 'registered';
     await _saveSession();
     SubscriptionService.instance.updateFromServer(result);
     return result;
@@ -93,6 +99,7 @@ class AuthService {
 
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
+      _loginType = 'registered';
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
       return result;
@@ -132,6 +139,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     _currentToken = prefs.getString('auth_token');
     _currentUserId = prefs.getString('user_id');
+    _loginType = prefs.getString('login_type');
     if (_currentToken == null) return false;
 
     try {
@@ -151,14 +159,17 @@ class AuthService {
   static Future<void> logout() async {
     _currentToken = null;
     _currentUserId = null;
+    _loginType = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('user_id');
+    await prefs.remove('login_type');
   }
 
   static Future<void> _saveSession() async {
     final prefs = await SharedPreferences.getInstance();
     if (_currentToken != null) await prefs.setString('auth_token', _currentToken!);
     if (_currentUserId != null) await prefs.setString('user_id', _currentUserId!);
+    if (_loginType != null) await prefs.setString('login_type', _loginType!);
   }
 }

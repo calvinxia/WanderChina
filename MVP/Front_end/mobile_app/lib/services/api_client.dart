@@ -17,6 +17,7 @@ class ApiClient {
   static String get searchUrl => BackendConfig.searchUrl;
   static String get routeUrl => BackendConfig.routeUrl;
   static String get generateItineraryUrl => BackendConfig.generateItineraryUrl;
+  static String get generateItineraryStreamUrl => BackendConfig.generateItineraryStreamUrl;
   static String get poiPhotoUrl => BackendConfig.poiPhotoUrl;
   static String get getFeatureFlagsUrl => BackendConfig.getFeatureFlagsUrl;
   static String get checkUserQuotaUrl => BackendConfig.checkUserQuotaUrl;

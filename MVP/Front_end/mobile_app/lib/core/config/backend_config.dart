@@ -14,6 +14,7 @@ class BackendConfig {
   static const String searchUrl = String.fromEnvironment('SEARCH_URL');
   static const String routeUrl = String.fromEnvironment('ROUTE_URL');
   static const String generateItineraryUrl = String.fromEnvironment('GENERATE_ITINERARY_URL');
+  static const String generateItineraryStreamUrl = String.fromEnvironment('GENERATE_ITINERARY_STREAM_URL');
   static const String poiPhotoUrl = String.fromEnvironment('POI_PHOTO_URL');
   static const String getFeatureFlagsUrl = String.fromEnvironment('GET_FEATURE_FLAGS_URL');
   static const String checkUserQuotaUrl = String.fromEnvironment('CHECK_USER_QUOTA_URL');

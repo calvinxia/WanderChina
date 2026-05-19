@@ -15,6 +15,8 @@ import '../../core/theme/city_theme.dart';
 import '../main/main_screen.dart';
 import '../../widgets/planner/willingness_survey_dialog.dart';
 import '../../utils/quota_helper.dart';
+import '../../services/itinerary_stream_service.dart';
+import '../../widgets/soft_login_sheet.dart';
 
 /// Screen 9: AI Trip Planner Home
 ///
@@ -43,10 +45,12 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
 
   // Loading animation state
   bool _isGenerating = false;
-  String _loadingMessage = '';
+  String _loadingText = 'Finding best attractions...';
   String _funFact = '';
   int _loadingStep = 0;
   Timer? _loadingTimer;
+  Map<String, dynamic>? _streamingItinerary;
+  bool _isStreaming = false;
 
   /// Get active theme: use selected city theme if available, otherwise fallback to GPS city theme
   CityTheme get _activeTheme {
@@ -163,9 +167,11 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     setState(() {
       _isGenerating = true;
       _loadingStep = 0;
-      _loadingMessage = _loadingSteps[0];
+      _loadingText = 'Finding best attractions...';
       final cityFacts = _cityFunFacts[_selectedCity] ?? _cityFunFacts['北京']!;
       _funFact = cityFacts[0];
+      _streamingItinerary = null;
+      _isStreaming = false;
     });
 
     _loadingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
@@ -176,7 +182,6 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
 
       setState(() {
         _loadingStep = (_loadingStep + 1) % _loadingSteps.length;
-        _loadingMessage = _loadingSteps[_loadingStep];
 
         // Cycle through fun facts
         final cityFacts = _cityFunFacts[_selectedCity] ?? _cityFunFacts['北京']!;
@@ -206,8 +211,10 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         appBar: AppBar(
           title: const Text('Plan Your Trip'),
           backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
           foregroundColor: AppColors.gray900,
           elevation: 0,
+          scrolledUnderElevation: 0,
           actions: [
             IconButton(
               icon: const Icon(Icons.help_outline),
@@ -362,7 +369,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                         const SnackBar(content: Text('Showing all trips below')),
                       );
                     },
-                    child: Text('View All', style: AppTextStyles.body(color: AppColors.jade500)),
+                    child: Text('View All', style: AppTextStyles.body(color: _activeTheme.pillActiveColor)),
                   ),
               ],
             ),
@@ -386,6 +393,44 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                   days: '${trip['duration_days'] ?? 0} days',
                   focus: trip['title'] ?? '',
                   date: _formatDate(trip['created_at']),
+                  onDelete: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Delete Trip'),
+                        content: Text('Delete "${trip['title'] ?? 'this trip'}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: Text('Cancel',
+                              style: TextStyle(color: _activeTheme.pillActiveColor)),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: Text('Delete',
+                              style: TextStyle(color: _activeTheme.pillActiveColor)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true || !mounted) return;
+                    try {
+                      await ApiClient.post(ApiClient.tripUrl, {
+                        'action': 'delete',
+                        'trip_id': trip['trip_id'],
+                        'user_id': AuthService.currentUserId,
+                      });
+                      setState(() {
+                        _savedTrips.removeWhere((t) => t['trip_id'] == trip['trip_id']);
+                      });
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to delete trip: $e')),
+                        );
+                      }
+                    }
+                  },
                   onTap: () async {
                     try {
                       // 先从后端拉取完整行程数据
@@ -550,13 +595,13 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
 
   Widget _buildDaySelector() {
     return Row(
-      children: List.generate(5, (index) {
+      children: List.generate(7, (index) {
         final day = index + 1;
         final isSelected = _selectedDays == day;
 
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: index < 4 ? 8 : 0),
+            padding: EdgeInsets.only(right: index < 6 ? 8 : 0),
             child: GestureDetector(
               onTap: () {
                 setState(() {
@@ -650,6 +695,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     required String focus,
     required String date,
     required VoidCallback onTap,
+    VoidCallback? onDelete,
   }) {
     // Get theme based on trip city
     final tripCity = city.split(',').first.trim(); // Extract first city if multiple
@@ -698,7 +744,15 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.gray400),
+            if (onDelete != null)
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: AppColors.gray400, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: onDelete,
+              )
+            else
+              const Icon(Icons.chevron_right, color: AppColors.gray400),
           ],
         ),
       ),
@@ -732,7 +786,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
   }
 
   Future<void> _generatePlan() async {
-    // Quota check
+    // 软登录检查：匿名用户弹注册引导
+    if (!await requireLogin(context, 'itinerary_generate', theme: _activeTheme)) return;
+    // Quota check (Phase 2)
     if (!await requireQuotaCheck(
       context,
       'itinerary',
@@ -740,52 +796,85 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       userId: AuthService.currentUserId,
     )) return;
 
-    final stopwatch = Stopwatch()..start();
-
     // Start loading animation
     _startLoadingAnimation();
 
-    final t1 = stopwatch.elapsedMilliseconds;
-    debugPrint('⏱️ UI loading started: ${t1}ms');
-
     try {
-      // 将选中的中文城市名转换为英文完整名
       final selectedCityMap = _cities.firstWhere(
         (city) => city['zh'] == _selectedCity,
         orElse: () => {'zh': '', 'en': '', 'fullName': 'Beijing'},
       );
       final cityEnglishName = selectedCityMap['fullName']!;
 
-      // Step 1: 公网函数生成行程
-      debugPrint('🗺️ Step 1: Calling generate_itinerary (public)');
-      final genResponse = await ApiClient.post(
-        ApiClient.generateItineraryUrl,
-        {
-          'cities': [cityEnglishName],
-          'days': _selectedDays,
-          'interests': _selectedInterests.toList(),
-          'language': 'english',
-        },
-        timeout: const Duration(seconds: 75),  // 云函数 60s + 网络延迟
-      );
+      Map<String, dynamic>? finalData;
 
-      final t2 = stopwatch.elapsedMilliseconds;
-      debugPrint('⏱️ Cloud function returned: ${t2}ms');
+      // 流式生成
+      await for (final event in ItineraryStreamService.generateStream(
+        cities: [cityEnglishName],
+        days: _selectedDays,
+        interests: _selectedInterests.toList(),
+        language: 'english',
+      )) {
+        switch (event['event']) {
+          case 'partial':
+            final dayCount = (event['data'] as Map)['days']?.length ?? 0;
+            if (mounted) setState(() {
+              _loadingText = 'Planning Day $dayCount of $_selectedDays...';
+              _streamingItinerary = event['data'] as Map<String, dynamic>;
+              _isStreaming = true;
+            });
+            debugPrint('📡 Partial: $dayCount days');
+            break;
+          case 'complete':
+            if (mounted) setState(() {
+              _isStreaming = false;
+              _streamingItinerary = null;
+            });
+            finalData = event['data'] as Map<String, dynamic>;
+            debugPrint('✅ Stream complete: ${finalData['title']}');
+            break;
+          case 'error':
+            throw Exception(event['message'] ?? 'Generation failed');
+        }
+      }
 
-      debugPrint('🗺️ generate_itinerary response: $genResponse');
-      debugPrint('🗺️ response type: ${genResponse.runtimeType}');
-      debugPrint('🗺️ response keys: ${genResponse.keys.toList()}');
-
-      final itineraryJson = genResponse['itinerary'];
-      final title = genResponse['title'] ?? 'My Trip';
-      debugPrint('🗺️ Generated title: $title');
-
+      if (finalData == null) throw Exception('No complete event received');
       if (!mounted) return;
 
-      // Stop loading animation
+      final itineraryJson = finalData['itinerary'];
+      final title = finalData['title'] ?? 'My Trip';
+
+      // 自动保存到 DB（保存失败则 fallback 到预览模式）
+      String? savedTripId;
+      try {
+        debugPrint('💾 Auto-saving trip to DB...');
+        final saveResult = await ApiClient.post(
+          ApiClient.tripUrl,
+          {
+            'action': 'create',
+            'user_id': AuthService.currentUserId,
+            'title': title,
+            'cities': [cityEnglishName],
+            'duration_days': _selectedDays,
+            'interests': _selectedInterests.toList(),
+            'itinerary': itineraryJson,
+            'description': null,
+          },
+          timeout: const Duration(seconds: 10),
+        );
+        savedTripId = saveResult['trip_id'] as String?;
+        debugPrint('💾 Trip saved: $savedTripId');
+      } catch (saveError) {
+        // 保存失败 → 不阻塞用户，fallback 到预览模式（tripId: null）
+        // 用户可在详情页手动点 Save
+        debugPrint('⚠️ Auto-save failed, falling back to preview mode: $saveError');
+        Sentry.captureException(saveError);
+      }
+
+      if (!mounted) return;
       _stopLoadingAnimation();
 
-      // 使用 fromCloudData 解析云函数返回的行程数据
+      // 解析 Itinerary model
       final itinerary = Itinerary.fromCloudData({
         ...itineraryJson,
         'title': title,
@@ -794,8 +883,6 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         'interests': _selectedInterests.toList(),
       });
 
-      debugPrint('🗺️ Itinerary parsed successfully (preview mode): ${itinerary.title}');
-
       // Analytics tracking
       _analytics.itineraryGenerated(
         cityEnglishName,
@@ -803,13 +890,15 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         _selectedInterests.toList(),
       );
 
-      // 导航到行程详情页（预览模式，传入保存所需参数）
+      // 跳转详情页
+      // savedTripId != null → 已保存，详情页无 Save 按钮
+      // savedTripId == null → 保存失败 fallback 到预览模式，用户可手动 Save
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ItineraryDetailScreen(
             itinerary: itinerary,
-            tripId: null,  // null 表示未保存（预览模式）
+            tripId: savedTripId,  // null = 预览模式（保存失败时的 fallback）
             cities: [cityEnglishName],
             days: _selectedDays,
             interests: _selectedInterests.toList(),
@@ -817,37 +906,27 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         ),
       );
 
-      final t3 = stopwatch.elapsedMilliseconds;
-      debugPrint('⏱️ Parse + navigate completed: ${t3}ms');
-
-      // ── 付费意愿调研检查 ──
+      // 付费意愿调研
       if (mounted) {
         await _checkAndShowSurvey();
       }
 
-      // 返回后重新加载保存的行程列表
+      // 刷新已保存行程列表
       _loadSavedTrips();
+
     } catch (e, stackTrace) {
       debugPrint('🗺️ generate_plan error: $e');
-      debugPrint('🗺️ error type: ${e.runtimeType}');
-      debugPrint('🗺️ stack trace: $stackTrace');
-
       if (!mounted) return;
-
-      // Stop loading animation
       _stopLoadingAnimation();
 
-      // 收起键盘
-      FocusScope.of(context).unfocus();
-
-      // 显示错误信息
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to generate itinerary: ${e.toString()}'),
-          backgroundColor: AppColors.error500,
-          duration: const Duration(seconds: 3),
+          content: Text('Failed to generate plan: ${e.toString().substring(0, (e.toString().length).clamp(0, 80))}'),
+          duration: const Duration(seconds: 5),
         ),
       );
+
+      Sentry.captureException(e, stackTrace: stackTrace);
     }
   }
 
@@ -926,7 +1005,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'This usually takes 30-60 seconds',
+            'This usually takes 10-30 seconds',
             style: AppTextStyles.bodySmall(color: AppColors.gray600),
           ),
 
@@ -944,8 +1023,8 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 500),
             child: Text(
-              _loadingMessage,
-              key: ValueKey<String>(_loadingMessage),
+              _loadingText,
+              key: ValueKey<String>(_loadingText),
               style: AppTextStyles.body(color: _activeTheme.pillActiveColor)
                   .copyWith(fontWeight: FontWeight.w600),
             ),
@@ -953,63 +1032,128 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
 
           const SizedBox(height: 32),
 
-          // Fun fact card
-          AnimatedSwitcher(
+          // Fun fact card — fades out when first real card arrives
+          AnimatedOpacity(
+            opacity: _isStreaming ? 0.0 : 1.0,
             duration: const Duration(milliseconds: 500),
-            child: Container(
-              key: ValueKey<String>(_funFact),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _activeTheme.pillActiveColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _activeTheme.pillActiveColor.withOpacity(0.3),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              child: Container(
+                key: ValueKey<String>(_funFact),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _activeTheme.pillActiveColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _activeTheme.pillActiveColor.withOpacity(0.3),
+                  ),
                 ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline,
-                    color: _activeTheme.pillActiveColor,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Did you know?',
-                          style: AppTextStyles.caption(
-                            color: _activeTheme.pillActiveColor,
-                          ).copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _funFact,
-                          style: AppTextStyles.bodySmall(color: AppColors.gray700),
-                        ),
-                      ],
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline,
+                      color: _activeTheme.pillActiveColor,
+                      size: 24,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Did you know?',
+                            style: AppTextStyles.caption(
+                              color: _activeTheme.pillActiveColor,
+                            ).copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _funFact,
+                            style: AppTextStyles.bodySmall(color: AppColors.gray700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
 
           const SizedBox(height: 32),
 
-          // Skeleton activity cards
+          // Real day cards (streaming) or skeleton cards
           Text(
             'Preview',
             style: AppTextStyles.h4(color: AppColors.gray900),
           ),
           const SizedBox(height: 12),
-          ...[1, 2, 3].map((i) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildSkeletonActivityCard(),
-          )),
+          if (_isStreaming && _streamingItinerary != null) ...[
+            ...(_streamingItinerary!['days'] as List).map((day) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildStreamingDayCard(day as Map<String, dynamic>),
+            )),
+            ...List.generate(
+              (_selectedDays - (_streamingItinerary!['days'] as List).length).clamp(0, _selectedDays),
+              (_) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildSkeletonActivityCard(),
+              ),
+            ),
+          ] else ...[
+            ...[1, 2, 3].map((_) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildSkeletonActivityCard(),
+            )),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreamingDayCard(Map<String, dynamic> day) {
+    final activities = (day['activities'] as List?) ?? [];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _activeTheme.pillActiveColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _activeTheme.pillActiveColor.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Day ${day['day_number']} · ${day['title'] ?? ''}',
+            style: AppTextStyles.bodySmall(color: _activeTheme.pillActiveColor)
+                .copyWith(fontWeight: FontWeight.w600),
+          ),
+          if (activities.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...activities.take(3).map((act) {
+              final activity = act as Map<String, dynamic>;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      activity['time'] ?? '',
+                      style: AppTextStyles.caption(color: AppColors.gray600),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        activity['name'] ?? '',
+                        style: AppTextStyles.caption(color: AppColors.gray900),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );
@@ -1019,9 +1163,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.25),
+        color: _activeTheme.pillActiveColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        border: Border.all(color: _activeTheme.pillActiveColor.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

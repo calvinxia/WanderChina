@@ -1,0 +1,1025 @@
+任务: Task 10.1-10.7 — 体验优化（流式骨架屏 + 深链 + Detail Sheet 增强 + 软登录）
+
+> **版本:** v1.0
+> **架构文档:** PHASE_3_INSTRUCTIONS_V2.md
+
+=== 前置事实 ===
+- Flutter 3.41.4，CardThemeData/DialogThemeData，google_fonts: ^8.0.2
+- Task 9.1-9.6 已完成：流式生成 + 自动保存 + 天数 1-7 + 进度文字
+- itinerary_detail_screen.dart: lib/screens/planner/itinerary_detail_screen.dart
+- activity_detail_sheet.dart: lib/widgets/planner/activity_detail_sheet.dart（独立文件）
+- _handleNavigate: 当前跳回 MainScreen Map tab 搜索，不是跳 Apple Maps
+- url_launcher: ^6.2.1 已在 pubspec.yaml
+- AnalyticsService: lib/services/analytics_service.dart，用 .track() 方法
+- AuthService: isLoggedIn getter + currentUserId getter 已存在
+
+=== 执行规则 ===
+⚠️ 每个 Task 完成后必须停下，输出 diff，等用户确认后才进入下一个 Task。
+⚠️ 不要批量执行多个 Task。
+⚠️ 每个 Task 完成后跑 `flutter analyze`，有新增 error 必须先修复再汇报。
+
+---
+
+## Task 10.1: 流式骨架屏 + AI 编辑高亮 + 局部更新
+
+### 10.1a: 流式骨架屏（planner_home_screen.dart）
+
+当前 _generatePlan 的 partial 事件只更新 _loadingText。改为同时渲染已收到的真实 day 卡片。
+
+**实现思路：**
+
+1. 在 State 类加状态变量：
+
+```dart
+Map<String, dynamic>? _streamingItinerary;  // partial 收到的数据
+bool _isStreaming = false;
+```
+
+2. partial 事件处理改为：
+
+```dart
+case 'partial':
+  final dayCount = (event['data'] as Map)['days']?.length ?? 0;
+  setState(() {
+    _loadingText = 'Planning Day $dayCount of $_selectedDays...';
+    _streamingItinerary = event['data'] as Map<String, dynamic>;
+    _isStreaming = true;
+  });
+  break;
+```
+
+3. Loading UI 改造（找到现有的骨架屏/loading 构建位置）：
+   - `_isStreaming == false`: 显示原有骨架卡片 + "Did you know?" 卡片
+   - `_isStreaming == true`: 已收到的 days 显示为真实 activity 卡片，剩余显示骨架卡片
+   - "Did you know?" 卡片在第一个真实卡片出现后淡出（AnimatedOpacity）
+
+4. complete 事件触发后：
+```dart
+case 'complete':
+  setState(() {
+    _isStreaming = false;
+    _streamingItinerary = null;
+  });
+  // ... 自动保存 + 跳转详情页
+```
+
+⚠️ 先 `view` 现有 loading UI 构建代码（搜索 `_isGenerating` 或 `Shimmer` 或 `skeleton`），理解当前骨架屏结构后再改。
+
+### 10.1b: AI 编辑高亮（itinerary_detail_screen.dart）
+
+修改后的 activity 卡片高亮 2 秒后恢复。
+
+1. 在 ItineraryDetailScreen 的 State 类加：
+
+```dart
+Set<String> _recentlyChangedIds = {};
+```
+
+2. AI modify 成功后，对比新旧 itinerary 找出变更的 activity：
+
+```dart
+// modify 成功后
+final changedIds = _findChangedActivities(oldItinerary, newItinerary);
+setState(() {
+  _recentlyChangedIds = changedIds;
+});
+
+// 2 秒后清除高亮
+Future.delayed(const Duration(seconds: 2), () {
+  if (mounted) setState(() => _recentlyChangedIds = {});
+});
+```
+
+3. Activity 卡片构建时根据 `_recentlyChangedIds` 加边框高亮：
+
+```dart
+AnimatedContainer(
+  duration: const Duration(milliseconds: 300),
+  decoration: BoxDecoration(
+    border: _recentlyChangedIds.contains(activityId)
+        ? Border.all(color: theme.pillActiveColor, width: 2)
+        : null,
+    borderRadius: BorderRadius.circular(12),
+  ),
+  child: ... // 现有卡片内容
+)
+```
+
+### 10.1c: 局部更新替代整页 pushReplacement（itinerary_detail_screen.dart）
+
+搜索 AI modify 成功后的代码（可能是 `Navigator.pushReplacement` 或 `setState`）：
+
+```bash
+grep -n "pushReplacement\|_modifyItinerary\|modify.*success" \
+     lib/screens/planner/itinerary_detail_screen.dart | head -10
+```
+
+如果用了 pushReplacement，改为 setState 局部更新，保留滚动位置和对话历史。
+
+### 10.1d: 多轮对话记忆
+
+检查 AI 编辑是否保留之前的 instruction 历史：
+
+```bash
+grep -n "instruction\|chat_history\|messages\|conversation" \
+     lib/screens/planner/itinerary_detail_screen.dart | head -10
+```
+
+如果没有，在 modify 调用时把 edit_history 传给 generate_itinerary：
+
+```dart
+'instruction': userInput,
+'edit_history': _previousInstructions,  // List<String>
+```
+
+⚠️ 如果 generate_itinerary/generate_itinerary_stream 的 modify action 不支持 edit_history 参数，跳过此步。
+
+🛑 **CHECKPOINT 1:** 输出所有改动 diff + flutter analyze 结果。等用户确认后继续。
+
+---
+
+## Task 10.2: 乐观更新优化
+
+### 10.2a: 翻译 + 写库 fire-and-forget（map_with_translation_screen.dart）
+
+搜索 POI 翻译后写库的代码：
+
+```bash
+grep -n "await.*translate\|await.*db_write\|unawaited" \
+     lib/screens/map/map_with_translation_screen.dart | head -10
+```
+
+将翻译结果写库改为 fire-and-forget：
+
+```dart
+// 改前
+await ApiClient.post(dbWriteUrl, {...});
+
+// 改后
+import 'dart:async';
+unawaited(ApiClient.post(dbWriteUrl, {...}).catchError((e) {
+  debugPrint('⚠️ DB write failed (non-blocking): $e');
+}));
+```
+
+⚠️ 只改写库操作，不改翻译本身（翻译结果要显示给用户，不能 fire-and-forget）。
+
+### 10.2b: Sentry breadcrumb 补全（map_with_translation_screen.dart）
+
+在关键操作点加 breadcrumb：
+
+```dart
+Sentry.addBreadcrumb(Breadcrumb(
+  category: 'poi',
+  message: 'search_poi called',
+  data: {'keyword': keyword, 'city': city},
+));
+```
+
+需要加的位置：
+1. search_poi 调用前
+2. translate 调用前
+3. map 移动/缩放时
+4. db_write 调用前
+
+### 10.2c: SnackBar duration 和错误信息
+
+搜索现有 SnackBar：
+
+```bash
+grep -n "SnackBar\|duration.*Duration" \
+     lib/screens/map/map_with_translation_screen.dart | head -10
+```
+
+将 `Duration(seconds: 2)` 改为 `Duration(seconds: 5)`，错误信息按步骤区分：
+
+```dart
+// 改前
+'Search temporarily unavailable, please try again'
+
+// 改后（按步骤区分）
+'POI search failed: ...'
+'Translation failed: ...'
+```
+
+### 10.2d: 删除 calculateDistance 死代码
+
+```bash
+grep -n "calculateDistance" lib/services/poi_service.dart
+```
+
+如果存在且没有任何调用方（`grep -rn "calculateDistance" lib/` 确认），删除该方法。
+
+🛑 **CHECKPOINT 2:** 输出所有改动 diff + flutter analyze 结果。等用户确认后继续。
+
+---
+
+## Task 10.3: Activity Detail Sheet 增强 + Action Bar
+
+⚠️ 依赖 Task 10.4 的 DeeplinkService。**先执行 Task 10.4，再回来做 10.3。**
+
+### 实际执行顺序：先跳到 Task 10.4 → 完成后回来做 10.3。
+
+---
+
+## Task 10.4: 创建 DeeplinkService
+
+### 10.4a: 创建 DeeplinkService
+
+新建 `lib/services/deeplink_service.dart`：
+
+```dart
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// 深链服务 — Alipay + DiDi
+/// 产品决策: 只集成 Alipay + DiDi。不集成大众点评/美团/携程（无英文支持）。
+/// DiDi 决策变更: 原方案通过 Alipay 小程序（appId 不可靠，测试打开了沙县小吃），
+/// 改为 DiDi 独立 App URL Scheme `diditaxi://`。
+class DeeplinkService {
+
+  /// 打开 Alipay 扫一扫（线下消费扫码支付）
+  /// 返回 true = 成功跳转，false = Alipay 未安装
+  static Future<bool> openAlipayScanner() async {
+    const url = 'alipays://platformapi/startapp?appId=10000007';
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Open Alipay scanner failed: $e');
+    }
+    return false;
+  }
+
+  /// 打开 DiDi 打车（独立 App）
+  /// diditaxi:// 不支持传目的地参数，只能打开首页
+  /// 复制目的地到剪贴板，方便用户粘贴到 DiDi 搜索栏
+  static Future<bool> openDidi(String destName) async {
+    await Clipboard.setData(ClipboardData(text: destName));
+    const url = 'diditaxi://';
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Open DiDi failed: $e');
+    }
+    return false;  // DiDi 未安装
+  }
+
+  /// 检查 Alipay 是否安装
+  static Future<bool> isAlipayInstalled() async {
+    try {
+      return await canLaunchUrl(Uri.parse('alipays://'));
+    } catch (_) {
+      return false;
+    }
+  }
+}
+```
+
+### 10.4b: 确认 iOS URL Schemes 白名单
+
+检查 `ios/Runner/Info.plist` 是否有 `LSApplicationQueriesSchemes`：
+
+```bash
+grep -A 10 "LSApplicationQueriesSchemes" ios/Runner/Info.plist
+```
+
+如果没有，在 `<dict>` 内加：
+
+```xml
+<key>LSApplicationQueriesSchemes</key>
+<array>
+    <string>alipay</string>
+    <string>alipays</string>
+    <string>diditaxi</string>
+</array>
+```
+
+⚠️ 没有这个白名单，`canLaunchUrl` 在 iOS 上永远返回 false。
+
+🛑 **CHECKPOINT 3:** 输出 deeplink_service.dart 完整内容 + Info.plist diff + flutter analyze 结果。等用户确认后继续。
+
+---
+
+## Task 10.3: Activity Detail Sheet 增强 + Action Bar（回到 10.3）
+
+### 10.3a: 修改 ActivityDetailSheet
+
+文件: lib/widgets/planner/activity_detail_sheet.dart
+
+在现有的 Detail Sheet 底部加 action bar。先 `view` 完整文件了解当前结构，然后在 build 方法的最后（关闭按钮之前或之后）加：
+
+```dart
+import '../../services/deeplink_service.dart';
+import '../../services/analytics_service.dart';
+import '../../screens/main/main_screen.dart';
+```
+
+在 build 方法合适位置加 action bar：
+
+```dart
+// ── Action Bar ──
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  child: Column(
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Navigate — 跳 Map tab 搜索目的地（和 Activity 卡片行为一致）
+          _buildActionButton(
+            icon: Icons.navigation_rounded,
+            label: 'Navigate',
+            onTap: () {
+              AnalyticsService.instance.track('deeplink_navigate', {
+                'destination': widget.nameZh,
+              });
+              Navigator.of(context).pop();  // 关闭 sheet
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              MainScreen.globalKey.currentState?.switchToMapAndSearch(
+                widget.nameZh,
+                displayName: widget.nameEn,
+                city: widget.city,
+              );
+            },
+          ),
+
+          // Ride — DiDi 打车
+          // Ride — DiDi 独立 App（复制目的地到剪贴板）
+          _buildActionButton(
+            icon: Icons.local_taxi,
+            label: 'Ride',
+            onTap: () async {
+              final destName = widget.nameEn.isNotEmpty ? widget.nameEn : widget.nameZh;
+              AnalyticsService.instance.track('deeplink_didi', {
+                'destination': destName,
+              });
+              final success = await DeeplinkService.openDidi(destName);
+              if (context.mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Destination copied! Paste it in DiDi\'s search bar')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please install DiDi to use ride hailing')),
+                  );
+                }
+              }
+            },
+          ),
+
+          // Pay — 仅有消费的 activity
+          if (_hasCost())
+            _buildActionButton(
+              icon: Icons.qr_code_scanner,
+              label: 'Pay',
+              onTap: () async {
+                AnalyticsService.instance.track('deeplink_alipay_pay', {
+                  'venue': widget.nameZh,
+                  'cost': widget.cost,
+                });
+                final success = await DeeplinkService.openAlipayScanner();
+                if (!success && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please install Alipay to pay in China')),
+                  );
+                }
+              },
+            ),
+        ],
+      ),
+
+      // Pay 提示文案
+      if (_hasCost())
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '💡 Scan the QR code at checkout with Alipay',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+        ),
+    ],
+  ),
+),
+```
+
+### 10.3b: 添加辅助方法
+
+在 `_ActivityDetailSheetState` 类中加：
+
+```dart
+bool _hasCost() {
+  final cost = widget.cost.toLowerCase().trim();
+  return cost.isNotEmpty && cost != 'free' && cost != '¥0' && cost != '0';
+}
+
+Widget _buildActionButton({
+  required IconData icon,
+  required String label,
+  required VoidCallback onTap,
+}) {
+  final color = widget.theme?.pillActiveColor ?? const Color(0xFF2D6A4F);
+  return GestureDetector(
+    onTap: onTap,
+    child: Column(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+      ],
+    ),
+  );
+}
+```
+
+### 10.3c: Navigate 按钮行为确认
+
+Activity 卡片上的 Navigate 和 Detail Sheet 里的 Navigate 行为一致——都跳 Map tab + 自动搜索目的地（`switchToMapAndSearch`）。**不跳 Apple Maps。**
+
+⚠️ 不需要改 `_handleNavigate`，Detail Sheet 的 Navigate 用同样逻辑。
+
+🛑 **CHECKPOINT 4:** 输出 activity_detail_sheet.dart diff + flutter analyze 结果。等用户确认后继续。
+
+---
+
+## Task 10.5: 软登录体系（启动流程改造 + AuthService 身份类型 + SoftLoginSheet）
+
+⚠️ **这是 Phase 3 最大的体验改动。** 从登录墙改为"先进 App 浏览，触发核心功能时再注册"。
+⚠️ 按子步骤逐个执行，每步有 CHECKPOINT。
+
+### 10.5a: AuthService 加身份类型区分
+
+文件: lib/services/backend/auth_service.dart
+
+**新增字段和 getter：**
+
+```dart
+static String? _loginType;  // 'anonymous' | 'registered'
+
+static bool get isRegistered => _loginType == 'registered';
+static bool get isAnonymous => _loginType == 'anonymous';
+```
+
+**各方法加赋值 + 持久化：**
+
+| 方法 | 加在 `_saveSession()` 之前 |
+|------|---|
+| `anonymousAuth()` | `_loginType = 'anonymous';` |
+| `login()` | `_loginType = 'registered';` |
+| `register()` | `_loginType = 'registered';` |
+| `signInWithApple()` | `_loginType = 'registered';` |
+
+**_saveSession() 加存 login_type：**
+
+```dart
+static Future<void> _saveSession() async {
+  final prefs = await SharedPreferences.getInstance();
+  if (_currentToken != null) await prefs.setString('auth_token', _currentToken!);
+  if (_currentUserId != null) await prefs.setString('user_id', _currentUserId!);
+  if (_loginType != null) await prefs.setString('login_type', _loginType!);
+}
+```
+
+**restoreSession() 读 login_type：**
+
+在现有 `_currentToken = prefs.getString('auth_token');` 附近加：
+
+```dart
+_loginType = prefs.getString('login_type');
+```
+
+**logout() 清 login_type：**
+
+```dart
+static Future<void> logout() async {
+  _currentToken = null;
+  _currentUserId = null;
+  _loginType = null;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('auth_token');
+  await prefs.remove('user_id');
+  await prefs.remove('login_type');
+}
+```
+
+🛑 **CHECKPOINT 5a:** 输出 auth_service.dart diff + flutter analyze。等用户确认后继续。
+
+---
+
+### 10.5b: 启动流程改造（登录墙 → 软登录）
+
+⚠️ 这步改动较大，需要谨慎。先 grep 确认当前启动跳转逻辑：
+
+```bash
+grep -n "LoginScreen\|SplashScreen\|MainScreen\|pushReplacement\|pushAndRemoveUntil" \
+     lib/main.dart \
+     lib/screens/onboarding/splash_screen.dart | head -20
+```
+
+输出 grep 结果给用户。
+
+🛑 **CHECKPOINT 5b-pre:** 输出 grep 结果。不要直接改代码。等用户确认当前启动流程后再执行。
+
+用户确认后执行以下改动：
+
+**SplashScreen 改造（或等效的启动逻辑）：**
+
+```
+改前:
+  SplashScreen → restoreSession()
+    → 成功: 跳 MainScreen
+    → 失败: 跳 LoginScreen（登录墙）
+
+改后:
+  SplashScreen → restoreSession()
+    → 成功: 跳 MainScreen（已注册/匿名用户都进）
+    → 失败: 调 anonymousAuth(deviceId) → 跳 MainScreen（匿名模式）
+    → anonymousAuth 也失败: 仍跳 MainScreen（离线模式，功能受限）
+```
+
+**获取 device_id：**
+
+```dart
+import 'package:flutter/services.dart';
+
+// 用设备唯一标识（iOS 用 identifierForVendor）
+String _getDeviceId() {
+  // 如果已有 device_id 获取逻辑，复用它
+  // 否则用 UUID 生成一个，存 SharedPreferences
+}
+```
+
+⚠️ 先 grep 确认项目里是否已有 device_id 获取逻辑：
+
+```bash
+grep -rn "device_id\|deviceId\|identifierForVendor\|device_info" \
+     lib/ --include="*.dart" | head -10
+```
+
+如果已有，复用。如果没有，用 `uuid` 包生成一个，首次存 SharedPreferences，后续读取。
+
+**关键逻辑：绝对不能出现"白屏无法进入 App"的情况。** 即使 anonymousAuth 网络请求失败，也要跳 MainScreen。匿名用户在无网络时只是功能受限（Generate/Voice 不可用），但可以浏览 Home/Map。
+
+🛑 **CHECKPOINT 5b:** 输出 splash_screen.dart（或等效文件）+ main.dart diff + flutter analyze。等用户确认后继续。
+
+---
+
+### 10.5c: Login Screen 加 fromSoftLogin 参数
+
+文件: lib/screens/auth/login_screen.dart
+
+**加参数：**
+
+```dart
+class LoginScreen extends StatefulWidget {
+  final bool fromSoftLogin;
+  const LoginScreen({super.key, this.fromSoftLogin = false});
+  // ...
+}
+```
+
+**登录成功处（搜索 pushAndRemoveUntil）改为条件跳转：**
+
+找到第 47 行和第 84 行的 `pushAndRemoveUntil`：
+
+```dart
+// 改前
+Navigator.of(context).pushAndRemoveUntil(
+  MaterialPageRoute(builder: (_) => const MainScreen()),
+  (route) => false,
+);
+
+// 改后
+if (widget.fromSoftLogin) {
+  Navigator.of(context).pop(true);  // 返回 SoftLoginSheet
+} else {
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const MainScreen()),
+    (route) => false,
+  );
+}
+```
+
+⚠️ 两处 `pushAndRemoveUntil` 都要改（邮箱登录 + Apple 登录的成功回调）。
+
+🛑 **CHECKPOINT 5c:** 输出 login_screen.dart diff + flutter analyze。等用户确认后继续。
+
+---
+
+### 10.5d: 创建 SoftLoginSheet
+
+新建 `lib/widgets/soft_login_sheet.dart`：
+
+```dart
+import 'package:flutter/material.dart';
+import '../core/theme/city_theme.dart';
+import '../services/backend/auth_service.dart';
+import '../screens/auth/login_screen.dart';
+
+/// 软登录底部弹窗 — 匿名用户触发核心功能时弹出
+class SoftLoginSheet extends StatefulWidget {
+  final CityTheme? theme;
+  final String feature;
+
+  const SoftLoginSheet({
+    super.key,
+    this.theme,
+    required this.feature,
+  });
+
+  @override
+  State<SoftLoginSheet> createState() => _SoftLoginSheetState();
+}
+
+class _SoftLoginSheetState extends State<SoftLoginSheet> {
+  bool _isLoading = false;
+
+  String _getTitle() {
+    switch (widget.feature) {
+      case 'itinerary_generate':
+        return 'Sign in to plan your trip';
+      case 'voice_translate':
+        return 'Sign in to use voice translation';
+      case 'ai_edit':
+        return 'Sign in to edit your itinerary';
+      default:
+        return 'Sign in to continue';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.theme?.pillActiveColor ?? const Color(0xFF2D6A4F);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40, height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Icon(Icons.lock_open_rounded, size: 48, color: color),
+          const SizedBox(height: 16),
+          Text(
+            _getTitle(),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Create a free account to unlock all features',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+
+          // Apple Sign-In
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.apple, size: 24),
+              label: const Text('Continue with Apple', style: TextStyle(fontSize: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isLoading ? null : _handleAppleSignIn,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Email Sign-In
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              icon: Icon(Icons.email_outlined, color: color),
+              label: Text('Continue with Email',
+                  style: TextStyle(fontSize: 16, color: color)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: color),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isLoading ? null : _handleEmailSignIn,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Skip
+          TextButton(
+            onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
+            child: Text('Skip for now', style: TextStyle(color: Colors.grey[400])),
+          ),
+
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: CircularProgressIndicator(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAppleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.signInWithApple();
+      // signInWithApple 内部已设 _loginType = 'registered'
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      debugPrint('⚠️ Apple Sign-In failed: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign in failed: ${e.toString().substring(0, 60.clamp(0, e.toString().length))}')),
+        );
+      }
+    }
+  }
+
+  /// Email 登录：push LoginScreen，等待结果返回
+  /// 不先 pop SoftLoginSheet — 等 LoginScreen 返回后再一起关
+  Future<void> _handleEmailSignIn() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const LoginScreen(fromSoftLogin: true),
+      ),
+    );
+    // LoginScreen pop(true) → 回到这里 → 关闭 SoftLoginSheet
+    if (result == true && mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+}
+
+/// 检查是否已注册用户，未注册则弹软登录 sheet
+/// 返回 true = 已注册或刚注册成功，false = 取消/跳过
+Future<bool> requireLogin(BuildContext context, String feature, {CityTheme? theme}) async {
+  // ⚠️ 用 isRegistered 而不是 isLoggedIn（匿名用户也是 loggedIn）
+  if (AuthService.isRegistered) return true;
+
+  final result = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => SoftLoginSheet(theme: theme, feature: feature),
+  );
+
+  return result == true;
+}
+```
+
+🛑 **CHECKPOINT 5d:** 输出 soft_login_sheet.dart 完整内容 + flutter analyze。等用户确认后继续。
+
+---
+
+### 10.5e: 集成到 3 个核心入口
+
+先 grep 确认当前各入口的登录/配额检查状态：
+
+```bash
+grep -n "isLoggedIn\|isRegistered\|requireLogin\|requireQuotaCheck" \
+     lib/screens/planner/planner_home_screen.dart \
+     lib/screens/voice/voice_translation_screen.dart \
+     lib/screens/planner/itinerary_detail_screen.dart | head -15
+```
+
+输出 grep 结果给用户。
+
+🛑 **CHECKPOINT 5e-pre:** 输出 grep 结果。不要直接改代码。等用户确认插入位置后再执行。
+
+用户确认后，在 3 个入口的核心方法开头加（requireQuotaCheck 之前）：
+
+```dart
+import '../../widgets/soft_login_sheet.dart';
+
+// 先检查注册状态，再检查配额
+if (!await requireLogin(context, 'itinerary_generate', theme: _activeTheme)) return;
+if (!await requireQuotaCheck(context, 'itinerary', _activeTheme)) return;
+```
+
+⚠️ 如果现有代码有 `if (!AuthService.isLoggedIn)` 检查，替换为 `requireLogin`。不要保留旧的检查。
+
+---
+
+### 10.5f: Me tab 匿名用户登录引导
+
+文件: lib/screens/profile/profile_screen.dart
+
+在 Profile 页面 build 方法开头加条件判断：
+
+```dart
+if (AuthService.isAnonymous) {
+  return _buildAnonymousProfile();
+}
+// ... 现有的已注册用户 Profile UI
+```
+
+```dart
+Widget _buildAnonymousProfile() {
+  final mainState = MainScreen.globalKey.currentState;
+  final color = mainState?.cityTheme?.pillActiveColor ?? const Color(0xFF2D6A4F);
+
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_outline, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          const Text(
+            'Sign in for the full experience',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Save trips, sync across devices, and unlock premium features',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.apple, size: 24),
+              label: const Text('Continue with Apple'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                try {
+                  await AuthService.signInWithApple();
+                  if (mounted) setState(() {});  // 刷新为已注册 Profile
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Sign in failed: $e')),
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              icon: Icon(Icons.email_outlined, color: color),
+              label: Text('Continue with Email', style: TextStyle(color: color)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: color),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+```
+
+🛑 **CHECKPOINT 5f:** 输出 profile_screen.dart diff + flutter analyze。等用户确认后继续。
+
+---
+
+## Task 10.6: Apple OAuth 按钮官方图标
+
+⚠️ 只做 Apple（Google Sign-In 不可用）。
+
+### 10.6a: 检查现有 Apple 登录按钮
+
+```bash
+grep -n "apple\|Apple\|sign.*in.*apple" \
+     lib/screens/auth/login_screen.dart \
+     lib/screens/auth/signup_screen.dart | head -10
+```
+
+输出现有按钮代码给用户查看。
+
+### 10.6b: 下载 Apple 官方 SF Symbol 或使用 flutter_svg
+
+⚠️ Apple HIG 要求 Sign in with Apple 按钮使用官方图标和样式。
+如果现有代码用 `Icons.apple`（Material icon），需要替换。
+
+两种方式（按现有项目情况选择）：
+
+**方式 1：用 Apple 官方 Logo SVG（如果项目已有 flutter_svg）：**
+
+```bash
+grep "flutter_svg" pubspec.yaml
+```
+
+如果有：
+- 下载 Apple logo SVG 到 `assets/icons/oauth/apple_logo.svg`
+- `pubspec.yaml` 注册 asset 路径
+- 替换按钮 icon 为 `SvgPicture.asset(...)`
+
+**方式 2：继续用 Icons.apple（Material icon）：**
+
+如果项目没有 flutter_svg，继续用 `Icons.apple` 也能通过审核——Apple 只要求按钮样式（黑底白字/白底黑框），不强制要求用 SF Symbol。确保按钮样式满足：
+- 黑色背景 + 白色文字 + Apple icon
+- 或白色背景 + 黑色边框 + 黑色文字 + Apple icon
+- 圆角矩形，高度至少 44pt
+
+输出现有按钮样式给用户确认是否需要调整。
+
+🛑 **CHECKPOINT 6:** 输出 login_screen.dart + signup_screen.dart diff + flutter analyze。等用户视觉验收后继续。
+
+---
+
+## Task 10.7: ParentDataWidget 警告缓解
+
+### 10.7a: 定位警告来源
+
+在 debug 模式跑 App 时，console 会出现 `Incorrect use of ParentDataWidget` 警告。
+
+```bash
+grep -rn "Positioned\|Stack\|Expanded" \
+     lib/screens/map/map_with_translation_screen.dart | head -15
+```
+
+### 10.7b: 包 RepaintBoundary
+
+在地图相关 widget（可能是 `WanderAMapWidget` 或地图页面的 Stack）外层包 RepaintBoundary：
+
+```dart
+RepaintBoundary(
+  child: ... // 现有地图 widget
+)
+```
+
+### 10.7c: 验证
+
+release 模式跑一次确认 warning 减少：
+
+```bash
+flutter run --release 2>&1 | grep "ParentData"
+```
+
+🛑 **CHECKPOINT 7（最终）:** 输出所有改动 diff + flutter analyze 最终结果。
+
+---
+
+## 验收汇总
+
+输出：
+1. 新建文件列表（deeplink_service.dart, soft_login_sheet.dart）
+2. 修改文件列表 + 每个文件的关键改动
+3. flutter analyze 最终结果
+4. 所有 CHECKPOINT 状态
+
+🛑 **最终 CHECKPOINT:** 用户审阅通过后进入真机测试。
+
+---
+
+## 真机测试验证点
+
+1. **流式骨架屏:** generate → 骨架卡片逐张替换为真实卡片 → Did you know 淡出
+2. **AI 编辑高亮:** modify → 变更的 activity 高亮 2 秒 → 恢复
+3. **Detail Sheet Navigate:** 点 Navigate → 关闭 sheet → 跳到 Map tab → 自动搜索目的地
+4. **Detail Sheet Ride:** 点 Ride → 跳 DiDi 独立 App + SnackBar "Destination copied!" → DiDi 搜索栏粘贴目的地名称
+5. **Detail Sheet Pay:** 餐厅/景点点 Pay → 跳 Alipay 扫一扫 / 免费景点无 Pay 按钮
+6. **软登录:** 未登录状态下点 Generate → 弹 SoftLoginSheet → Apple 登录 → 继续生成
+7. **Apple 按钮样式:** 黑底白字/白底黑框，符合 Apple HIG
+8. **ParentDataWidget:** release 模式 console 无 ParentData 警告
+9. **Sentry breadcrumbs:** 跑一次完整流程 → Sentry 能看到 poi 相关 breadcrumb 链

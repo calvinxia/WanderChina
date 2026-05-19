@@ -238,31 +238,4 @@ class POIService {
     return pois;
   }
 
-  /// 计算两点之间的距离（米）
-  double calculateDistance(
-    double lat1,
-    double lng1,
-    double lat2,
-    double lng2,
-  ) {
-    // 使用Haversine公式计算距离
-    const R = 6371000; // 地球半径（米）
-    final dLat = _toRadians(lat2 - lat1);
-    final dLng = _toRadians(lng2 - lng1);
-
-    final a =
-        _sin(dLat / 2) * _sin(dLat / 2) +
-        _cos(_toRadians(lat1)) * _cos(_toRadians(lat2)) *
-        _sin(dLng / 2) * _sin(dLng / 2);
-
-    final c = 2 * _atan2(_sqrt(a), _sqrt(1 - a));
-
-    return R * c;
-  }
-
-  double _toRadians(double degrees) => degrees * 3.141592653589793 / 180;
-  double _sin(double x) => x; // 简化计算
-  double _cos(double x) => 1 - x * x / 2; // 简化计算
-  double _sqrt(double x) => x; // 简化计算
-  double _atan2(double y, double x) => y / x; // 简化计算
 }

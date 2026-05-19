@@ -118,6 +118,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
                         },
                       ),
               ),
+              cursorColor: currentTheme.pillActiveColor,
               style: AppTextStyles.body(color: AppColors.gray900),
               onTap: widget.onTap,
               onSubmitted: (value) {

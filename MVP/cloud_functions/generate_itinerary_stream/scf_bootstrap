@@ -1,0 +1,19 @@
+#!/bin/bash
+cd /var/user
+python3 -c "
+import sys
+print(f'Python: {sys.version}', flush=True)
+print(f'Path: {sys.path}', flush=True)
+try:
+    import markupsafe
+    print(f'markupsafe OK: {markupsafe.__file__}', flush=True)
+except Exception as e:
+    print(f'markupsafe FAIL: {e}', flush=True)
+try:
+    from flask import Flask
+    print(f'Flask OK', flush=True)
+except Exception as e:
+    print(f'Flask FAIL: {e}', flush=True)
+" 2>&1
+
+exec python3 app.py 2>&1

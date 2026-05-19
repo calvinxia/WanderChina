@@ -119,6 +119,8 @@ Return ONLY valid JSON, no markdown or explanation:
 Rules:
 - Exactly {days} days, 4-5 activities per day
 - Realistic times and costs in CNY
+- Allow at least 30 minutes gap between activities at different locations for transit
+- If two activities are in different districts of the city, allow 45-60 minutes for travel
 - Bilingual place names (English + Chinese)
 - Descriptions in {language}"""
 

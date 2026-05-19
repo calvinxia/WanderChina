@@ -110,7 +110,7 @@ class _ActivityCardState extends State<ActivityCard> {
                               );
                               if (confirm == true) widget.onDelete!();
                             },
-                            child: Icon(Icons.close, size: 16, color: Colors.grey[400]),
+                            child: Icon(Icons.close, size: 20, color: Colors.grey[600]),
                           ),
                       ],
                     ),

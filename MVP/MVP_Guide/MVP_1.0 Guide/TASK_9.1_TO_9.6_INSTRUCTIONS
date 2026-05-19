@@ -1,0 +1,940 @@
+任务: Task 9.1-9.6 — generate_itinerary_stream 流式行程生成 + Flutter 集成
+
+> **版本:** v1.0
+> **架构文档:** PHASE_3_INSTRUCTIONS_V2.md
+
+=== 前置事实 ===
+- Flutter 3.41.4，CardThemeData/DialogThemeData，google_fonts: ^8.0.2
+- 现有非流式函数: generate_itinerary（公网函数，DeepSeek V4，thinking mode enabled）
+- 现有前端: _generatePlan() 在 planner_home_screen.dart 第 733 行
+- 当前流程: generate → 预览模式（tripId: null）→ 用户手动 save
+- 新流程: stream generate → 自动保存 → 带 tripId 跳转详情页
+- Itinerary.fromCloudData 已存在（lib/models/itinerary.dart）
+- ApiClient.tripUrl 已存在，create_trip 云函数已部署
+- requireQuotaCheck 已集成在 _generatePlan 开头
+
+=== 执行规则 ===
+⚠️ 每个 Step 完成后必须停下，输出 diff 或完整文件，等用户确认后才进入下一个 Step。
+⚠️ 不要批量执行多个 Step。
+⚠️ 每个 Step 完成后跑 `flutter analyze`（前端步骤）或 `python3 -c "import py_compile; ..."` （后端步骤）。
+
+---
+
+## Task 9.1: 创建 generate_itinerary_stream 云函数
+
+文件: cloud_functions/generate_itinerary_stream/app.py（新建）
+
+⚠️ 这是 **Web 函数**（Flask），不是事件函数。入口是 `app.py`，不是 `index.py`。
+
+```python
+# generate_itinerary_stream/app.py
+# -*- coding: utf-8 -*-
+"""
+流式行程生成 Web 函数（Flask + SSE）
+- 关闭 thinking mode（优先响应速度）
+- 开启 stream
+- 括号深度计数法增量解析
+- 不写 DB，不连 VPC
+"""
+import os
+import json
+import time
+from flask import Flask, request, Response
+
+app = Flask(__name__)
+
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+
+
+def _build_prompt(cities, days, interests, budget_level='medium', language='english'):
+    city_str = ', '.join(cities) if cities else 'Beijing'
+    interest_str = ', '.join(interests) if interests else 'Culture, Food'
+
+    return f"""Create a {days}-day travel itinerary for {city_str}, China.
+Traveler interests: {interest_str}.
+Budget level: {budget_level}.
+
+Return ONLY valid JSON, no markdown or explanation:
+{{
+  "days": [
+    {{
+      "day_number": 1,
+      "title": "Day theme",
+      "city": "{cities[0] if cities else 'Beijing'}",
+      "summary": "One sentence summary",
+      "estimated_cost": 200,
+      "activities": [
+        {{
+          "time": "09:00",
+          "name": "Place Name",
+          "name_zh": "中文名",
+          "duration": "2 hrs",
+          "cost": "¥60",
+          "description": "Brief description"
+        }}
+      ]
+    }}
+  ]
+}}
+
+Rules:
+- Exactly {days} days, 4-5 activities per day
+- Realistic times and costs in CNY
+- Bilingual place names (English + Chinese)
+- Descriptions in {language}"""
+
+
+def _stream_deepseek(prompt):
+    """调用 DeepSeek streaming API，yield 原始 chunk"""
+    import requests
+
+    for attempt in range(3):
+        try:
+            t_start = time.time()
+            resp = requests.post(
+                'https://api.deepseek.com/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {DEEPSEEK_API_KEY}',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'model': 'deepseek-v4-flash',
+                    'messages': [{'role': 'user', 'content': prompt}],
+                    'temperature': 0.3,
+                    'max_tokens': 16384,
+                    'thinking': {'type': 'disabled'},
+                    'stream': True,
+                },
+                stream=True,
+                timeout=60,
+            )
+            resp.raise_for_status()
+            print(f"[TIMING][stream] API connected: {(time.time()-t_start)*1000:.0f}ms")
+
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line or not line.startswith('data: '):
+                    continue
+                payload = line[6:]  # strip "data: "
+                if payload.strip() == '[DONE]':
+                    break
+                try:
+                    chunk = json.loads(payload)
+                    delta = chunk.get('choices', [{}])[0].get('delta', {})
+                    content = delta.get('content', '')
+                    if content:
+                        yield content
+                except json.JSONDecodeError:
+                    continue
+            return  # 成功，不重试
+
+        except Exception as e:
+            print(f"[STREAM] Retry {attempt+1}/3: {e}")
+            if attempt < 2:
+                time.sleep(2)
+            else:
+                raise
+
+
+def _try_parse_partial(buffer):
+    """
+    括号深度计数法：尝试从不完整的 JSON buffer 中提取已完成的 day 对象。
+    不用 rfind('},{') — description 字段可能含 } 字面量。
+    """
+    depth = 0
+    in_string = False
+    escape_next = False
+    days = []
+    day_start = None
+
+    # 找到 "days": [ 的起始位置
+    days_idx = buffer.find('"days"')
+    if days_idx == -1:
+        return None
+    bracket_idx = buffer.find('[', days_idx)
+    if bracket_idx == -1:
+        return None
+
+    i = bracket_idx + 1
+    while i < len(buffer):
+        c = buffer[i]
+
+        if escape_next:
+            escape_next = False
+            i += 1
+            continue
+
+        if c == '\\' and in_string:
+            escape_next = True
+            i += 1
+            continue
+
+        if c == '"' and not escape_next:
+            in_string = not in_string
+            i += 1
+            continue
+
+        if in_string:
+            i += 1
+            continue
+
+        # 不在字符串内
+        if c == '{':
+            if depth == 0:
+                day_start = i
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0 and day_start is not None:
+                day_str = buffer[day_start:i+1]
+                try:
+                    day_obj = json.loads(day_str)
+                    days.append(day_obj)
+                except json.JSONDecodeError:
+                    pass
+                day_start = None
+
+        i += 1
+
+    if not days:
+        return None
+
+    return {'days': days}
+
+
+@app.route('/', methods=['POST', 'GET'])
+def generate_stream():
+    """SSE 流式端点"""
+    if request.method == 'GET':
+        return Response('generate_itinerary_stream is running', status=200)
+
+    t_total = time.time()
+
+    try:
+        body = request.get_json(force=True) or {}
+        cities = body.get('cities', [])
+        days = body.get('days', 1)
+        interests = body.get('interests', [])
+        budget_level = body.get('budget_level', 'medium')
+        language = body.get('language', 'english')
+
+        if not cities:
+            return Response(
+                json.dumps({'error': 'Missing cities'}),
+                status=400,
+                content_type='application/json',
+            )
+
+        prompt = _build_prompt(cities, days, interests, budget_level, language)
+        print(f"[TIMING][stream] cities={cities}, days={days}, interests={interests}")
+
+        def event_stream():
+            buffer = ''
+            last_day_count = 0
+            partial_count = 0
+
+            try:
+                for chunk in _stream_deepseek(prompt):
+                    buffer += chunk
+
+                    # 尝试增量解析
+                    partial = _try_parse_partial(buffer)
+                    if partial and len(partial['days']) > last_day_count:
+                        last_day_count = len(partial['days'])
+                        partial_count += 1
+                        yield f"data: {json.dumps({'event': 'partial', 'data': partial}, ensure_ascii=False)}\n\n"
+
+                # 流结束，解析完整 JSON
+                # 清理 markdown 包裹
+                clean = buffer.strip()
+                if '```json' in clean:
+                    clean = clean.split('```json')[1].split('```')[0]
+                elif '```' in clean:
+                    clean = clean.split('```')[1].split('```')[0]
+
+                final_obj = json.loads(clean.strip())
+
+                if 'days' not in final_obj or not isinstance(final_obj['days'], list):
+                    raise ValueError('Response missing days array')
+
+                t_end = time.time()
+                print(f"[TIMING][stream] total={int((t_end-t_total)*1000)}ms, "
+                      f"partial_events={partial_count}, days={len(final_obj['days'])}")
+
+                # 构建 title
+                city_str = ', '.join(cities)
+                interest_str = interests[0] if interests else 'Culture'
+                title = f"{city_str} · {days} Days · {interest_str}"
+
+                yield f"data: {json.dumps({'event': 'complete', 'data': {'title': title, 'itinerary': final_obj}}, ensure_ascii=False)}\n\n"
+
+            except Exception as e:
+                print(f"[STREAM ERROR] {e}")
+                import traceback
+                traceback.print_exc()
+                yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+
+        return Response(
+            event_stream(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',
+                'Access-Control-Allow-Origin': '*',
+            },
+        )
+
+    except Exception as e:
+        print(f"[STREAM ERROR] {e}")
+        return Response(
+            json.dumps({'error': str(e)}),
+            status=500,
+            content_type='application/json',
+        )
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=9000)
+```
+
+文件: cloud_functions/generate_itinerary_stream/requirements.txt（新建）
+
+```
+Flask==3.0.0
+requests==2.31.0
+```
+
+🛑 **CHECKPOINT 1:** 输出 app.py 完整内容 + requirements.txt。等用户确认后继续。
+
+---
+
+## Task 9.2: 打包指引（输出给用户）
+
+输出以下内容给用户：
+
+### 打包命令
+
+```bash
+cd ~/Projects/WanderChina/MVP/cloud_functions/generate_itinerary_stream
+pip install -r requirements.txt -t .
+zip -r ../generate_itinerary_stream.zip . -x '*.pyc' '__pycache__/*' '*.dist-info/*'
+```
+
+⚠️ 本函数不需要 shared/ 模块（不连 DB）。
+⚠️ `pip install` 在本地 Mac 执行即可（纯 Python 包，不需要 manylinux wheel）。
+
+### 部署配置
+
+| 配置项 | 值 |
+|--------|-----|
+| 函数名 | generate_itinerary_stream |
+| 函数类型 | ⚠️ **Web 函数**（不是事件函数！）|
+| 运行环境 | Python 3.9 |
+| 框架 | Flask |
+| 内存 | 512MB |
+| 超时 | 90 秒 |
+| 公网 | 是 |
+| VPC | 否 |
+| 触发方式 | 函数 URL |
+| 预置并发 | 建议设 1（减少冷启动）|
+
+### 环境变量
+
+| Key | Value |
+|-----|-------|
+| `DEEPSEEK_API_KEY` | （和 generate_itinerary 一致）|
+
+🛑 **CHECKPOINT 2:** 用户确认以下全部完成后才继续：
+- [ ] zip 上传成功
+- [ ] 环境变量配置
+- [ ] 提供函数 URL
+
+---
+
+## Task 9.3: 边界测试脚本（10 次）
+
+用户提供函数 URL 后，创建测试脚本。
+
+文件: cloud_functions/generate_itinerary_stream/test_stream.py（新建）
+
+```python
+#!/usr/bin/env python3
+"""
+流式行程生成边界测试（10 个 case）
+用法: STREAM_URL=https://xxx python3 test_stream.py
+"""
+import os
+import sys
+import json
+import time
+import requests
+
+STREAM_URL = os.environ.get('STREAM_URL', '')
+
+if not STREAM_URL:
+    print("Usage: STREAM_URL=https://xxx python3 test_stream.py")
+    sys.exit(1)
+
+TEST_CASES = [
+    {'cities': ['Beijing'], 'days': 1, 'interests': ['Culture']},
+    {'cities': ['Shanghai'], 'days': 3, 'interests': ['Food', 'Shopping']},
+    {'cities': ['Chengdu'], 'days': 5, 'interests': ['Food', 'Nature']},
+    {"cities": ["Xi'an"], 'days': 2, 'interests': ['History']},  # 城市名含引号
+    {'cities': ['Hangzhou'], 'days': 7, 'interests': ['Nature', 'Culture', 'Food']},
+    {'cities': ['Guangzhou'], 'days': 1, 'interests': ['Food']},
+    {'cities': ['Shenzhen'], 'days': 3, 'interests': ['Technology', 'Shopping']},
+    {'cities': ['Beijing'], 'days': 5, 'interests': ['History', 'Art']},
+    {'cities': ['Chengdu'], 'days': 1, 'interests': ['Food']},  # 最小 case
+    {'cities': ['Shanghai'], 'days': 7, 'interests': ['Culture', 'Food', 'Shopping', 'Nature']},  # 最大 case
+]
+
+results = []
+
+for i, case in enumerate(TEST_CASES):
+    print(f"\n{'='*60}")
+    print(f"Test {i+1}/10: {case['cities'][0]} · {case['days']}d · {case['interests']}")
+    print(f"{'='*60}")
+
+    t_start = time.time()
+    partial_count = 0
+    final_days = 0
+    success = False
+    error_msg = None
+
+    try:
+        resp = requests.post(
+            STREAM_URL,
+            json={**case, 'language': 'english'},
+            stream=True,
+            timeout=90,
+        )
+
+        buffer = ''
+        for line in resp.iter_lines(decode_unicode=True):
+            if not line or not line.startswith('data: '):
+                continue
+            payload = line[6:]
+            try:
+                event = json.loads(payload)
+                evt_type = event.get('event')
+
+                if evt_type == 'partial':
+                    partial_count += 1
+                    days_so_far = len(event.get('data', {}).get('days', []))
+                    print(f"  partial #{partial_count}: {days_so_far} days")
+
+                elif evt_type == 'complete':
+                    itinerary = event['data']['itinerary']
+                    final_days = len(itinerary.get('days', []))
+                    title = event['data'].get('title', '?')
+                    print(f"  complete: {title} ({final_days} days)")
+                    success = True
+
+                elif evt_type == 'error':
+                    error_msg = event.get('message', 'unknown')
+                    print(f"  ERROR: {error_msg}")
+
+            except json.JSONDecodeError as e:
+                print(f"  JSON parse error: {e}")
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"  EXCEPTION: {e}")
+
+    duration = time.time() - t_start
+
+    result = {
+        'case': f"{case['cities'][0]}_{case['days']}d",
+        'success': success,
+        'duration_s': round(duration, 1),
+        'partial_events': partial_count,
+        'final_days': final_days,
+        'expected_days': case['days'],
+        'days_match': final_days == case['days'],
+        'error': error_msg,
+    }
+    results.append(result)
+    print(f"  Duration: {duration:.1f}s | Partials: {partial_count} | Days: {final_days}/{case['days']}")
+
+# 汇总
+print(f"\n{'='*60}")
+print("SUMMARY")
+print(f"{'='*60}")
+passed = sum(1 for r in results if r['success'] and r['days_match'])
+print(f"Passed: {passed}/10")
+for r in results:
+    status = '✅' if r['success'] and r['days_match'] else '❌'
+    print(f"  {status} {r['case']}: {r['duration_s']}s, "
+          f"{r['partial_events']} partials, "
+          f"days={r['final_days']}/{r['expected_days']}"
+          f"{' ERROR: ' + r['error'] if r['error'] else ''}")
+```
+
+输出给用户的运行命令:
+
+```bash
+STREAM_URL="用户提供的函数URL" python3 test_stream.py
+```
+
+🛑 **CHECKPOINT 3:** 用户执行测试并贴出 SUMMARY 结果。10 个 case 中至少 8 个通过才继续。
+
+---
+
+## Task 9.4: Flutter ItineraryStreamService
+
+文件: lib/services/itinerary_stream_service.dart（新建）
+
+```dart
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'api_client.dart';
+import '../core/config/backend_config.dart';
+
+/// 流式行程生成服务
+/// - SSE 流式接收 DeepSeek 输出
+/// - fallback 到非流式 generate_itinerary
+class ItineraryStreamService {
+
+  /// 流式生成行程，yield partial/complete/error 事件
+  static Stream<Map<String, dynamic>> generateStream({
+    required List<String> cities,
+    required int days,
+    required List<String> interests,
+    String budgetLevel = 'medium',
+    String language = 'english',
+  }) async* {
+    try {
+      yield* _streamFromCloud(
+        cities: cities,
+        days: days,
+        interests: interests,
+        budgetLevel: budgetLevel,
+        language: language,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ Stream failed, falling back to non-stream: $e');
+      Sentry.captureException(e, stackTrace: stackTrace,
+        hint: Hint.withMap({'fallback': 'non_stream'}),
+      );
+
+      // Fallback 到非流式
+      try {
+        final result = await ApiClient.post(
+          ApiClient.generateItineraryUrl,
+          {
+            'action': 'generate',
+            'cities': cities,
+            'days': days,
+            'interests': interests,
+            'budget_level': budgetLevel,
+            'language': language,
+          },
+          timeout: const Duration(seconds: 75),
+        );
+        yield {
+          'event': 'complete',
+          'data': {
+            'title': result['title'] ?? 'My Trip',
+            'itinerary': result['itinerary'],
+          },
+        };
+      } catch (fallbackError) {
+        yield {
+          'event': 'error',
+          'message': fallbackError.toString(),
+        };
+      }
+    }
+  }
+
+  /// SSE 流式请求
+  static Stream<Map<String, dynamic>> _streamFromCloud({
+    required List<String> cities,
+    required int days,
+    required List<String> interests,
+    required String budgetLevel,
+    required String language,
+  }) async* {
+    final url = BackendConfig.generateItineraryStreamUrl;
+    if (url.isEmpty) {
+      throw Exception('GENERATE_ITINERARY_STREAM_URL not configured');
+    }
+
+    final request = http.Request('POST', Uri.parse(url))
+      ..headers['Content-Type'] = 'application/json; charset=utf-8'
+      ..body = json.encode({
+        'cities': cities,
+        'days': days,
+        'interests': interests,
+        'budget_level': budgetLevel,
+        'language': language,
+      });
+
+    final response = await http.Client().send(request).timeout(
+      const Duration(seconds: 85),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Stream API returned ${response.statusCode}');
+    }
+
+    // 手动 buffer SSE 消息（用 \n\n 分割，不用 LineSplitter）
+    String buffer = '';
+
+    await for (final chunk in response.stream.transform(utf8.decoder)) {
+      buffer += chunk;
+
+      // SSE 消息以 \n\n 分割
+      while (buffer.contains('\n\n')) {
+        final idx = buffer.indexOf('\n\n');
+        final message = buffer.substring(0, idx).trim();
+        buffer = buffer.substring(idx + 2);
+
+        if (!message.startsWith('data: ')) continue;
+        final payload = message.substring(6); // strip "data: "
+
+        try {
+          final event = json.decode(payload) as Map<String, dynamic>;
+          yield event;
+
+          // error 事件直接抛异常，触发 fallback
+          if (event['event'] == 'error') {
+            throw Exception(event['message'] ?? 'Stream error');
+          }
+        } catch (e) {
+          if (e is Exception && e.toString().contains('Stream error')) rethrow;
+          debugPrint('⚠️ SSE parse error: $e');
+        }
+      }
+    }
+  }
+}
+```
+
+同时在 BackendConfig 和 ApiClient 添加 stream URL:
+
+**lib/core/config/backend_config.dart** 加一行:
+```dart
+static const String generateItineraryStreamUrl = String.fromEnvironment('GENERATE_ITINERARY_STREAM_URL');
+```
+
+**lib/services/api_client.dart** 加一行 getter:
+```dart
+static String get generateItineraryStreamUrl => BackendConfig.generateItineraryStreamUrl;
+```
+
+提醒用户在 `.env` 加:
+```
+GENERATE_ITINERARY_STREAM_URL=<用户提供的函数URL>
+```
+
+🛑 **CHECKPOINT 4:** 输出以下内容：
+1. itinerary_stream_service.dart 完整内容
+2. backend_config.dart diff
+3. api_client.dart diff
+4. `flutter analyze` 结果
+等用户确认后继续。
+
+---
+
+## Task 9.5: Planner 页面集成流式 + 自动保存
+
+文件: lib/screens/planner/planner_home_screen.dart
+
+修改 `_generatePlan()` 方法（约第 733 行）。
+
+⚠️ **关键变更:**
+1. 用 ItineraryStreamService.generateStream 替代 ApiClient.post
+2. generation complete 后**自动保存**到 DB（调 create_trip）
+3. 带 tripId 跳转详情页（不再是 null 预览模式）
+4. 保留 requireQuotaCheck（Phase 2 已加）
+5. 天数选择器从 1-5 扩展到 1-7（流式已验证 7 天 25 秒可完成）
+6. Loading 进度文字实时更新 "Planning Day X of Y..."
+7. 时间估算从 "30-60 seconds" 改为 "10-30 seconds"
+
+### 5a. 顶部加 import
+
+```dart
+import '../../services/itinerary_stream_service.dart';
+```
+
+### 5b. 替换 _generatePlan 方法
+
+将现有 _generatePlan 方法替换为:
+
+```dart
+  Future<void> _generatePlan() async {
+    // Quota check (Phase 2)
+    if (!await requireQuotaCheck(
+      context,
+      'itinerary',
+      _activeTheme,
+      userId: AuthService.currentUserId,
+    )) return;
+
+    // Start loading animation
+    _startLoadingAnimation();
+
+    try {
+      final selectedCityMap = _cities.firstWhere(
+        (city) => city['zh'] == _selectedCity,
+        orElse: () => {'zh': '', 'en': '', 'fullName': 'Beijing'},
+      );
+      final cityEnglishName = selectedCityMap['fullName']!;
+
+      Map<String, dynamic>? finalData;
+
+      // 流式生成
+      await for (final event in ItineraryStreamService.generateStream(
+        cities: [cityEnglishName],
+        days: _selectedDays,
+        interests: _selectedInterests.toList(),
+        language: 'english',
+      )) {
+        switch (event['event']) {
+          case 'partial':
+            // 实时更新进度文字
+            final dayCount = (event['data'] as Map)['days']?.length ?? 0;
+            setState(() => _loadingText = 'Planning Day $dayCount of $_selectedDays...');
+            debugPrint('📡 Partial: $dayCount days');
+            break;
+          case 'complete':
+            finalData = event['data'] as Map<String, dynamic>;
+            debugPrint('✅ Stream complete: ${finalData['title']}');
+            break;
+          case 'error':
+            throw Exception(event['message'] ?? 'Generation failed');
+        }
+      }
+
+      if (finalData == null) throw Exception('No complete event received');
+      if (!mounted) return;
+
+      final itineraryJson = finalData['itinerary'];
+      final title = finalData['title'] ?? 'My Trip';
+
+      // 自动保存到 DB（保存失败则 fallback 到预览模式）
+      String? savedTripId;
+      try {
+        debugPrint('💾 Auto-saving trip to DB...');
+        final saveResult = await ApiClient.post(
+          ApiClient.tripUrl,
+          {
+            'action': 'create',
+            'user_id': AuthService.currentUserId,
+            'title': title,
+            'cities': [cityEnglishName],
+            'duration_days': _selectedDays,
+            'interests': _selectedInterests.toList(),
+            'itinerary': itineraryJson,
+            'description': _customDescription.text.trim().isNotEmpty
+                ? _customDescription.text.trim()
+                : null,
+          },
+          timeout: const Duration(seconds: 10),
+        );
+        savedTripId = saveResult['trip_id'] as String?;
+        debugPrint('💾 Trip saved: $savedTripId');
+      } catch (saveError) {
+        // 保存失败 → 不阻塞用户，fallback 到预览模式（tripId: null）
+        // 用户可在详情页手动点 Save
+        debugPrint('⚠️ Auto-save failed, falling back to preview mode: $saveError');
+        Sentry.captureException(saveError);
+      }
+
+      if (!mounted) return;
+      _stopLoadingAnimation();
+
+      // 解析 Itinerary model
+      final itinerary = Itinerary.fromCloudData({
+        ...itineraryJson,
+        'title': title,
+        'cities': [cityEnglishName],
+        'totalDays': _selectedDays,
+        'interests': _selectedInterests.toList(),
+      });
+
+      // Analytics
+      _analytics.itineraryGenerated(
+        cityEnglishName,
+        _selectedDays,
+        _selectedInterests.toList(),
+      );
+
+      // 跳转详情页
+      // savedTripId != null → 已保存，详情页无 Save 按钮
+      // savedTripId == null → 保存失败 fallback 到预览模式，用户可手动 Save
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ItineraryDetailScreen(
+            itinerary: itinerary,
+            tripId: savedTripId,  // null = 预览模式（保存失败时的 fallback）
+            cities: [cityEnglishName],
+            days: _selectedDays,
+            interests: _selectedInterests.toList(),
+          ),
+        ),
+      );
+
+      // 付费意愿调研
+      if (mounted) {
+        await _checkAndShowSurvey();
+      }
+
+      // 刷新已保存行程列表
+      _loadSavedTrips();
+
+    } catch (e, stackTrace) {
+      debugPrint('🗺️ generate_plan error: $e');
+      if (!mounted) return;
+      _stopLoadingAnimation();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to generate plan: ${e.toString().substring(0, (e.toString().length).clamp(0, 80))}'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      Sentry.captureException(e, stackTrace: stackTrace);
+    }
+  }
+```
+
+⚠️ **注意事项:**
+- `_customDescription` — 检查现有代码中是否有这个 TextEditingController。如果没有，替换为 `null`。
+- `_analytics.itineraryGenerated` — 保留现有的 analytics 调用。
+- `_startLoadingAnimation` / `_stopLoadingAnimation` — 保留现有的 loading 动画逻辑。
+- `_checkAndShowSurvey` / `_loadSavedTrips` — 保留现有的调研+刷新逻辑。
+- `_loadingText` — 需要在 State 类中声明（见 5c）。
+
+在替换前，先 `view` 现有 _generatePlan 方法完整代码，确认上述方法名和变量名与实际代码一致。不一致的地方按实际代码调整。
+
+### 5c. 添加 _loadingText 状态变量
+
+在 State 类中（现有的 `_selectedDays` 等变量附近）加：
+
+```dart
+String _loadingText = 'Creating your perfect itinerary...';
+```
+
+在 `_startLoadingAnimation()` 方法中（或调用它的位置）重置：
+
+```dart
+_loadingText = 'Creating your perfect itinerary...';
+```
+
+在 loading UI 构建处，找到显示 "Finding best attractions..." 或类似文字的地方，替换为 `_loadingText`。
+
+### 5d. 天数选择器扩展到 1-7
+
+搜索 day selector 的构建代码（可能是 `List.generate(5, ...)` 或硬编码的 1-5）：
+
+```bash
+grep -n "selectedDays\|_selectedDays\|dayCount\|maxDays\|[1, 2, 3, 4, 5]" \
+     lib/screens/planner/planner_home_screen.dart | head -10
+```
+
+找到天数列表，从 5 改为 7：
+
+```dart
+// 改前（可能是以下任一形式）
+final days = [1, 2, 3, 4, 5];
+// 或
+List.generate(5, (i) => i + 1)
+
+// 改后
+final days = [1, 2, 3, 4, 5, 6, 7];
+// 或
+List.generate(7, (i) => i + 1)
+```
+
+### 5e. 时间估算文字更新
+
+搜索 loading 页面中的时间估算文字：
+
+```bash
+grep -n "30-60\|usually takes\|seconds" \
+     lib/screens/planner/planner_home_screen.dart | head -5
+```
+
+替换：
+
+```dart
+// 改前
+'This usually takes 30-60 seconds'
+
+// 改后
+'This usually takes 10-30 seconds'
+```
+
+🛑 **CHECKPOINT 5:** 输出以下内容：
+1. planner_home_screen.dart diff（包含 _generatePlan 替换 + _loadingText 状态 + 天数 1-7 + 时间估算更新）
+2. 列出保留的现有调用（analytics, loading, survey 等）确认未丢失
+3. 确认天数选择器 UI 显示 7 个选项
+4. `flutter analyze` 结果
+等用户确认后继续。
+
+---
+
+## Task 9.6: 验证
+
+1. `flutter analyze` — 无新增 error
+2. 不要跑 `flutter run`
+
+输出完整变更汇总：
+1. 新建文件列表（3 个：app.py, test_stream.py, itinerary_stream_service.dart）
+2. 修改文件列表（3 个：backend_config.dart, api_client.dart, planner_home_screen.dart）
+3. 每个文件的关键改动摘要
+4. flutter analyze 最终结果
+5. 提醒用户在 .env 加 GENERATE_ITINERARY_STREAM_URL
+
+🛑 **CHECKPOINT 6（最终）:** 用户审阅通过后进行真机测试。
+
+---
+
+## 真机测试验证点（用户手动执行）
+
+1. **天数选择器:** 显示 1-7 共 7 个选项，选 6 或 7 不报错
+2. **流式生成:** 点 Generate → loading 文字从 "Creating..." → "Planning Day 1 of X..." → "Planning Day 2 of X..." 逐步更新
+3. **时间估算:** loading 页面显示 "This usually takes 10-30 seconds"
+4. **自动保存:** 生成完成后直接跳到详情页，详情页标题栏无"Save"按钮（已保存）
+5. **Navigate 不丢 plan:** 详情页点 Navigate → 跳外部地图 → 切回 App → plan 仍在
+6. **Stream fallback:** 临时把 GENERATE_ITINERARY_STREAM_URL 改成错误地址 → 应 fallback 到非流式 → 仍然成功生成
+7. **Save fallback:** 临时把 TRIP_URL 改成错误地址 → 生成成功但保存失败 → 详情页以预览模式打开（有 Save 按钮）→ 恢复正确 URL 后手动 Save 成功
+8. **trips_count:** 查 DB，确认只递增 1 次（不重复保存）
+9. **已保存行程列表:** 切回 planner tab → "My Trips" 列表有刚生成的行程
+
+---
+
+## Fallback 架构总览（四层防御）
+
+```
+Layer 1: 流式生成
+  generate_itinerary_stream (Flask SSE)
+    → DeepSeek stream API (retry 3x)
+    → 成功: yield partial → yield complete
+    → 失败: ↓
+
+Layer 2: 非流式生成 (fallback)
+  generate_itinerary (事件函数)
+    → DeepSeek API (retry 3x)
+    → 成功: yield complete
+    → 失败: yield error → UI 显示 SnackBar
+
+Layer 3: 自动保存
+  ApiClient.post(createTripUrl)
+    → 成功: savedTripId → 详情页（已保存模式）
+    → 失败: savedTripId = null → 详情页（预览模式，用户手动 Save）
+
+Layer 4: UI 兜底
+  _generatePlan() catch
+    → _stopLoadingAnimation()
+    → SnackBar 报错
+    → Sentry.captureException()
+```
+

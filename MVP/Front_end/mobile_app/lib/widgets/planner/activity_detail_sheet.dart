@@ -3,6 +3,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/city_theme.dart';
 import '../../services/api_client.dart';
 import '../../core/config/backend_config.dart';
+import '../../services/deeplink_service.dart';
+import '../../services/analytics_service.dart';
+import '../../screens/main/main_screen.dart';
 
 class ActivityDetailSheet extends StatefulWidget {
   final String nameEn;
@@ -179,8 +182,126 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
               ),
 
             const SizedBox(height: 24),
+
+            // ── Action Bar ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Navigate — 跳 Map tab 搜索目的地
+                      _buildActionButton(
+                        icon: Icons.navigation_rounded,
+                        label: 'Navigate',
+                        onTap: () {
+                          AnalyticsService.instance.track('deeplink_navigate', {
+                            'destination': widget.nameZh,
+                          });
+                          Navigator.of(context).pop();
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          MainScreen.globalKey.currentState?.switchToMapAndSearch(
+                            widget.nameEn.isNotEmpty ? widget.nameEn : widget.nameZh,
+                            displayName: widget.nameEn.isNotEmpty ? widget.nameEn : widget.nameZh,
+                            city: widget.city,
+                            fallbackQuery: widget.nameZh.isNotEmpty ? widget.nameZh : null,
+                          );
+                        },
+                      ),
+
+                      // Ride — DiDi 打车（直接跳 DiDi App，剪贴板传目的地）
+                      _buildActionButton(
+                        icon: Icons.local_taxi,
+                        label: 'Ride',
+                        onTap: () async {
+                          AnalyticsService.instance.track('deeplink_didi', {
+                            'destination': widget.nameZh,
+                          });
+                          final destName = widget.nameEn.isNotEmpty ? widget.nameEn : widget.nameZh;
+                          final success = await DeeplinkService.openDidi(destName);
+                          if (context.mounted) {
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Destination copied! Paste it in DiDi\'s search bar')),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please install DiDi to use ride hailing')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+
+                      // Pay — 仅有消费的 activity 显示
+                      if (_hasCost())
+                        _buildActionButton(
+                          icon: Icons.qr_code_scanner,
+                          label: 'Pay',
+                          onTap: () async {
+                            AnalyticsService.instance.track('deeplink_alipay_pay', {
+                              'venue': widget.nameZh,
+                              'cost': widget.cost,
+                            });
+                            final success = await DeeplinkService.openAlipayScanner();
+                            if (!success && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please install Alipay to pay in China')),
+                              );
+                            }
+                          },
+                        ),
+                    ],
+                  ),
+
+                  // Pay 提示文案
+                  if (_hasCost())
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '💡 Scan the QR code at checkout with Alipay',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
           ],
         ),
+      ),
+    );
+  }
+
+  bool _hasCost() {
+    final cost = widget.cost.toLowerCase().trim();
+    return cost.isNotEmpty && cost != 'free' && cost != '¥0' && cost != '0';
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final color = widget.theme?.pillActiveColor ?? const Color(0xFF2D6A4F);
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }

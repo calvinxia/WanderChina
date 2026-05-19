@@ -42,3 +42,24 @@ android {
 flutter {
     source = "../.."
 }
+
+// ============================================================================
+// ABI 控制说明(2026-05)
+// ----------------------------------------------------------------------------
+// ABI 控制不在此文件配置,而是通过 Flutter CLI 参数完成,以绕过
+// sentry_flutter 8.14.2 插件的 abiFilters 干扰。
+//
+// Beta 测试构建(单架构,~70MB,海外下载友好):
+//     flutter build apk --release --target-platform android-arm64
+//
+// 兼容性构建(双架构 APK,arm64 + armv7):
+//     flutter build apk --release \
+//         --target-platform android-arm,android-arm64 \
+//         --split-per-abi
+//
+// 默认构建(三架构 fat APK,~134MB,不推荐用于海外分发):
+//     flutter build apk --release
+//
+// 注:Android 正式版开发时,应升级 sentry_flutter 到 9.x 并启用
+//     splits.abi 配置,届时本注释可删除。
+// ============================================================================
