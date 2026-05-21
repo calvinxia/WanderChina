@@ -17,6 +17,7 @@ class Activity {
   final DateTime endTime;
   final String category; // sightseeing, food, transport, accommodation, shopping, etc.
   final String? imageUrl;
+  final String imageKeyword;
   final double? estimatedCost;
   final String? currency;
   final bool isBooked;
@@ -33,6 +34,7 @@ class Activity {
     required this.endTime,
     required this.category,
     this.imageUrl,
+    this.imageKeyword = '',
     this.estimatedCost,
     this.currency,
     this.isBooked = false,
@@ -53,6 +55,7 @@ class Activity {
       endTime: DateTime.parse(json['endTime'] as String),
       category: json['category'] as String,
       imageUrl: json['imageUrl'] as String?,
+      imageKeyword: json['imageKeyword'] as String? ?? '',
       estimatedCost: (json['estimatedCost'] as num?)?.toDouble(),
       currency: json['currency'] as String?,
       isBooked: json['isBooked'] as bool? ?? false,
@@ -102,6 +105,7 @@ class Activity {
       startTime: startTime,
       endTime: endTime,
       category: json['category'] as String? ?? 'sightseeing',
+      imageKeyword: json['imageKeyword'] as String? ?? '',
       estimatedCost: cost,
       currency: 'CNY',
       notes: json['name_zh'] as String?,
@@ -119,6 +123,7 @@ class Activity {
       'endTime': endTime.toIso8601String(),
       'category': category,
       'imageUrl': imageUrl,
+      'imageKeyword': imageKeyword,
       'estimatedCost': estimatedCost,
       'currency': currency,
       'isBooked': isBooked,

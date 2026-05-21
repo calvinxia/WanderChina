@@ -41,6 +41,8 @@ Return ONLY valid JSON, no markdown or explanation:
           "name_zh": "中文名",
           "duration": "2 hrs",
           "cost": "¥60",
+          "category": "sightseeing",
+          "imageKeyword": "descriptive photo search term",
           "description": "Brief description"
         }}
       ]
@@ -49,8 +51,10 @@ Return ONLY valid JSON, no markdown or explanation:
 }}
 
 Rules:
+- Use real, specific venue names (e.g. "Dim sum at Dian Du De 点都德" not "Lunch at a local dim sum restaurant"). Every activity must reference an actual named place that exists in the city.
 - Exactly {days} days, 4-5 activities per day
 - Realistic times and costs in CNY
+- Each activity must have a category (sightseeing, food, shopping, transport, entertainment) and an imageKeyword for photo search (e.g. "Cantonese dim sum" for a dim sum restaurant, "ancient city wall" for Xi'an Wall)
 - Allow at least 30 minutes gap between activities at different locations for transit
 - If two activities are in different districts of the city, allow 45-60 minutes for travel
 - Bilingual place names (English + Chinese)

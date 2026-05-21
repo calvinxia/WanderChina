@@ -48,10 +48,8 @@ class _LoginScreenState extends State<LoginScreen> {
         if (widget.fromSoftLogin) {
           Navigator.of(context).pop(true);
         } else {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
-            (route) => false,
-          );
+          // 如果当前已在 MainScreen 内，pop 回去而不是创建新的
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
       }
     } catch (e) {
@@ -89,10 +87,8 @@ class _LoginScreenState extends State<LoginScreen> {
         if (widget.fromSoftLogin) {
           Navigator.of(context).pop(true);
         } else {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
-            (route) => false,
-          );
+          // 如果当前已在 MainScreen 内，pop 回去而不是创建新的
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
       }
     } catch (e) {

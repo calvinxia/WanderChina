@@ -515,6 +515,8 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
         cost: activity['estimatedCost'] != null ? '¥${activity['estimatedCost']}' : '',
         city: _itinerary.destination,
         theme: _itineraryTheme,
+        category: activity['category'] ?? '',
+        imageKeyword: activity['imageKeyword'] ?? '',
       ),
     );
   }

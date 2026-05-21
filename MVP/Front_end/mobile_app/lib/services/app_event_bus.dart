@@ -18,6 +18,8 @@ class PurchaseFailedEvent extends AppEvent {
 
 class SubscriptionExpiredEvent extends AppEvent {}
 
+class LoginStatusChangedEvent extends AppEvent {}
+
 class QuotaUpdatedEvent extends AppEvent {
   final String feature;
   final int usedCount;

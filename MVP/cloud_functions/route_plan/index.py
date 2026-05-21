@@ -1,12 +1,13 @@
 # route_plan/index.py
 # -*- coding: utf-8 -*-
 """
-路线规划云函数（优化版 v2）
+路线规划云函数（优化版 v2.1）
 - 调用高德路线规划 API 获取路线
 - 步行/驾车指令：纯本地模板翻译，零网络调用
 - 公交站名：查库翻译（3s 超时），未命中返回中文原文（不 fallback DeepSeek）
 - 线路名：规则化翻译（不需要 AI）
 - 目标：总响应时间 < 10s
+- v2.1: 修复高德返回 list 而非 dict 的类型防御
 """
 import os
 import sys
@@ -67,16 +68,27 @@ DRIVE_PATTERNS = {
 }
 
 
+# ===== 类型安全辅助函数 =====
+
+def _safe_dict(value, default=None):
+    """确保返回 dict，防御高德返回 list 或其他类型"""
+    if default is None:
+        default = {}
+    if isinstance(value, list):
+        return value[0] if value else default
+    if isinstance(value, dict):
+        return value
+    return default
+
+
 # ===== 纯本地翻译函数（零网络调用）=====
 
 def _translate_walk_instruction(instruction_zh, distance, road_zh=''):
     """步行指令本地翻译，不调任何网络"""
-    # 匹配"到达XXX"
     m = re.search(r'到达(.+)', instruction_zh)
     if m:
         return f"Arrive at destination ({distance}m)"
 
-    # 匹配方向动作
     for zh, en in WALK_PATTERNS.items():
         if zh in instruction_zh:
             dist_match = re.search(r'(\d+)米', instruction_zh)
@@ -84,49 +96,40 @@ def _translate_walk_instruction(instruction_zh, distance, road_zh=''):
             road_str = f" on {road_zh}" if road_zh else ''
             return f"{en}{dist_str}{road_str}"
 
-    # 匹配"向X步行Y米"
     for zh, en in DIRECTION_MAP.items():
         if f'向{zh}' in instruction_zh:
             return f"Head {en} for {distance}m"
 
-    # 匹配"沿XXX步行Y米"
     m = re.search(r'沿(.+?)步行', instruction_zh)
     if m:
         return f"Walk along {m.group(1)} for {distance}m"
 
-    # 兜底
     return f"Continue for {distance}m"
 
 
 def _translate_drive_instruction(instruction_zh, distance, road_zh=''):
     """驾车指令本地翻译，不调任何网络"""
-    # 匹配"到达目的地"
     if '到达目的地' in instruction_zh:
         return f"Arrive at destination"
 
-    # 匹配方向动作
     for zh, en in DRIVE_PATTERNS.items():
         if zh in instruction_zh:
             dist_str = f" for {distance}m" if distance > 0 else ''
             road_str = f" onto {road_zh}" if road_zh else ''
             return f"{en}{dist_str}{road_str}"
 
-    # 匹配"进入XXX"
     m = re.search(r'进入(.+)', instruction_zh)
     if m:
         return f"Enter {m.group(1)} for {distance}m"
 
-    # 匹配"沿XXX行驶Y米"
     m = re.search(r'沿(.+?)行驶', instruction_zh)
     if m:
         return f"Follow {m.group(1)} for {distance}m"
 
-    # 匹配"从XXX出口离开"
     m = re.search(r'从(.+?)出口', instruction_zh)
     if m:
         return f"Take exit {m.group(1)}"
 
-    # 兜底
     return f"Continue for {distance}m"
 
 
@@ -135,22 +138,18 @@ def translate_line_name(line_zh):
     if not line_zh:
         return line_zh
 
-    # 地铁X号线 → Metro Line X
     m = re.search(r'地铁(\d+)号线', line_zh)
     if m:
         return f"Metro Line {m.group(1)}"
 
-    # X号线 → Line X
     m = re.search(r'(\d+)号线', line_zh)
     if m:
         return f"Line {m.group(1)}"
 
-    # 公交X路 → Bus X
     m = re.search(r'(\d+)路', line_zh)
     if m:
         return f"Bus {m.group(1)}"
 
-    # 特殊线路
     if '机场' in line_zh and ('快线' in line_zh or '线' in line_zh):
         return "Airport Express"
     if '磁悬浮' in line_zh:
@@ -162,13 +161,11 @@ def translate_line_name(line_zh):
     if '快速公交' in line_zh or 'BRT' in line_zh:
         return "BRT"
 
-    # 其他：保留原文（外国游客给司机看）
     return line_zh
 
 
 # ===== 站名翻译（唯一允许的网络调用，严格限时）=====
 
-# 内存缓存：同一次请求内避免重复查库
 _station_cache = {}
 
 def lookup_station_name(name_zh, lang):
@@ -176,7 +173,6 @@ def lookup_station_name(name_zh, lang):
     if not name_zh:
         return name_zh
 
-    # 检查内存缓存
     cache_key = f"{name_zh}_{lang}"
     if cache_key in _station_cache:
         return _station_cache[cache_key]
@@ -200,7 +196,6 @@ def lookup_station_name(name_zh, lang):
     except Exception:
         pass
 
-    # DB 未命中 → DeepSeek fallback（仅限站名，3s 超时）
     translate_url = os.environ.get('TRANSLATE_URL')
     if translate_url:
         try:
@@ -214,7 +209,6 @@ def lookup_station_name(name_zh, lang):
             return translated
         except Exception:
             pass
-            
     _station_cache[cache_key] = name_zh
     return name_zh
 
@@ -230,8 +224,8 @@ def parse_transit_route(route_data, lang):
         segments = transit.get('segments', [])
 
         for segment in segments:
-            # 步行段
-            walking = segment.get('walking', {})
+            # 步行段（类型防御）
+            walking = _safe_dict(segment.get('walking', {}))
             if walking and int(walking.get('distance', 0)) > 0:
                 walk_steps = walking.get('steps', [])
                 distance = int(walking.get('distance', 0))
@@ -240,7 +234,8 @@ def parse_transit_route(route_data, lang):
                 # 提取目的地
                 destination_zh = ''
                 if walk_steps:
-                    last_instruction = walk_steps[-1].get('instruction', '')
+                    last_step = _safe_dict(walk_steps[-1]) if walk_steps else {}
+                    last_instruction = last_step.get('instruction', '')
                     m = re.search(r'到达(.+)', last_instruction)
                     if m:
                         destination_zh = m.group(1)
@@ -265,14 +260,16 @@ def parse_transit_route(route_data, lang):
 
                 steps.append(step)
 
-            # 公交/地铁段
-            bus_info = segment.get('bus', {})
+            # 公交/地铁段（类型防御）
+            bus_info = _safe_dict(segment.get('bus', {}))
             buslines = bus_info.get('buslines', [])
             if buslines:
-                line = buslines[0]
+                line = _safe_dict(buslines[0]) if buslines else {}
                 line_name_zh = line.get('name', '')
-                departure_zh = line.get('departure_stop', {}).get('name', '')
-                arrival_zh = line.get('arrival_stop', {}).get('name', '')
+                departure_stop = _safe_dict(line.get('departure_stop', {}))
+                arrival_stop = _safe_dict(line.get('arrival_stop', {}))
+                departure_zh = departure_stop.get('name', '')
+                arrival_zh = arrival_stop.get('name', '')
                 via_num = int(line.get('via_num', 0))
                 distance = int(line.get('distance', 0))
                 duration = int(line.get('duration', 0))
@@ -316,6 +313,23 @@ def parse_transit_route(route_data, lang):
 
                 steps.append(step)
 
+        # 拼接 transit polyline（步行段 + 公交段，类型防御）
+        all_polyline_parts = []
+        for segment in segments:
+            walking = _safe_dict(segment.get('walking', {}))
+            for ws in walking.get('steps', []):
+                ws = _safe_dict(ws)
+                pl = ws.get('polyline', '')
+                if pl:
+                    all_polyline_parts.append(pl)
+            bus_info = _safe_dict(segment.get('bus', {}))
+            for bl in bus_info.get('buslines', []):
+                bl = _safe_dict(bl)
+                pl = bl.get('polyline', '')
+                if pl:
+                    all_polyline_parts.append(pl)
+        all_polyline = ';'.join(all_polyline_parts)
+
         # 路线摘要
         route_entry = {
             'distance': int(transit.get('distance', 0)),
@@ -323,6 +337,7 @@ def parse_transit_route(route_data, lang):
             'cost': float(transit.get('cost', 0) or 0),
             'walking_distance': int(transit.get('walking_distance', 0)),
             'steps': steps,
+            'polyline': all_polyline,
         }
 
         if lang != 'zh':
@@ -353,8 +368,8 @@ def parse_walking_driving_route(route_data, mode, lang):
     for path in paths[:2]:
         steps = []
         for raw_step in path.get('steps', []):
+            raw_step = _safe_dict(raw_step)
             instruction_zh = raw_step.get('instruction', '')
-            # road 字段可能是字符串或空数组
             road_raw = raw_step.get('road', '')
             road_zh = road_raw if isinstance(road_raw, str) else ''
             distance = int(raw_step.get('distance', 0))
@@ -374,7 +389,6 @@ def parse_walking_driving_route(route_data, mode, lang):
                     step['instruction_en'] = _translate_walk_instruction(instruction_zh, distance, road_zh)
                 else:
                     step['instruction_en'] = _translate_drive_instruction(instruction_zh, distance, road_zh)
-                # 路名保留中文（打车给司机看）
                 if road_zh:
                     step['road_en'] = road_zh
 
@@ -395,7 +409,6 @@ def parse_walking_driving_route(route_data, mode, lang):
 # ===== 主入口 =====
 
 def main_handler(event, context):
-    # 每次请求重置站名缓存
     global _station_cache
     _station_cache = {}
 
@@ -420,7 +433,6 @@ def main_handler(event, context):
         if not amap_key:
             return json_response(500, {'error': 'Missing AMAP_WEB_KEY'})
 
-        # 调用高德路线规划 API
         import requests
         params = {
             'key': amap_key,
@@ -440,7 +452,6 @@ def main_handler(event, context):
                 'error': f"Gaode API error: {data.get('info', 'Unknown')}"
             })
 
-        # 解析路线
         if mode == 'transit':
             routes = parse_transit_route(data, lang)
         else:

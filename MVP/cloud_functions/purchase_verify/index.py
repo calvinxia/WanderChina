@@ -4,11 +4,13 @@
 Apple IAP receipt 验证 + 订阅状态更新.
 
 流程:
-1. 接收 client_id_token (JWT 验证) + receipt_data + product_id
-2. 调 Apple verifyReceipt API (sandbox first, fallback production)
-3. 解析 latest_receipt_info, 提取 transaction_id
+1. 接收 user_id + receipt_data + product_id
+2. 调 Apple verifyReceipt API (production first, fallback sandbox)
+3. 解析 receipt.in_app, 提取 transaction_id
 4. 调 process_purchase SQL function (写 transactions + 更新 users)
 5. 返回新的 premium_expires_at
+
+v2.1: 新增 is_sandbox 标记，区分沙盒和生产交易
 """
 import os
 import sys
@@ -36,7 +38,7 @@ def verify_receipt_with_apple(receipt_data):
       - status=21008: receipt 来自 production, 用 production endpoint 重试
 
     Returns:
-        dict: parsed receipt response from Apple
+        tuple: (parsed receipt response, is_sandbox bool)
     Raises:
         ValueError: if receipt invalid after both endpoints tried
     """
@@ -49,6 +51,8 @@ def verify_receipt_with_apple(receipt_data):
         'exclude-old-transactions': True,
     }
 
+    is_sandbox = False
+
     # 第 1 次: production (Apple 推荐先试 production)
     resp = requests.post(PRODUCTION_URL, json=payload, timeout=10)
     resp.raise_for_status()
@@ -57,6 +61,7 @@ def verify_receipt_with_apple(receipt_data):
 
     # status=21007 = receipt 来自 sandbox, 切换到 sandbox 重试
     if status == 21007:
+        is_sandbox = True
         resp = requests.post(SANDBOX_URL, json=payload, timeout=10)
         resp.raise_for_status()
         result = resp.json()
@@ -66,7 +71,7 @@ def verify_receipt_with_apple(receipt_data):
     if status != 0:
         raise ValueError(f"Apple receipt verification failed with status: {status}")
 
-    return result
+    return result, is_sandbox
 
 
 def extract_transaction(receipt_response, expected_product_id):
@@ -130,7 +135,7 @@ def main_handler(event, context):
 
         # 1. 验证 receipt with Apple
         try:
-            receipt_response = verify_receipt_with_apple(receipt_data)
+            receipt_response, is_sandbox = verify_receipt_with_apple(receipt_data)
         except requests.exceptions.RequestException as e:
             print(f"[PURCHASE] Apple API network error: {e}")
             return json_response(503, {'error': 'Apple verification service unavailable'})
@@ -145,19 +150,20 @@ def main_handler(event, context):
             print(f"[PURCHASE] Transaction extraction failed: {e}")
             return json_response(400, {'error': str(e)})
 
-        # 3. 调 process_purchase SQL function
+        # 3. 调 process_purchase SQL function（含 is_sandbox 参数）
         conn = get_db_connection()
         cursor = conn.cursor()
 
         try:
             cursor.execute("""
-                SELECT process_purchase(%s, %s, %s, %s, %s)
+                SELECT process_purchase(%s, %s, %s, %s, %s, %s)
             """, (
                 user_id,
                 product_id,
                 tx['transaction_id'],
                 'apple',
-                json.dumps(receipt_response)[:10000],  # 截断防止过大
+                json.dumps(receipt_response)[:10000],
+                is_sandbox,
             ))
             new_expires_at = cursor.fetchone()[0]
             conn.commit()
@@ -194,7 +200,8 @@ def main_handler(event, context):
         except Exception:
             pass
 
-        print(f"[PURCHASE] Success: user={user_id} product={product_id} tx={tx['transaction_id']}")
+        env_label = "SANDBOX" if is_sandbox else "PRODUCTION"
+        print(f"[PURCHASE] [{env_label}] Success: user={user_id} product={product_id} tx={tx['transaction_id']}")
 
         return json_response(200, {
             'success': True,
@@ -202,6 +209,7 @@ def main_handler(event, context):
             'premium_expires_at': new_expires_at.isoformat(),
             'product_id': product_id,
             'transaction_id': tx['transaction_id'],
+            'is_sandbox': is_sandbox,
         })
 
     except Exception as e:

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import 'backend/auth_service.dart';
@@ -145,6 +146,16 @@ class PurchaseService {
         return false;
       }
 
+      // 通过公开 API 获取 App Receipt（base64 PKCS7）
+      final platformAddition = _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
+      final receiptData = await platformAddition.refreshPurchaseVerificationData();
+      final appReceipt = receiptData?.localVerificationData ?? '';
+
+      if (appReceipt.isEmpty) {
+        debugPrint('[PURCHASE] No app receipt available');
+        return false;
+      }
+
       final result = await ApiClient.post(
         ApiClient.purchaseVerifyUrl,
         {
@@ -152,7 +163,7 @@ class PurchaseService {
           'platform': 'apple',
           'product_id': purchase.productID,
           'transaction_id': purchase.purchaseID ?? '',
-          'receipt_data': purchase.verificationData.serverVerificationData,
+          'receipt_data': appReceipt,
         },
         timeout: const Duration(seconds: 15),
       );

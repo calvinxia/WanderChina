@@ -66,40 +66,19 @@ class POIBottomSheet extends StatelessWidget {
           const SizedBox(height: 16),
 
           // 操作按钮
-          Row(
-            children: [
-              // Directions 按钮（主操作）
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onDirections,
-                  icon: const Icon(Icons.directions, size: 20),
-                  label: const Text('Directions'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: currentTheme.pillActiveColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onDirections,
+              icon: const Icon(Icons.directions, size: 20),
+              label: const Text('Directions'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: currentTheme.pillActiveColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(width: 12),
-              // Details 按钮（次操作）
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // MVP: 展示更多信息或 coming soon
-                  },
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  label: const Text('Details'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: currentTheme.pillActiveColor,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(color: currentTheme.pillActiveColor),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),

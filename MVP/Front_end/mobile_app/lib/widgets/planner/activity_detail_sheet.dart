@@ -15,6 +15,8 @@ class ActivityDetailSheet extends StatefulWidget {
   final String cost;
   final String city;
   final CityTheme? theme;
+  final String category;
+  final String imageKeyword;
 
   const ActivityDetailSheet({
     super.key,
@@ -25,6 +27,8 @@ class ActivityDetailSheet extends StatefulWidget {
     required this.cost,
     required this.city,
     this.theme,
+    this.category = '',
+    this.imageKeyword = '',
   });
 
   @override
@@ -33,6 +37,8 @@ class ActivityDetailSheet extends StatefulWidget {
 
 class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
   String? _photoUrl;
+  String? _photographer;
+  String? _source;
   bool _isLoadingPhoto = true;
 
   @override
@@ -43,32 +49,43 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
 
   Future<void> _loadPhoto() async {
     try {
-      // 第一次尝试：用完整中文名
+      // 传 category + imageKeyword 给后端，Unsplash 搜索用
       var result = await ApiClient.post(BackendConfig.poiPhotoUrl, {
         'action': 'single',
         'name_zh': widget.nameZh,
+        'name_en': widget.nameEn,
         'city': widget.city,
+        'category': widget.category,
+        'image_keyword': widget.imageKeyword,
       });
 
       String? photoUrl = result['photo_url'] as String?;
+      String? photographer = result['photographer'] as String?;
+      String? source = result['source'] as String?;
 
-      // 第二次尝试：如果无结果，用英文名搜
+      // 第二次尝试：如果无结果，用英文名搜（现有 fallback 逻辑）
       if (photoUrl == null && widget.nameEn.isNotEmpty) {
-        // 提取核心名称（去掉 "Lunch at"、"Dinner at" 等前缀）
         String cleanName = widget.nameEn
             .replaceAll(RegExp(r'^(Lunch|Dinner|Breakfast|Visit|Explore)\s+(at|to|in)\s+', caseSensitive: false), '');
 
         result = await ApiClient.post(BackendConfig.poiPhotoUrl, {
           'action': 'single',
           'name_zh': cleanName,
+          'name_en': cleanName,
           'city': widget.city,
+          'category': widget.category,
+          'image_keyword': widget.imageKeyword,
         });
         photoUrl = result['photo_url'] as String?;
+        photographer = result['photographer'] as String?;
+        source = result['source'] as String?;
       }
 
       if (mounted) {
         setState(() {
           _photoUrl = photoUrl;
+          _photographer = photographer;
+          _source = source;
           _isLoadingPhoto = false;
         });
       }
@@ -130,6 +147,19 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
                         )
                       : _buildPlaceholder(),
             ),
+
+            // 仅 Unsplash 来源时显示摄影师署名（合规要求）
+            if (_source == 'unsplash' && _photographer != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, right: 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Photo by $_photographer on Unsplash',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  ),
+                ),
+              ),
 
             const SizedBox(height: 16),
 

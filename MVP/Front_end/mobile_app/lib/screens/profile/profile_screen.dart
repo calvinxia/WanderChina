@@ -42,6 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isLoadingTrips = true;
   String _currentCity = 'China';
   StreamSubscription? _subEventSub;
+  StreamSubscription? _loginEventSub;
 
   @override
   void initState() {
@@ -52,6 +53,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     _loadCurrentCity();
     // [PB4] SubscriptionService 是全局单例，setState 仅触发 build 重读最新状态
     _subEventSub = AppEventBus.instance.on<PurchaseSuccessEvent>().listen((_) {
+      if (mounted) setState(() {});
+    });
+    _loginEventSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
       if (mounted) setState(() {});
     });
   }
@@ -126,6 +130,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void dispose() {
     _subEventSub?.cancel();
+    _loginEventSub?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -196,10 +201,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                     side: BorderSide(color: color),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  onPressed: () async {
+                    final result = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(builder: (_) => const LoginScreen(fromSoftLogin: true)),
                     );
+                    if (result == true && mounted) {
+                      setState(() {});
+                    }
                   },
                 ),
               ),
@@ -360,7 +368,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                     showDialog(
                       context: context,
                       barrierDismissible: false,
-                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                      builder: (_) => Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            cityTheme.pillActiveColor,
+                          ),
+                        ),
+                      ),
                     );
 
                     try {
@@ -496,15 +510,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       return const Center(child: CircularProgressIndicator());
     } else if (_userTrips.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.luggage, size: 64, color: Colors.grey[300]),
-            const SizedBox(height: 12),
-            Text('No trips yet', style: TextStyle(color: Colors.grey[500], fontSize: 15)),
-            const SizedBox(height: 4),
-            Text('Your saved trips will appear here', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.luggage, size: 64, color: Colors.grey[300]),
+              const SizedBox(height: 12),
+              Text('No trips yet', style: TextStyle(color: Colors.grey[500], fontSize: 15)),
+              const SizedBox(height: 4),
+              Text('Your saved trips will appear here', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+            ],
+          ),
         ),
       );
     } else {

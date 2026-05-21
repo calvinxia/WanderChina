@@ -50,10 +50,6 @@ class LanguageSwitcher extends StatelessWidget {
             child: Row(
               children: [
                 _buildLanguagePill(context, AppLanguage.english, 'EN', currentTheme),
-                const SizedBox(width: 8),
-                _buildLanguagePill(context, AppLanguage.french, 'FR', currentTheme),
-                const SizedBox(width: 8),
-                _buildLanguagePill(context, AppLanguage.spanish, 'ES', currentTheme),
               ],
             ),
           ),

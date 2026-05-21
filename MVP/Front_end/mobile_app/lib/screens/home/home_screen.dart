@@ -194,53 +194,25 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top bar: Menu, Search, Profile
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Menu icon
-                      IconButton(
-                        icon: Icon(Icons.menu, color: cityTheme.primaryTextColor, size: 24),
-                        onPressed: () {},
-                      ),
-
-                      // Title + Logo
-                      Row(
-                        children: [
-                          Text(
-                            'WanderChina',
-                            style: AppTextStyles.h4(
-                              color: cityTheme.primaryTextColor,
-                            ),
+                  // Top bar: Title + Logo
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'WanderChina',
+                          style: AppTextStyles.h4(
+                            color: cityTheme.primaryTextColor,
                           ),
-                          const SizedBox(width: 8),
-                          AppLogo(
-                            size: 40,
-                            backgroundColor: cityTheme.badgeBackground,
-                            strokeColor: cityTheme.badgeTextColor,
-                          ),
-                        ],
-                      ),
-
-                      // Search & Profile
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.search, color: cityTheme.primaryTextColor, size: 24),
-                            onPressed: () {},
-                          ),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () {},
-                            child: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: cityTheme.pillActiveColor,
-                              child: const Icon(Icons.person, color: Colors.white, size: 18),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(width: 8),
+                        AppLogo(
+                          size: 40,
+                          backgroundColor: cityTheme.badgeBackground,
+                          strokeColor: cityTheme.badgeTextColor,
+                        ),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 24),

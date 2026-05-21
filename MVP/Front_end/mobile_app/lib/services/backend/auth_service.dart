@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../api_client.dart';
+import '../app_event_bus.dart';
 import '../subscription_service.dart';
 
 class AuthService {
@@ -51,6 +52,7 @@ class AuthService {
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
     _loginType = 'registered';
+    AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
     return result;
   }
@@ -68,6 +70,7 @@ class AuthService {
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
     _loginType = 'registered';
+    AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
     SubscriptionService.instance.updateFromServer(result);
     return result;
@@ -100,6 +103,7 @@ class AuthService {
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
       _loginType = 'registered';
+      AppEventBus.instance.fire(LoginStatusChangedEvent());
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
       return result;

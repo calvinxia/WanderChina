@@ -175,11 +175,6 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                 // Direction Toggle
                 _buildDirectionToggle(),
 
-                const SizedBox(height: 16),
-
-                // Language Selector
-                _buildLanguageSelector(),
-
                 const SizedBox(height: 24),
               ],
             ),
@@ -296,66 +291,6 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
             color: isActive ? Colors.white : cityTheme.pillActiveColor,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageSelector() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Text(
-            'Language:',
-            style: AppTextStyles.body(color: AppColors.gray600),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.25),
-              border: Border.all(color: Colors.white.withOpacity(0.3)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<AppLanguage>(
-                value: _selectedLanguage,
-                icon: const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.gray600),
-                items: const [
-                  DropdownMenuItem(
-                    value: AppLanguage.english,
-                    child: Text('English'),
-                  ),
-                  DropdownMenuItem(
-                    value: AppLanguage.french,
-                    child: Text('Français (coming soon)', style: TextStyle(color: Colors.grey)),
-                  ),
-                  DropdownMenuItem(
-                    value: AppLanguage.spanish,
-                    child: Text('Español (coming soon)', style: TextStyle(color: Colors.grey)),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    // FR/ES 暂不支持，显示提示
-                    if (value == AppLanguage.french || value == AppLanguage.spanish) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('French/Spanish translation coming soon — English available now'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                      return; // 不切换，保持当前语言
-                    }
-                    // EN 正常切换
-                    setState(() => _selectedLanguage = value);
-                  }
-                },
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
