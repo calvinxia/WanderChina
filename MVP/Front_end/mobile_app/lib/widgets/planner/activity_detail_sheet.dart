@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/city_theme.dart';
 import '../../services/api_client.dart';
@@ -38,6 +40,7 @@ class ActivityDetailSheet extends StatefulWidget {
 class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
   String? _photoUrl;
   String? _photographer;
+  String? _photographerUrl;
   String? _source;
   bool _isLoadingPhoto = true;
 
@@ -61,6 +64,7 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
 
       String? photoUrl = result['photo_url'] as String?;
       String? photographer = result['photographer'] as String?;
+      String? photographerUrl = result['photographer_url'] as String?;
       String? source = result['source'] as String?;
 
       // 第二次尝试：如果无结果，用英文名搜（现有 fallback 逻辑）
@@ -78,6 +82,7 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
         });
         photoUrl = result['photo_url'] as String?;
         photographer = result['photographer'] as String?;
+        photographerUrl = result['photographer_url'] as String?;
         source = result['source'] as String?;
       }
 
@@ -85,6 +90,7 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
         setState(() {
           _photoUrl = photoUrl;
           _photographer = photographer;
+          _photographerUrl = photographerUrl;
           _source = source;
           _isLoadingPhoto = false;
         });
@@ -151,12 +157,43 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
             // 仅 Unsplash 来源时显示摄影师署名（合规要求）
             if (_source == 'unsplash' && _photographer != null)
               Padding(
-                padding: const EdgeInsets.only(top: 4, right: 8),
+                padding: const EdgeInsets.only(top: 4),
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: Text(
-                    'Photo by $_photographer on Unsplash',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  child: RichText(
+                    text: TextSpan(
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      children: [
+                        const TextSpan(text: 'Photo by '),
+                        TextSpan(
+                          text: _photographer,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[700],
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              if (_photographerUrl != null && _photographerUrl!.isNotEmpty) {
+                                launchUrl(Uri.parse(_photographerUrl!));
+                              }
+                            },
+                        ),
+                        const TextSpan(text: ' on '),
+                        TextSpan(
+                          text: 'Unsplash',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[700],
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              launchUrl(Uri.parse('https://unsplash.com/?utm_source=wanderchina&utm_medium=referral'));
+                            },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

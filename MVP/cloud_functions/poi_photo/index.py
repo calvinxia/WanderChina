@@ -51,11 +51,27 @@ def _get_unsplash_photo(query, per_page=1):
         photo_url = photo.get('urls', {}).get('regular')
         photographer = photo.get('user', {}).get('name', 'Unknown')
         photographer_url = photo.get('user', {}).get('links', {}).get('html', '')
+        # Unsplash 合规：加 UTM 参数
+        if photographer_url:
+            photographer_url += '?utm_source=wanderchina&utm_medium=referral'
+
+        # Unsplash 合规要求：触发 download 追踪（fire-and-forget）
+        download_location = photo.get('links', {}).get('download_location', '')
+        if download_location:
+            try:
+                dl_req = urllib.request.Request(download_location, headers={
+                    'Authorization': f'Client-ID {UNSPLASH_ACCESS_KEY}',
+                    'Accept-Version': 'v1',
+                })
+                urllib.request.urlopen(dl_req, timeout=3)
+            except Exception:
+                pass  # 追踪失败不影响主流程
 
         return {
             'photo_url': photo_url,
             'photographer': photographer,
             'photographer_url': photographer_url,
+            'unsplash_url': 'https://unsplash.com/?utm_source=wanderchina&utm_medium=referral',
             'source': 'unsplash',
         }
     except Exception as e:
@@ -252,6 +268,7 @@ def main_handler(event, context):
                     'photo_url': photo_url,
                     'photographer': photographer,
                     'photographer_url': photographer_url,
+                    'unsplash_url': 'https://unsplash.com/?utm_source=wanderchina&utm_medium=referral' if source == 'unsplash' else None,
                     'source': source,
                     'category': category,
                 })
