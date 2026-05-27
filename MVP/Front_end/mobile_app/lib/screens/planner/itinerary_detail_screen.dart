@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -557,8 +558,11 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
       debugPrint('❌ Save trip error: $e');
       if (mounted) {
         setState(() => _isSaving = false);
+        final message = (e is SocketException || e.toString().contains('host lookup'))
+            ? 'No internet connection. Please check your network and try again.'
+            : 'Something went wrong. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e')),
+          SnackBar(content: Text(message)),
         );
       }
     }
@@ -686,8 +690,11 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           _isModifying = false;
           _modifyingMessage = '';
         });
+        final message = (e is SocketException || e.toString().contains('host lookup'))
+            ? 'No internet connection. Please check your network and try again.'
+            : 'Something went wrong. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update itinerary: $e')),
+          SnackBar(content: Text(message)),
         );
       }
     }

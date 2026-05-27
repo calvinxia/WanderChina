@@ -31,8 +31,8 @@
 <body>
     <h1>Privacy Policy</h1>
     <div class="meta">
-        <strong>Effective Date:</strong> May 22, 2026<br>
-        <strong>Last Updated:</strong> May 15, 2026
+        <strong>Effective Date:</strong> May 30, 2026<br>
+        <strong>Last Updated:</strong> May 24, 2026
     </div>
 
     <p>WanderChina ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use the WanderChina mobile application (the "Service").</p>
@@ -59,6 +59,7 @@
         <li>Travel dates and duration</li>
         <li>Trip preferences and customization requests</li>
         <li>Voice translation inputs (audio recordings during translation requests)</li>
+        <li>AI-generated search keywords derived from your trip context (used to fetch travel photography)</li>
     </ul>
 
     <p><strong>Payment Information:</strong></p>
@@ -110,12 +111,14 @@
 
     <table>
         <tr><th>Provider</th><th>Purpose</th><th>Data Shared</th></tr>
-        <tr><td><strong>DeepSeek</strong> (AI provider)</td><td>Generate itineraries and translate POI names</td><td>Your trip preferences and POI text. We do not share your account identity.</td></tr>
-        <tr><td><strong>Baidu Cloud</strong> (voice services)</td><td>Convert your voice to text and synthesize spoken translations</td><td>Audio recordings during voice translation. Audio is processed in real-time and not retained by us.</td></tr>
-        <tr><td><strong>AMap (Gaode/Autonavi)</strong></td><td>Display maps, search points of interest, calculate routes</td><td>Your location coordinates when you grant location permission.</td></tr>
-        <tr><td><strong>Tencent Cloud</strong> (infrastructure)</td><td>Store user data, run cloud functions, host images</td><td>All user data (encrypted at rest in PostgreSQL, located in Mainland China).</td></tr>
-        <tr><td><strong>Apple</strong></td><td>Process In-App Purchases and Sign in with Apple</td><td>Transaction receipts, Apple User Identifier. Governed by Apple's Privacy Policy.</td></tr>
-        <tr><td><strong>Sentry</strong></td><td>Crash and error monitoring</td><td>Crash reports and stack traces. May include device model, OS version, app state, and (if signed in) a pseudonymous user identifier at time of error.</td></tr>
+        <tr><td><strong>DeepSeek</strong> (AI provider, China)</td><td>Generate itineraries and translate POI names</td><td>Your trip preferences and POI text. We do not share your account identity.</td></tr>
+        <tr><td><strong>Baidu Cloud</strong> (voice services, China)</td><td>Convert your voice to text and synthesize spoken translations</td><td>Audio recordings during voice translation. Audio is processed in real-time and not retained by us.</td></tr>
+        <tr><td><strong>AMap (Gaode/Autonavi)</strong> (China)</td><td>Display maps, search points of interest, calculate routes</td><td>Your location coordinates when you grant location permission.</td></tr>
+        <tr><td><strong>Unsplash</strong> (photography, United States)</td><td>Fetch high-quality travel photography for points of interest</td><td>AI-generated search keywords based on POI context (e.g., "Cantonese dim sum", "ancient city wall Xi'an"). No personal information or location data.</td></tr>
+        <tr><td><strong>Tencent Cloud</strong> (infrastructure, China)</td><td>Store user data, run cloud functions, host images</td><td>All user data (encrypted at rest in PostgreSQL, located in Mainland China).</td></tr>
+        <tr><td><strong>Apple</strong> (United States)</td><td>Process In-App Purchases and Sign in with Apple</td><td>Transaction receipts, Apple User Identifier. Governed by Apple's Privacy Policy.</td></tr>
+        <tr><td><strong>Resend</strong> (transactional email, United States)</td><td>Deliver password reset and account verification emails</td><td>Your email address and the verification code being sent. Not used for marketing.</td></tr>
+        <tr><td><strong>Sentry</strong> (United States)</td><td>Crash and error monitoring</td><td>Crash reports and stack traces. May include device model, OS version, app state, and (if signed in) a pseudonymous user identifier at time of error.</td></tr>
     </table>
 
     <p><strong>We do not sell your personal data to anyone.</strong></p>
@@ -187,7 +190,48 @@
 
     <p>To exercise any of these rights, contact us at the email below. We will respond within 30 days.</p>
 
-    <h2>6. Data Retention</h2>
+    <h2>6. AI Processing and Generated Content</h2>
+    <p>WanderChina uses artificial intelligence to deliver several core features. This section explains in plain language what AI is used, what data is processed, and how to identify AI-generated content.</p>
+
+    <h3>6.1 Which AI Services We Use</h3>
+    <table>
+        <tr><th>AI Provider</th><th>Used For</th><th>Data Sent</th></tr>
+        <tr><td><strong>DeepSeek</strong> (China)</td><td>Generating personalized travel itineraries, modifying itineraries based on your natural-language edit requests, generating search keywords for travel photography</td><td>Your trip preferences (cities, dates, interests, free-text descriptions), existing itinerary content when you edit it</td></tr>
+        <tr><td><strong>Baidu Cloud Speech</strong> (China)</td><td>Real-time voice-to-text and text-to-speech for translation</td><td>Audio recordings during translation requests (processed in real-time, not retained)</td></tr>
+    </table>
+
+    <h3>6.2 What This Means for You</h3>
+    <ul>
+        <li><strong>Your trip preferences</strong> are sent to DeepSeek to generate itineraries. We do <strong>not</strong> send your account identity, email, or any personal identifier — DeepSeek receives only the travel context.</li>
+        <li><strong>Your voice recordings</strong> are sent to Baidu Cloud only during active translation. Recordings are processed in real-time and not stored by us or by Baidu.</li>
+        <li>AI providers may temporarily process and log this data per their own privacy policies, which we recommend you review:
+            <ul>
+                <li>DeepSeek Privacy Policy: <a href="https://www.deepseek.com/privacy">https://www.deepseek.com/privacy</a></li>
+                <li>Baidu AI Cloud Privacy Policy: <a href="https://cloud.baidu.com/doc/Agreements/s/zk7l03gd9">https://cloud.baidu.com/doc/Agreements/s/zk7l03gd9</a></li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3>6.3 Identifying AI-Generated Content</h3>
+    <p>All itineraries and itinerary edits in WanderChina are generated by AI. To make this transparent:</p>
+    <ul>
+        <li>Itineraries are visibly labeled with a <strong>"Generated by AI"</strong> indicator in the app</li>
+        <li>AI-modified content (after AI Edit) is shown with the same indicator</li>
+        <li>Voice translation outputs are clearly framed as machine translations, not human-verified translations</li>
+    </ul>
+
+    <h3>6.4 Accuracy and Limitations</h3>
+    <p>AI-generated content (itineraries, translations, descriptions) may contain inaccuracies. Restaurant hours, venue availability, prices, and travel times may not be current. <strong>Always verify critical travel information</strong> (visa requirements, booking confirmations, official venue hours) through official sources before relying on AI suggestions.</p>
+
+    <h3>6.5 Your Choices</h3>
+    <p>You will see a one-time disclosure of these AI data flows when you first set up your destination city in the app. By continuing to use the AI features (Generate Plan, AI Edit, Voice Translate), you acknowledge this processing.</p>
+    <p>You can stop AI processing at any time by:</p>
+    <ul>
+        <li>Not using the AI features (other parts of the app — saved trips, map navigation, profile — work without sending data to AI providers)</li>
+        <li>Deleting your account (see Section 5: Your Rights → Account Deletion)</li>
+    </ul>
+
+    <h2>7. Data Retention</h2>
     <table>
         <tr><th>Data Type</th><th>Retention Period</th></tr>
         <tr><td>Active account data</td><td>Until you delete your account</td></tr>
@@ -201,7 +245,7 @@
         <tr><td>Password reset tokens</td><td>15 minutes</td></tr>
     </table>
 
-    <h2>7. Security</h2>
+    <h2>8. Security</h2>
     <p>We implement the following security measures:</p>
     <ul>
         <li><strong>Encryption in transit</strong>: All communication between the app and our servers uses TLS 1.2 or higher.</li>
@@ -212,10 +256,10 @@
     </ul>
     <p>While we strive to protect your data, no method of transmission or storage is 100% secure. We cannot guarantee absolute security.</p>
 
-    <h2>8. Children's Privacy</h2>
+    <h2>9. Children's Privacy</h2>
     <p>WanderChina is not intended for children under the age of 13 (or under 16 in the EU). We do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us and we will delete it.</p>
 
-    <h2>9. Third-Party Links and Integrations</h2>
+    <h2>10. Third-Party Links and Integrations</h2>
     <p>Our Service includes deep links to third-party applications, including:</p>
     <ul>
         <li><strong>Alipay Mini-Programs</strong> (for ticket booking, payments)</li>
@@ -223,7 +267,7 @@
     </ul>
     <p>When you tap these links, you leave our Service and enter the third-party application. We are not responsible for the privacy practices of these third parties. Please review their privacy policies before using them.</p>
 
-    <h2>10. Changes to This Privacy Policy</h2>
+    <h2>11. Changes to This Privacy Policy</h2>
     <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by:</p>
     <ul>
         <li>Posting the new policy at <a href="https://wanderchina.app/privacy">https://wanderchina.app/privacy</a></li>
@@ -232,7 +276,7 @@
     </ul>
     <p>Your continued use of the Service after changes take effect constitutes acceptance of the updated policy.</p>
 
-    <h2>11. Contact Us</h2>
+    <h2>12. Contact Us</h2>
     <p>If you have questions, concerns, or requests regarding this Privacy Policy or your personal data:</p>
     <p>
         <strong>Email:</strong> <a href="mailto:privacy@wanderchina.app">privacy@wanderchina.app</a><br>

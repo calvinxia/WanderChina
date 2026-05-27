@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../services/backend/auth_service.dart';
@@ -56,7 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (mounted) setState(() {});
     });
     _loginEventSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
-      if (mounted) setState(() {});
+      if (mounted) _loadProfile();
     });
   }
 
@@ -73,7 +75,22 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       debugPrint('❌ Load profile error: $e');
-      if (mounted) setState(() => _isLoadingProfile = false);
+      // 网络失败时尝试读 SharedPreferences 缓存
+      final prefs = await SharedPreferences.getInstance();
+      final cachedName = prefs.getString('user_display_name');
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+          if (cachedName != null) {
+            _userProfile = {'display_name': cachedName, 'username': cachedName};
+          }
+        });
+        if (e is SocketException || e.toString().contains('host lookup')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Offline mode. Some data may be outdated.')),
+          );
+        }
+      }
     }
   }
 
@@ -96,7 +113,14 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       debugPrint('❌ Load trips error: $e');
-      if (mounted) setState(() => _isLoadingTrips = false);
+      if (mounted) {
+        setState(() => _isLoadingTrips = false);
+        if (e is SocketException || e.toString().contains('host lookup')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not load trips. Check your connection.')),
+          );
+        }
+      }
     }
   }
 
@@ -377,17 +401,27 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                     );
 
+                    bool restoreSuccess = true;
+                    String? restoreError;
                     try {
                       await PurchaseService.instance.restorePurchases();
                       await Future.delayed(const Duration(seconds: 2));
+                    } catch (e) {
+                      debugPrint('❌ Restore purchases error: $e');
+                      restoreSuccess = false;
+                      restoreError = (e is SocketException || e.toString().contains('host lookup'))
+                          ? 'No internet connection. Please check your network and try again.'
+                          : 'Something went wrong. Please try again.';
                     } finally {
                       if (context.mounted) Navigator.of(context).pop();
                     }
 
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('If you have a valid purchase, your subscription has been restored.'),
+                        SnackBar(
+                          content: Text(restoreSuccess
+                              ? 'If you have a valid purchase, your subscription has been restored.'
+                              : restoreError!),
                         ),
                       );
                     }
@@ -595,8 +629,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                 } catch (e) {
                   debugPrint('❌ View trip error: $e');
                   if (mounted) {
+                    final message = (e is SocketException || e.toString().contains('host lookup'))
+                        ? 'No internet connection. Please check your network and try again.'
+                        : 'Something went wrong. Please try again.';
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to load trip: $e')),
+                      SnackBar(content: Text(message)),
                     );
                   }
                 }

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../services/backend/auth_service.dart';
@@ -65,7 +66,9 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to load account information';
+          _errorMessage = (e is SocketException || e.toString().contains('host lookup'))
+              ? 'No internet connection. Please check your network and try again.'
+              : 'Failed to load account information.';
         });
       }
     }
@@ -107,7 +110,9 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       if (mounted) {
         setState(() {
           _isDeleting = false;
-          _errorMessage = 'Incorrect password';
+          _errorMessage = (e is SocketException || e.toString().contains('host lookup'))
+              ? 'No internet connection. Account deletion requires network.'
+              : 'Incorrect password. Please try again.';
         });
       }
     }
@@ -196,7 +201,9 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       if (mounted) {
         setState(() {
           _isDeleting = false;
-          _errorMessage = 'Failed to delete account. Please try again.';
+          _errorMessage = (e is SocketException || e.toString().contains('host lookup'))
+              ? 'No internet connection. Account deletion requires network.'
+              : 'Failed to delete account. Please try again.';
         });
       }
     }

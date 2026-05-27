@@ -28,7 +28,7 @@ class ApiClient {
   static Future<Map<String, dynamic>> post(
     String url,
     Map<String, dynamic> body, {
-    Duration timeout = const Duration(seconds: 15),
+    Duration timeout = const Duration(seconds: 25),
   }) async {
     try {
       final response = await http.post(

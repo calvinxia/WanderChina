@@ -7,9 +7,11 @@ import 'app_colors.dart';
 class AppTextStyles {
   AppTextStyles._();
 
-  // Base font family
-  static String get _fontFamily => GoogleFonts.inter().fontFamily!;
-  static String get _chineseFontFamily => GoogleFonts.notoSansSc().fontFamily!;
+  // Base font family — allowRuntimeFetching = false 时 fallback 到系统字体
+  static String get _fontFamily =>
+      GoogleFonts.inter().fontFamily ?? 'SF Pro Text';
+  static String get _chineseFontFamily =>
+      GoogleFonts.notoSansSc().fontFamily ?? 'PingFang SC';
 
   // ============================================================================
   // HEADINGS

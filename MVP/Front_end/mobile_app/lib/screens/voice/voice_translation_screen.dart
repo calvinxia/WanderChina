@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -9,6 +10,7 @@ import '../main/main_screen.dart';
 import '../../utils/quota_helper.dart';
 import '../../services/backend/auth_service.dart';
 import '../../widgets/soft_login_sheet.dart';
+import '../../services/app_event_bus.dart';
 
 /// Screen 11: 语音翻译全屏页面
 ///
@@ -31,6 +33,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
   final VoiceTranslationService _service = VoiceTranslationService();
   late AnimationController _rippleController;
   final TextEditingController _textController = TextEditingController();
+  StreamSubscription? _loginSub;
 
   TranslationDirection _direction = TranslationDirection.foreignToChinese;
   AppLanguage _selectedLanguage = AppLanguage.english;
@@ -68,6 +71,9 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
       duration: const Duration(milliseconds: 1500),
     )..repeat();
     _service.addListener(_onServiceStateChanged);
+    _loginSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -75,6 +81,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     _rippleController.dispose();
     _textController.dispose();
     _service.removeListener(_onServiceStateChanged);
+    _loginSub?.cancel();
     super.dispose();
   }
 
@@ -103,7 +110,9 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         debugPrint('🎙️ Recording started successfully');
       } catch (e) {
         debugPrint('⚠️ Recording failed: $e');
-        _showError('麦克风权限未授权');
+        _showError(e.toString().contains('permission')
+            ? 'Microphone permission not granted.'
+            : 'Could not start recording. Please try again.');
       }
     } else {
       debugPrint('⚠️ Cannot start recording, current state: ${_service.state}');
@@ -458,6 +467,11 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
                       debugPrint('✅ Quick Phrase translated: ${result.originalText} → ${result.translatedText}');
                     } else {
                       debugPrint('⚠️ Quick Phrase translation failed');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No internet connection. Please check your network and try again.')),
+                        );
+                      }
                     }
                   },
                   child: Container(
@@ -543,6 +557,11 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
       debugPrint('✅ Text message translated: ${result.originalText} → ${result.translatedText}');
     } else {
       debugPrint('⚠️ Text message translation failed');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No internet connection. Please check your network and try again.')),
+        );
+      }
     }
   }
 

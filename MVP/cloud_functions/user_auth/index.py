@@ -587,6 +587,8 @@ def main_handler(event, context):
                         user_id = NULL,
                         device_id = NULL,
                         description = NULL,
+                        edit_history = '[]',
+                        itinerary_json = NULL,
                         updated_at = NOW()
                     WHERE user_id = %s
                 """, (user_id,))
@@ -697,12 +699,29 @@ def main_handler(event, context):
                 except Exception as e:
                     results[env_name] = {'error': type(e).__name__ + ': ' + str(e)[:200]}
             return json_response(200, results)
+        
+        elif action == 'mark_ai_disclosure_shown':
+            user_id = body.get('user_id')
+            if not user_id:
+                cursor.close()
+                return json_response(400, {'error': 'Missing user_id'})
+
+            cursor.execute("""
+                UPDATE users SET
+                    ai_disclosure_shown = TRUE,
+                    ai_disclosure_shown_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = %s AND is_active = true
+            """, (user_id,))
+            conn.commit()
+            cursor.close()
+            return json_response(200, {'success': True})
 
         else:
             cursor.close()
             return json_response(400, {
                 'error': f'Unknown action: {action}. '
-                         f'Supported: anonymous_auth, register, login, verify, '
+                         f'Supported: anonymous_auth, register, login, verify, mark_ai_disclosure_shown,'
                          f'restore_session, get_profile, update_profile, '
                          f'forgot_password, reset_password, delete_account, '
                          f'apple_sign_in'

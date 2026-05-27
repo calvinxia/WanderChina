@@ -46,19 +46,19 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>WanderChina needs camera access to take your profile picture</string>
+	<string>WanderChina uses your camera to take your profile picture and scan Chinese text for translation.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>WanderChina needs your location to show nearby places and provide navigation</string>
+	<string>WanderChina uses your location to show nearby places, provide navigation, and customize city recommendations.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>WanderChina needs your location to show nearby places and provide navigation</string>
+	<string>WanderChina uses your location to show nearby places, provide navigation, and customize city recommendations.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>WanderChina needs microphone access for voice translation</string>
+	<string>WanderChina uses your microphone to translate spoken English to Chinese in real time.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>WanderChina needs photo library access to update your profile photo</string>
+	<string>WanderChina saves translated images and lets you update your profile picture.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>WanderChina needs photo library access to set your profile picture</string>
+	<string>WanderChina accesses your photos to set your profile picture and translate text in images.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>WanderChina uses speech recognition for voice translation</string>
+	<string>WanderChina uses speech recognition to convert your voice into text for translation.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

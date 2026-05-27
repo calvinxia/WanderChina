@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -17,6 +18,7 @@ import '../../widgets/planner/willingness_survey_dialog.dart';
 import '../../utils/quota_helper.dart';
 import '../../services/itinerary_stream_service.dart';
 import '../../widgets/soft_login_sheet.dart';
+import '../../services/app_event_bus.dart';
 
 /// Screen 9: AI Trip Planner Home
 ///
@@ -49,6 +51,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
   String _funFact = '';
   int _loadingStep = 0;
   Timer? _loadingTimer;
+  StreamSubscription? _loginSub;
   Map<String, dynamic>? _streamingItinerary;
   bool _isStreaming = false;
 
@@ -131,6 +134,12 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
   void initState() {
     super.initState();
     _loadSavedTrips();
+    _loginSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
+      if (mounted) {
+        _loadSavedTrips();
+        setState(() {});
+      }
+    });
   }
 
   Future<void> _loadSavedTrips() async {
@@ -144,15 +153,40 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         'action': 'list',
         'user_id': userId,
       });
+      final trips = result['trips'] as List? ?? [];
+
+      // 成功后缓存到本地
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_trips_${userId}', json.encode(trips));
+
       if (mounted) {
         setState(() {
-          _savedTrips = List<Map<String, dynamic>>.from(result['trips'] ?? []);
+          _savedTrips = List<Map<String, dynamic>>.from(trips);
           _isLoadingTrips = false;
         });
       }
     } catch (e) {
       debugPrint('❌ Load trips error: $e');
-      if (mounted) setState(() => _isLoadingTrips = false);
+      // 网络失败 → 读本地缓存
+      final userId = AuthService.currentUserId;
+      final prefs = await SharedPreferences.getInstance();
+      final cached = userId != null ? prefs.getString('cached_trips_${userId}') : null;
+      if (cached != null && mounted) {
+        final trips = json.decode(cached) as List;
+        setState(() {
+          _savedTrips = List<Map<String, dynamic>>.from(trips);
+          _isLoadingTrips = false;
+        });
+      } else if (mounted) {
+        setState(() => _isLoadingTrips = false);
+      }
+      if (mounted && (e is SocketException || e.toString().contains('host lookup'))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(cached != null
+              ? 'Offline mode. Showing cached trips.'
+              : 'Could not load saved trips. Check your connection.')),
+        );
+      }
     }
   }
 
@@ -160,6 +194,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
   void dispose() {
     _customInput.dispose();
     _loadingTimer?.cancel();
+    _loginSub?.cancel();
     super.dispose();
   }
 
@@ -432,16 +467,23 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                     }
                   },
                   onTap: () async {
+                    final tripId = trip['trip_id'] as String?;
                     try {
                       // 先从后端拉取完整行程数据
-                      debugPrint('📋 Loading trip: ${trip['trip_id']}');
+                      debugPrint('📋 Loading trip: $tripId');
                       final detail = await ApiClient.post(BackendConfig.tripUrl, {
                         'action': 'get',
-                        'trip_id': trip['trip_id'],
+                        'trip_id': tripId,
                       });
 
                       debugPrint('📋 Trip detail response keys: ${detail.keys.toList()}');
                       debugPrint('📋 Trip detail response: $detail');
+
+                      // 成功后缓存到本地
+                      if (tripId != null) {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString('cached_trip_$tripId', json.encode(detail));
+                      }
 
                       // 尝试多个可能的字段名（itinerary_json 是数据库列名，itinerary/days 是可能的返回字段）
                       final itineraryJson = detail['itinerary_json'] ?? detail['itinerary'] ?? detail['days'];
@@ -483,7 +525,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                           MaterialPageRoute(
                             builder: (_) => ItineraryDetailScreen(
                               itinerary: itinerary,
-                              tripId: trip['trip_id'] as String?,
+                              tripId: tripId,
                             ),
                           ),
                         );
@@ -501,9 +543,51 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                     } catch (e, stackTrace) {
                       debugPrint('❌ Load trip detail error: $e');
                       debugPrint('❌ Stack trace: $stackTrace');
+
+                      // 网络失败 → 读本地缓存
+                      if (tripId != null) {
+                        final prefs = await SharedPreferences.getInstance();
+                        final cached = prefs.getString('cached_trip_$tripId');
+                        if (cached != null && mounted) {
+                          final detail = json.decode(cached) as Map<String, dynamic>;
+                          final itineraryJson = detail['itinerary_json'] ?? detail['itinerary'] ?? detail['days'];
+                          if (itineraryJson != null) {
+                            final itineraryData = itineraryJson is String
+                                ? json.decode(itineraryJson)
+                                : itineraryJson;
+                            final itinerary = Itinerary.fromCloudData({
+                              'days': itineraryData,
+                              'title': detail['title'],
+                              'cities': detail['cities'],
+                              'duration_days': detail['duration_days'],
+                              'interests': detail['interests'],
+                              'trip_id': detail['trip_id'],
+                              'status': detail['status'],
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Offline mode. Showing cached trip.')),
+                            );
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ItineraryDetailScreen(
+                                  itinerary: itinerary,
+                                  tripId: tripId,
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                        }
+                      }
+
+                      // 无缓存 → 友好提示
                       if (mounted) {
+                        final message = (e is SocketException || e.toString().contains('host lookup'))
+                            ? 'No internet connection. Please check your network and try again.'
+                            : 'Something went wrong. Please try again.';
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to load trip: $e')),
+                          SnackBar(content: Text(message)),
                         );
                       }
                     }
@@ -919,11 +1003,11 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       if (!mounted) return;
       _stopLoadingAnimation();
 
+      final message = (e is SocketException || e.toString().contains('host lookup'))
+          ? 'No internet connection. Please check your network and try again.'
+          : 'Something went wrong. Please try again.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to generate plan: ${e.toString().substring(0, (e.toString().length).clamp(0, 80))}'),
-          duration: const Duration(seconds: 5),
-        ),
+        SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
       );
 
       Sentry.captureException(e, stackTrace: stackTrace);

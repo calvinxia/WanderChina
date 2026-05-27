@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:x_amap_base/x_amap_base.dart';
@@ -68,6 +69,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
 
   // Fix-7.E: 翻译方向
   bool _directionIsChToEn = false;
+  bool _isOffline = false;
 
   // Step 4.1: 路线规划状态
   bool _showPOISheet = false;
@@ -97,6 +99,16 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     super.initState();
     _currentLanguage = widget.language;
     _fetchCurrentLocation();
+    _checkConnectivity();
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      final result = await InternetAddress.lookup('example.com');
+      if (mounted) setState(() => _isOffline = result.isEmpty);
+    } on SocketException catch (_) {
+      if (mounted) setState(() => _isOffline = true);
+    }
   }
 
   /// 从外部调用的搜索方法（供 MainScreen 使用）
@@ -248,11 +260,11 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
           _isSearching = false;
           _showSearchResults = false;
         });
+        final message = (e is SocketException || e.toString().contains('host lookup'))
+            ? 'No internet connection. Please check your network.'
+            : 'Search failed. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('POI search failed: ${e.toString().substring(0, e.toString().length.clamp(0, 80))}'),
-            duration: const Duration(seconds: 5),
-          ),
+          SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
         );
       }
     }
@@ -349,11 +361,11 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     } catch (e) {
       debugPrint('🔄 On-the-fly translate failed: $e');
       if (mounted) {
+        final message = (e is SocketException || e.toString().contains('host lookup'))
+            ? 'No internet connection. Please check your network.'
+            : 'Something went wrong. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Translation failed: ${e.toString().substring(0, e.toString().length.clamp(0, 80))}'),
-            duration: const Duration(seconds: 5),
-          ),
+          SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
         );
       }
     }
@@ -696,6 +708,27 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             },
           ),
           ), // RepaintBoundary
+
+          // 1.5. 离线提示覆盖层
+          if (_isOffline)
+            Positioned(
+              top: 120,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Map requires internet connection',
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ),
+              ),
+            ),
 
           // 2. Top UI controls — 固定在顶部，不占满全屏
           Positioned(

@@ -167,14 +167,20 @@ class CityTheme {
     }
   }
 
+  /// Get city key from GPS coordinates. Returns null if not in any supported city.
+  static String? keyFromCoordinates(double lat, double lng) {
+    if (lat > 39.4 && lat < 40.4 && lng > 115.7 && lng < 117.0) return 'BJ';
+    if (lat > 30.8 && lat < 31.8 && lng > 120.8 && lng < 122.0) return 'SH';
+    if (lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0) return 'GZ';
+    if (lat > 22.3 && lat < 22.9 && lng > 113.7 && lng < 114.5) return 'SZ';
+    if (lat > 30.0 && lat < 31.0 && lng > 103.5 && lng < 104.8) return 'CD';
+    if (lat > 33.8 && lat < 34.6 && lng > 108.5 && lng < 109.5) return 'XA';
+    return null;
+  }
+
   /// Get theme from GPS coordinates
   static CityTheme fromCoordinates(double lat, double lng) {
-    if (lat > 39.4 && lat < 40.4 && lng > 115.7 && lng < 117.0) return beijing;
-    if (lat > 30.8 && lat < 31.8 && lng > 120.8 && lng < 122.0) return shanghai;
-    if (lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0) return guangzhou;
-    if (lat > 22.3 && lat < 22.9 && lng > 113.7 && lng < 114.5) return shenzhen;
-    if (lat > 30.0 && lat < 31.0 && lng > 103.5 && lng < 104.8) return chengdu;
-    if (lat > 33.8 && lat < 34.6 && lng > 108.5 && lng < 109.5) return xian;
-    return defaultTheme;
+    final key = keyFromCoordinates(lat, lng);
+    return key != null ? fromCityKey(key) : defaultTheme;
   }
 }

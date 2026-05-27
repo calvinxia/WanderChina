@@ -1,12 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
-import '../../widgets/app_logo.dart';
 import '../../widgets/mountain_silhouette.dart';
 import '../voice/voice_translation_screen.dart';
 import '../../services/backend/auth_service.dart';
+import '../../services/app_event_bus.dart';
 import '../../services/amap_service.dart';
 import '../main/main_screen.dart';
 import '../../core/theme/city_theme.dart';
@@ -27,17 +28,25 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedCity = 'BJ'; // Default: Beijing
   String _userName = 'Traveler';
   String _currentCity = 'China';
+  StreamSubscription? _loginSub;
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     _loadCurrentCity();
+    _loginSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
+      if (mounted) {
+        _loadUserInfo();
+        setState(() {});
+      }
+    });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _loginSub?.cancel();
     super.dispose();
   }
 
@@ -206,10 +215,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        AppLogo(
-                          size: 40,
-                          backgroundColor: cityTheme.badgeBackground,
-                          strokeColor: cityTheme.badgeTextColor,
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.asset(
+                            'assets/images/app_logo.png',
+                            width: 32,
+                            height: 32,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ],
                     ),

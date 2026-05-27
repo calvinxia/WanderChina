@@ -4,7 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/theme/city_theme.dart';
 import '../../services/backend/auth_service.dart';
+import '../../widgets/ai_disclosure_dialog.dart';
 import '../../widgets/app_logo.dart';
 import '../main/main_screen.dart';
 import 'onboarding_screen.dart';
@@ -19,6 +21,9 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  // GlobalKey 冲突防护：确保整个生命周期只跳转一次
+  bool _hasNavigated = false;
+
   @override
   void initState() {
     super.initState();
@@ -32,13 +37,21 @@ class _SplashScreenState extends State<SplashScreen> {
       AuthService.restoreSession(),
     ]);
 
-    if (!mounted) return;
+    if (!mounted || _hasNavigated) return;
 
     final isLoggedIn = results[1] as bool;
 
     if (isLoggedIn) {
-      Navigator.of(context).pushReplacement(
+      final prefs = await SharedPreferences.getInstance();
+      final cityKey = prefs.getString('selected_city') ?? 'guangzhou';
+      final cityTheme = CityTheme.fromCityKey(cityKey);
+      if (!mounted || _hasNavigated) return;
+      await showAIDisclosureIfNeeded(context, cityTheme);
+      if (!mounted || _hasNavigated) return;
+      _hasNavigated = true;
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+        (route) => false,
       );
       return;
     }
@@ -47,23 +60,42 @@ class _SplashScreenState extends State<SplashScreen> {
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_done') ?? false;
 
-    if (!mounted) return;
+    if (!mounted || _hasNavigated) return;
 
     if (!onboardingDone) {
       // 首次安装 → 走 Onboarding（完成后会设 onboarding_done + 匿名登录）
+      _hasNavigated = true;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
       return;
     }
 
-    // 已完成 Onboarding 但 session 过期 → 匿名登录，直接进 MainScreen
+    // 已完成 Onboarding 但 session 过期 → 匿名登录，最多重试 2 次
     final deviceId = await _getOrCreateDeviceId(prefs);
-    await AuthService.anonymousAuth(deviceId);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        final ok = await AuthService.anonymousAuth(deviceId);
+        if (ok) break;
+        debugPrint('[AUTH] Anonymous auth attempt ${attempt + 1} returned false');
+      } catch (e) {
+        debugPrint('[AUTH] Anonymous auth attempt ${attempt + 1} failed: $e');
+      }
+      if (attempt == 1) {
+        debugPrint('[AUTH] All attempts failed, entering offline mode');
+      }
+    }
+
     // 绝不出现白屏：无论 anonymousAuth 成功失败都进 MainScreen
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
+    final cityKey = prefs.getString('selected_city') ?? 'guangzhou';
+    final cityTheme = CityTheme.fromCityKey(cityKey);
+    if (!mounted || _hasNavigated) return;
+    await showAIDisclosureIfNeeded(context, cityTheme);
+    if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+      (route) => false,
     );
   }
 
@@ -135,7 +167,15 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ],
         ),
-        child: const AppLogo(size: 60),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Image.asset(
+            'assets/images/app_logo.png',
+            width: 60,
+            height: 60,
+            fit: BoxFit.cover,
+          ),
+        ),
       )
           .animate()
           .fadeIn(

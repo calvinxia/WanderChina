@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/city_theme.dart';
 import '../services/purchase_service.dart';
 
@@ -308,6 +309,46 @@ class _PaywallDialogState extends State<PaywallDialog> {
                   ),
                 ),
               ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // EULA + Privacy Policy links (App Store 合规要求)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => launchUrl(
+                    Uri.parse('https://wanderchina.app/terms/'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: Text(
+                    'Terms of Use',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+                ),
+                Text(' · ', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => launchUrl(
+                    Uri.parse('https://wanderchina.app/privacy/'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: Text(
+                    'Privacy Policy',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+                ),
+              ],
             ),
           ],
           ),
