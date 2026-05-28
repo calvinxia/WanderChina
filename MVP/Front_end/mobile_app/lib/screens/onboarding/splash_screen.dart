@@ -7,7 +7,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/theme/city_theme.dart';
 import '../../services/backend/auth_service.dart';
 import '../../widgets/ai_disclosure_dialog.dart';
-import '../../widgets/app_logo.dart';
+import '../auth/login_screen.dart';
 import '../main/main_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -47,6 +47,7 @@ class _SplashScreenState extends State<SplashScreen> {
       final cityTheme = CityTheme.fromCityKey(cityKey);
       if (!mounted || _hasNavigated) return;
       await showAIDisclosureIfNeeded(context, cityTheme);
+      if (AuthService.isRegistered) AuthService.syncAIDisclosure(); // fire-and-forget
       if (!mounted || _hasNavigated) return;
       _hasNavigated = true;
       Navigator.of(context).pushAndRemoveUntil(
@@ -56,22 +57,32 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    // session 不存在/已过期 — 检查是否首次安装
+    // session 不存在/已过期 — 检查路由方向
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+    final wasRegistered = prefs.getBool('was_registered') ?? false;
 
     if (!mounted || _hasNavigated) return;
 
     if (!onboardingDone) {
-      // 首次安装 → 走 Onboarding（完成后会设 onboarding_done + 匿名登录）
+      // 新用户 → Onboarding
       _hasNavigated = true;
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        (route) => false,
+      );
+      return;
+    } else if (wasRegistered) {
+      // 曾注册过的用户 → 直接 LoginScreen
+      _hasNavigated = true;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
       );
       return;
     }
 
-    // 已完成 Onboarding 但 session 过期 → 匿名登录，最多重试 2 次
+    // 匿名用户 → anonymous_auth → MainScreen（最多重试 2 次）
     final deviceId = await _getOrCreateDeviceId(prefs);
     for (int attempt = 0; attempt < 2; attempt++) {
       try {
@@ -91,6 +102,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final cityTheme = CityTheme.fromCityKey(cityKey);
     if (!mounted || _hasNavigated) return;
     await showAIDisclosureIfNeeded(context, cityTheme);
+    if (AuthService.isRegistered) AuthService.syncAIDisclosure(); // fire-and-forget
     if (!mounted || _hasNavigated) return;
     _hasNavigated = true;
     Navigator.of(context).pushAndRemoveUntil(

@@ -649,7 +649,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
   String _getStateLabel(VoiceServiceState state) {
     switch (state) {
       case VoiceServiceState.idle:
-        return 'Hold to speak';
+        return 'Press and hold until red to start recording';
       case VoiceServiceState.recording:
         return 'Listening...';
       case VoiceServiceState.processing:

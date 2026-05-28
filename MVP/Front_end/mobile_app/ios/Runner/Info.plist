@@ -47,8 +47,6 @@
 	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>WanderChina uses your camera to take your profile picture and scan Chinese text for translation.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>WanderChina uses your location to show nearby places, provide navigation, and customize city recommendations.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>WanderChina uses your location to show nearby places, provide navigation, and customize city recommendations.</string>
 	<key>NSMicrophoneUsageDescription</key>

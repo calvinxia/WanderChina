@@ -54,6 +54,7 @@ class AuthService {
     _loginType = 'registered';
     AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
+    syncAIDisclosure(); // fire-and-forget
     return result;
   }
 
@@ -73,6 +74,7 @@ class AuthService {
     AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
     SubscriptionService.instance.updateFromServer(result);
+    syncAIDisclosure(); // fire-and-forget
     return result;
   }
 
@@ -106,6 +108,7 @@ class AuthService {
       AppEventBus.instance.fire(LoginStatusChangedEvent());
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
+      syncAIDisclosure(); // fire-and-forget
       return result;
     } on SignInWithAppleAuthorizationException catch (e) {
       // User cancelled authorization
@@ -175,5 +178,29 @@ class AuthService {
     if (_currentToken != null) await prefs.setString('auth_token', _currentToken!);
     if (_currentUserId != null) await prefs.setString('user_id', _currentUserId!);
     if (_loginType != null) await prefs.setString('login_type', _loginType!);
+  }
+
+  /// 登录/注册成功后，把本地 AI disclosure 状态同步到注册用户（fire-and-forget）
+  static Future<void> syncAIDisclosure() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shown = prefs.getBool('ai_disclosure_shown') ?? false;
+      if (!shown || _currentUserId == null) return;
+
+      // 检查是否已为当前用户同步过，避免重复调用后端
+      final syncKey = 'ai_disclosure_synced_$_currentUserId';
+      if (prefs.getBool(syncKey) == true) return;
+
+      await ApiClient.post(ApiClient.authUrl, {
+        'action': 'mark_ai_disclosure_shown',
+        'user_id': _currentUserId,
+      });
+
+      // 标记已同步
+      await prefs.setBool(syncKey, true);
+      debugPrint('[AUTH] AI disclosure synced to user: $_currentUserId');
+    } catch (e) {
+      debugPrint('[AUTH] AI disclosure sync failed (non-blocking): $e');
+    }
   }
 }

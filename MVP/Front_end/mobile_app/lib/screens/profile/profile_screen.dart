@@ -361,7 +361,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                         _analytics.clearUser();
                         _analytics.track('logout');
 
+                        // 标记此设备曾有注册用户（下次冷启动直接显示 LoginScreen）
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('was_registered', true);
+
                         await AuthService.logout();
+
+                        // 跳回 LoginScreen，清空导航栈
                         if (mounted) {
                           Navigator.of(context).pushAndRemoveUntil(
                             MaterialPageRoute(builder: (_) => const LoginScreen()),
