@@ -1,6 +1,6 @@
 name: wanderchina
 description: AI-Powered China Travel Companion - Your ultimate guide to exploring China
-version: 0.1.0+6
+version: 1.0.0+7
 publish_to: 'none'
 
 environment:
