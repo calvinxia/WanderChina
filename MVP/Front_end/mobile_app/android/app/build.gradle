@@ -35,6 +35,13 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.debug
+
+            // 显式控制 R8 + 引用高德 keep 规则(2026-05-28)
+            // 根因:AGP 8.9.1 release 默认启用 R8,无 keep 规则时会误删
+            // 高德 native 反射调用的类(ClassTools 等),导致地图崩溃
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
