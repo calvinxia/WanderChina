@@ -18,6 +18,7 @@ import '../auth/delete_account_screen.dart';
 import '../planner/itinerary_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../core/theme/city_theme.dart';
+import '../../widgets/paywall_dialog.dart';
 import '../main/main_screen.dart';
 
 /// Screen 12: Profile / Me Page
@@ -271,12 +272,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
       body: _isLoadingProfile
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Profile Header
-                _buildProfileHeader(),
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Profile Header
+                  _buildProfileHeader(),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Stats
                 _buildStats(),
@@ -306,7 +308,113 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
+
+                // 订阅状态卡片
+                _buildSubscriptionCard(),
+
+                const SizedBox(height: 12),
+
+                // 操作按钮组
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      // 第一行：Log Out（全宽，红色边框）
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            _analytics.clearUser();
+                            _analytics.track('logout');
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('was_registered', true);
+                            await AuthService.logout();
+                            if (mounted) {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                (route) => false,
+                              );
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text('Log Out', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 第二行：Restore + Delete 并排
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () async {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      cityTheme.pillActiveColor,
+                                    ),
+                                  ),
+                                ),
+                              );
+
+                              bool restoreSuccess = true;
+                              String? restoreError;
+                              try {
+                                await PurchaseService.instance.restorePurchases();
+                                await Future.delayed(const Duration(seconds: 2));
+                              } catch (e) {
+                                debugPrint('❌ Restore purchases error: $e');
+                                restoreSuccess = false;
+                                restoreError = (e is SocketException || e.toString().contains('host lookup'))
+                                    ? 'No internet connection. Please check your network and try again.'
+                                    : 'Something went wrong. Please try again.';
+                              } finally {
+                                if (context.mounted) Navigator.of(context).pop();
+                              }
+
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(restoreSuccess
+                                        ? 'If you have a valid purchase, your subscription has been restored.'
+                                        : restoreError!),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.restore, size: 16),
+                            label: const Text('Restore Purchases', style: TextStyle(fontSize: 13)),
+                            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+                          ),
+                          TextButton(
+                            onPressed: _confirmDeleteAccount,
+                            child: Text(
+                              'Delete Account',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.red[300],
+                                decoration: TextDecoration.underline,
+                                decorationColor: Colors.red[300],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 8),
 
                 // Tab Bar
                 Container(
@@ -339,7 +447,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
 
                 // Tab Content
-                Expanded(
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.5,
                   child: TabBarView(
                     controller: _tabController,
                     children: [
@@ -349,113 +458,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ],
                   ),
                 ),
-
-                // Log Out Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        // Analytics tracking
-                        _analytics.clearUser();
-                        _analytics.track('logout');
-
-                        // 标记此设备曾有注册用户（下次冷启动直接显示 LoginScreen）
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('was_registered', true);
-
-                        await AuthService.logout();
-
-                        // 跳回 LoginScreen，清空导航栈
-                        if (mounted) {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (_) => const LoginScreen()),
-                            (route) => false,
-                          );
-                        }
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('Log Out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ),
-
-                // 订阅状态卡片
-                _buildSubscriptionCard(),
-
-                // Restore Purchases
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.restore),
-                  title: const Text('Restore Purchases'),
-                  onTap: () async {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            cityTheme.pillActiveColor,
-                          ),
-                        ),
-                      ),
-                    );
-
-                    bool restoreSuccess = true;
-                    String? restoreError;
-                    try {
-                      await PurchaseService.instance.restorePurchases();
-                      await Future.delayed(const Duration(seconds: 2));
-                    } catch (e) {
-                      debugPrint('❌ Restore purchases error: $e');
-                      restoreSuccess = false;
-                      restoreError = (e is SocketException || e.toString().contains('host lookup'))
-                          ? 'No internet connection. Please check your network and try again.'
-                          : 'Something went wrong. Please try again.';
-                    } finally {
-                      if (context.mounted) Navigator.of(context).pop();
-                    }
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(restoreSuccess
-                              ? 'If you have a valid purchase, your subscription has been restored.'
-                              : restoreError!),
-                        ),
-                      );
-                    }
-                  },
-                ),
-
-                // Delete Account Text Link
-                const SizedBox(height: 24),
-                Center(
-                  child: TextButton(
-                    onPressed: _confirmDeleteAccount,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.gray600,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                    ),
-                    child: const Text(
-                      'Delete Account',
-                      style: TextStyle(
-                        fontSize: 13,
-                        decoration: TextDecoration.underline,
-                        decorationColor: AppColors.gray600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
               ],
             ),
+          ),
     );
   }
 
@@ -774,51 +779,56 @@ class _ProfileScreenState extends State<ProfileScreen>
     final cityTheme = mainState?.cityTheme;
     final activeColor = cityTheme?.pillActiveColor ?? const Color(0xFF2D6A4F);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: activeColor.withOpacity(isPremium ? 0.08 : 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: activeColor.withOpacity(isPremium ? 0.3 : 0.2),
-          width: 1,
+    return GestureDetector(
+      onTap: isPremium ? null : () {
+        showPaywallDialog(context, cityTheme ?? CityTheme.defaultTheme, 'profile_upgrade');
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: activeColor.withOpacity(isPremium ? 0.08 : 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: activeColor.withOpacity(isPremium ? 0.3 : 0.2),
+            width: 1,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isPremium ? Icons.workspace_premium_rounded : Icons.lock_outline,
-            color: activeColor,
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isPremium ? 'Trip Pass Active' : 'Free Plan',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: activeColor,
-                  ),
-                ),
-                if (isPremium && sub.premiumExpiresAt != null)
-                  Text(
-                    'Active until ${sub.premiumExpiresAt!.toString().substring(0, 10)}',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                if (!isPremium)
-                  Text(
-                    'Upgrade for unlimited features',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-              ],
+        child: Row(
+          children: [
+            Icon(
+              isPremium ? Icons.workspace_premium_rounded : Icons.lock_outline,
+              color: activeColor,
+              size: 28,
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isPremium ? 'Trip Pass Active' : 'Free Plan',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: activeColor,
+                    ),
+                  ),
+                  if (isPremium && sub.premiumExpiresAt != null)
+                    Text(
+                      'Active until ${sub.premiumExpiresAt!.toString().substring(0, 10)}',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                  if (!isPremium)
+                    Text(
+                      'Upgrade for unlimited features',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
