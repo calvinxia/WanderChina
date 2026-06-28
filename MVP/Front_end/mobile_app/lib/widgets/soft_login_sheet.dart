@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/theme/city_theme.dart';
 import '../services/backend/auth_service.dart';
@@ -70,25 +71,49 @@ class _SoftLoginSheetState extends State<SoftLoginSheet> {
           ),
           const SizedBox(height: 24),
 
-          // Apple Sign-In
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              icon: Image.asset(
-                'assets/icons/oauth/apple_logo_white.png',
-                width: 20,
-                height: 20,
+          // Apple Sign-In (iOS only)
+          if (Platform.isIOS) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                icon: Image.asset(
+                  'assets/icons/oauth/apple_logo_white.png',
+                  width: 20,
+                  height: 20,
+                ),
+                label: const Text('Continue with Apple', style: TextStyle(fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _isLoading ? null : _handleAppleSignIn,
               ),
-              label: const Text('Continue with Apple', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: _isLoading ? null : _handleAppleSignIn,
             ),
-          ),
+          ],
+          // Google Sign-In (Android only)
+          if (Platform.isAndroid) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                icon: Image.asset(
+                  'assets/icons/oauth/google_logo.png',
+                  width: 20,
+                  height: 20,
+                ),
+                label: const Text('Continue with Google', style: TextStyle(fontSize: 16)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF1F1F1F),
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFDADCE0)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _isLoading ? null : _handleGoogleSignIn,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
 
           // Email Sign-In
@@ -131,6 +156,22 @@ class _SoftLoginSheetState extends State<SoftLoginSheet> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       debugPrint('⚠️ Apple Sign-In failed: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign in failed: ${e.toString().substring(0, e.toString().length.clamp(0, 60))}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.signInWithGoogle();
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      debugPrint('⚠️ Google Sign-In failed: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

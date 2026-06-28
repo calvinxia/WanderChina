@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../core/config/amap_config.dart';
 
@@ -132,30 +133,32 @@ class AMapService {
     }
 
     try {
-      // 临时设置为单次定位
       _locationPlugin.setLocationOption(
-        AMapLocationOption(
-          onceLocation: true,
-          needAddress: true,
-        ),
+        AMapLocationOption(onceLocation: true, needAddress: true),
       );
 
-      // 用缓存的 broadcast stream，避免重复 listen
-      _broadcastStream ??= _locationPlugin.onLocationChanged().asBroadcastStream();
-
+      final completer = Completer<Map<String, Object>?>();
+      late StreamSubscription sub;
+      sub = _locationPlugin.onLocationChanged().listen(
+        (loc) {
+          debugPrint('🔬 onLocationChanged 推送了: errorCode=${loc['errorCode']} '
+                     'lat=${loc['latitude']} lng=${loc['longitude']}');
+          if (!completer.isCompleted) completer.complete(loc);
+        },
+        onError: (e) {
+          if (!completer.isCompleted) completer.complete(null);
+        },
+      );
       _locationPlugin.startLocation();
 
-      // 等待定位结果
-      final location = await _broadcastStream!.first;
-
-      // 恢复原配置
-      await _configureLocation();
-
+      final location = await completer.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => null,
+      );
+      await sub.cancel();
       return location;
     } catch (e) {
       debugPrint('❌ 获取定位失败: $e');
-      // stream 可能已失效，清空缓存下次重建
-      _broadcastStream = null;
       return null;
     }
   }

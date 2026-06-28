@@ -563,6 +563,81 @@ def main_handler(event, context):
             print(f"[AUTH] Apple Sign-In success: {user_id}")
             return json_response(200, response_data)
 
+        elif action == 'google_sign_in':
+            from oauth_verify import verify_google_id_token
+
+            missing = validate_required(body, ['id_token'])
+            if missing:
+                return json_response(400, {'error': f'Missing {missing}'})
+
+            try:
+                decoded = verify_google_id_token(body['id_token'])
+            except Exception as e:
+                print(f"[AUTH] Google token verification failed: {e}")
+                return json_response(401, {'error': f'Invalid Google token: {e}'})
+
+            google_user_id = decoded['sub']
+            email = decoded.get('email')
+
+            cursor.execute(
+                "SELECT id FROM users WHERE google_user_id = %s AND is_active = true",
+                (google_user_id,)
+            )
+            row = cursor.fetchone()
+
+            if row:
+                user_id = str(row[0])
+            elif email:
+                cursor.execute(
+                    "SELECT id FROM users WHERE email = %s AND google_user_id IS NULL AND is_active = true",
+                    (email,)
+                )
+                existing = cursor.fetchone()
+                if existing:
+                    cursor.execute(
+                        "UPDATE users SET google_user_id = %s WHERE id = %s",
+                        (google_user_id, existing[0])
+                    )
+                    user_id = str(existing[0])
+                else:
+                    user_id = str(uuid.uuid4())
+                    cursor.execute("""
+                        INSERT INTO users (id, google_user_id, email, email_verified, last_login_at)
+                        VALUES (%s, %s, %s, TRUE, NOW())
+                    """, (user_id, google_user_id, email))
+            else:
+                cursor.close()
+                return json_response(400, {'error': 'Invalid Google token: no email'})
+
+            cursor.execute(
+                "UPDATE users SET last_login_at = NOW() WHERE id = %s",
+                (user_id,)
+            )
+            conn.commit()
+
+            cursor.execute(f"""
+                SELECT {_USER_SELECT_FIELDS}
+                FROM users WHERE id = %s
+            """, (user_id,))
+            user_row = cursor.fetchone()
+            cursor.close()
+
+            token = create_jwt(user_id)
+            response_data = _build_user_response(user_row, token=token)
+
+            if r:
+                _cache_user(r, user_id, response_data)
+                try:
+                    r.setex(f"session:{user_id}", 7 * 86400, json.dumps({
+                        'login_type': 'google',
+                        'google_user_id': google_user_id,
+                    }))
+                except Exception:
+                    pass
+
+            print(f"[AUTH] Google Sign-In success: {user_id}")
+            return json_response(200, response_data)
+
         # ===== 删除账号（软删除）=====
         elif action == 'delete_account':
             missing = validate_required(body, ['user_id'])
@@ -724,7 +799,7 @@ def main_handler(event, context):
                          f'Supported: anonymous_auth, register, login, verify, mark_ai_disclosure_shown,'
                          f'restore_session, get_profile, update_profile, '
                          f'forgot_password, reset_password, delete_account, '
-                         f'apple_sign_in'
+                         f'apple_sign_in, google_sign_in'
             })
 
     except Exception as e:

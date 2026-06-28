@@ -93,3 +93,11 @@
 -keepattributes EnclosingMethod
 -keepattributes InnerClasses
 -keepattributes SourceFile,LineNumberTable
+
+# ---------------------------------------------------------------------------
+# Google Sign-In / Play Services Auth
+# ---------------------------------------------------------------------------
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.android.gms.tasks.** { *; }
+-dontwarn com.google.android.gms.**

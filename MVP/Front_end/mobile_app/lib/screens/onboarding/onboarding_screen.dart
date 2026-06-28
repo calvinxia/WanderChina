@@ -10,6 +10,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/mountain_silhouette.dart';
 import '../../widgets/onboarding_illustrations.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../services/backend/auth_service.dart';
 import '../../widgets/ai_disclosure_dialog.dart';
 import '../main/main_screen.dart';
@@ -112,30 +113,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _isDetectingCity = true;
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
+      debugPrint('🌍 [GPS] checkPermission initial: $permission');
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.unableToDetermine) {
         permission = await Geolocator.requestPermission();
+        debugPrint('🌍 [GPS] requestPermission result: $permission');
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        debugPrint('🌍 [GPS] permission denied, skipping detection');
         _isDetectingCity = false;
         return;
       }
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.low,
       ).timeout(const Duration(seconds: 5));
-
+      debugPrint('🌍 [GPS] position: ${position.latitude}, ${position.longitude}');
       final cityKey = CityTheme.keyFromCoordinates(
         position.latitude,
         position.longitude,
       );
+      debugPrint('🌍 [GPS] detected cityKey: $cityKey');
       if (cityKey != null && mounted) {
         setState(() {
           _detectedCityKey = cityKey;
           _selectedCityKey = cityKey; // 预选，让第4页城市卡高亮
         });
       }
-    } catch (_) {
-      // GPS 失败，不影响用户继续滑动
+    } catch (e, st) {
+      debugPrint('🌍 [GPS] detection FAILED: $e');
+      // 上报 Sentry 以便诊断(定位失败本身不阻塞用户)
+      await Sentry.captureException(e, stackTrace: st);
     }
     _isDetectingCity = false;
   }

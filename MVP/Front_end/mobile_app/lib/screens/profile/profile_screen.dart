@@ -11,7 +11,6 @@ import '../../services/app_event_bus.dart';
 import '../../services/analytics_service.dart';
 import '../../services/api_client.dart';
 import '../../core/config/backend_config.dart';
-import '../../services/amap_service.dart';
 import '../../models/itinerary.dart';
 import '../auth/login_screen.dart';
 import '../auth/delete_account_screen.dart';
@@ -53,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _tabController = TabController(length: 3, vsync: this);
     _loadProfile();
     _loadTrips();
-    _loadCurrentCity();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateCityFromMainScreen());
     // [PB4] SubscriptionService 是全局单例，setState 仅触发 build 重读最新状态
     _subEventSub = AppEventBus.instance.on<PurchaseSuccessEvent>().listen((_) {
       if (mounted) setState(() {});
@@ -125,31 +124,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  Future<void> _loadCurrentCity() async {
-    try {
-      final amapService = AMapService();
-      await amapService.initialize();
-      final location = await amapService.getLocation();
-      if (location != null && mounted) {
-        final lat = double.tryParse(location['latitude'].toString()) ?? 0;
-        final lng = double.tryParse(location['longitude'].toString()) ?? 0;
-        setState(() {
-          _currentCity = _detectCity(lat, lng);
-        });
-      }
-    } catch (e) {
-      debugPrint('📍 Profile location failed: $e');
+  void _updateCityFromMainScreen() {
+    if (!mounted) return;
+    final theme = MainScreen.globalKey.currentState?.cityTheme;
+    if (theme != null) {
+      setState(() => _currentCity = theme.cityName);
     }
-  }
-
-  String _detectCity(double lat, double lng) {
-    if (lat > 39.4 && lat < 40.4 && lng > 115.7 && lng < 117.0) return 'Beijing';
-    if (lat > 30.8 && lat < 31.8 && lng > 120.8 && lng < 122.0) return 'Shanghai';
-    if (lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0) return 'Guangzhou';
-    if (lat > 22.3 && lat < 22.9 && lng > 113.7 && lng < 114.5) return 'Shenzhen';
-    if (lat > 30.0 && lat < 31.0 && lng > 103.5 && lng < 104.8) return 'Chengdu';
-    if (lat > 33.8 && lat < 34.6 && lng > 108.5 && lng < 109.5) return "Xi'an";
-    return 'China';
   }
 
   @override
@@ -186,36 +166,71 @@ class _ProfileScreenState extends State<ProfileScreen>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  icon: Image.asset(
-                    'assets/icons/oauth/apple_logo_white.png',
-                    width: 20,
-                    height: 20,
-                  ),
-                  label: const Text('Continue with Apple'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () async {
-                    try {
-                      await AuthService.signInWithApple();
-                      if (mounted) setState(() {});
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Sign in failed: $e')),
-                        );
+              if (Platform.isIOS) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    icon: Image.asset(
+                      'assets/icons/oauth/apple_logo_white.png',
+                      width: 20,
+                      height: 20,
+                    ),
+                    label: const Text('Continue with Apple'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      try {
+                        await AuthService.signInWithApple();
+                        if (mounted) setState(() {});
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Sign in failed: $e')),
+                          );
+                        }
                       }
-                    }
-                  },
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
+              if (Platform.isAndroid) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1F1F1F),
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFFDADCE0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: Image.asset(
+                      'assets/icons/oauth/google_logo.png',
+                      width: 20,
+                      height: 20,
+                    ),
+                    label: const Text('Continue with Google', style: TextStyle(fontSize: 15)),
+                    onPressed: () async {
+                      try {
+                        await AuthService.signInWithGoogle();
+                        if (mounted) setState(() {});
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Sign in failed: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 height: 50,

@@ -8,6 +8,20 @@ allprojects {
     }
 }
 
+// 为缺少 namespace 的老插件自动补全(AGP 8+ 要求)
+// amap_flutter_location 3.0.0 等老插件未声明 namespace
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                if (namespace == null) {
+                    namespace project.group.toString()
+                }
+            }
+        }
+    }
+}
+
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"

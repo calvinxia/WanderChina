@@ -8,7 +8,6 @@ import '../../widgets/mountain_silhouette.dart';
 import '../voice/voice_translation_screen.dart';
 import '../../services/backend/auth_service.dart';
 import '../../services/app_event_bus.dart';
-import '../../services/amap_service.dart';
 import '../main/main_screen.dart';
 import '../../core/theme/city_theme.dart';
 
@@ -34,7 +33,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadUserInfo();
-    _loadCurrentCity();
+    // 读 MainScreen 已识别的城市主题，避免与 main_screen 并发定位冲突
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateCityFromMainScreen());
+    Future.delayed(const Duration(seconds: 3), _updateCityFromMainScreen);
     _loginSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
       if (mounted) {
         _loadUserInfo();
@@ -61,31 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadCurrentCity() async {
-    try {
-      final amapService = AMapService();
-      await amapService.initialize();
-      final location = await amapService.getLocation();
-      if (location != null && mounted) {
-        // 用经纬度反查城市（简单方案：根据坐标范围判断）
-        final lat = double.tryParse(location['latitude'].toString()) ?? 0;
-        final lng = double.tryParse(location['longitude'].toString()) ?? 0;
-        setState(() {
-          _currentCity = _detectCity(lat, lng);
-        });
-      }
-    } catch (_) {}
-  }
-
-  String _detectCity(double lat, double lng) {
-    // 简单经纬度范围判断
-    if (lat > 39.4 && lat < 40.4 && lng > 115.7 && lng < 117.0) return 'Beijing, China';
-    if (lat > 30.8 && lat < 31.8 && lng > 120.8 && lng < 122.0) return 'Shanghai, China';
-    if (lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0) return 'Guangzhou, China';
-    if (lat > 22.3 && lat < 22.9 && lng > 113.7 && lng < 114.5) return 'Shenzhen, China';
-    if (lat > 30.0 && lat < 31.0 && lng > 103.5 && lng < 104.8) return 'Chengdu, China';
-    if (lat > 33.8 && lat < 34.6 && lng > 108.5 && lng < 109.5) return "Xi'an, China";
-    return 'China';
+  void _updateCityFromMainScreen() {
+    if (!mounted) return;
+    final theme = MainScreen.globalKey.currentState?.cityTheme;
+    if (theme != null) {
+      setState(() => _currentCity = theme.cityName);
+    }
   }
 
   String get _greeting {

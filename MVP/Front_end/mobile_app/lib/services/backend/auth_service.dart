@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 // lib/services/backend/auth_service.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../api_client.dart';
 import '../app_event_bus.dart';
 import '../subscription_service.dart';
@@ -10,6 +11,12 @@ class AuthService {
   static String? _currentUserId;
   static String? _currentToken;
   static String? _loginType;  // 'anonymous' | 'registered'
+
+  // Google Sign-In 实例(serverClientId 用 Web Client,以便后端验证 id_token)
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '641720570444-ilmrpkcu3161kmh59jbk2algc1h4p9dq.apps.googleusercontent.com',
+    scopes: ['email', 'profile', 'openid'],
+  );
 
   static String? get currentUserId => _currentUserId;
   static bool get isLoggedIn => _currentToken != null;
@@ -120,6 +127,43 @@ class AuthService {
       rethrow;
     } catch (e) {
       debugPrint('[AUTH] Apple Sign-In failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Google Sign-In 登录(Android 主用;iOS 用 Apple Sign-In)
+  ///
+  /// 返回 null 表示用户取消,throw Exception 表示技术错误
+  /// 后端 google_sign_in action 通过 Cloudflare 中转验证 id_token
+  static Future<Map<String, dynamic>?> signInWithGoogle() async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        debugPrint('[AUTH] Google Sign-In cancelled by user');
+        return null;
+      }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null) {
+        debugPrint('[AUTH] Google Sign-In: idToken is null');
+        throw Exception('Google Sign-In failed: no id token returned');
+      }
+      final result = await ApiClient.post(ApiClient.authUrl, {
+        'action': 'google_sign_in',
+        'id_token': idToken,
+        'email': googleUser.email,
+        'display_name': googleUser.displayName,
+      });
+      _currentUserId = result['user_id'];
+      _currentToken = result['token'];
+      _loginType = 'registered';
+      AppEventBus.instance.fire(LoginStatusChangedEvent());
+      await _saveSession();
+      SubscriptionService.instance.updateFromServer(result);
+      syncAIDisclosure();
+      return result;
+    } catch (e) {
+      debugPrint('[AUTH] Google Sign-In failed: $e');
       rethrow;
     }
   }
