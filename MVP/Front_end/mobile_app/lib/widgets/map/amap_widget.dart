@@ -75,6 +75,9 @@ class WanderAMapWidget extends StatefulWidget {
   /// 标记点击回调
   final Function(String)? onMarkerTap;
 
+  /// 地图定位更新回调（GCJ-02坐标）
+  final void Function(LatLng location)? onLocationUpdate;
+
   const WanderAMapWidget({
     super.key,
     this.initialLatitude,
@@ -98,6 +101,7 @@ class WanderAMapWidget extends StatefulWidget {
     this.onCameraIdle,
     this.onMapTap,
     this.onMarkerTap,
+    this.onLocationUpdate,
   });
 
   @override
@@ -140,6 +144,10 @@ class _WanderAMapWidgetState extends State<WanderAMapWidget> {
       onCameraMove: widget.onCameraMove,
       onCameraMoveEnd: widget.onCameraIdle,
       onTap: widget.onMapTap,
+      myLocationStyleOptions: MyLocationStyleOptions(true),
+      onLocationChanged: (AMapLocation loc) {
+        widget.onLocationUpdate?.call(loc.latLng);
+      },
     );
   }
 

@@ -1,6 +1,6 @@
 name: wanderchina
 description: AI-Powered China Travel Companion - Your ultimate guide to exploring China
-version: 1.0.0+7
+version: 1.0.0+16
 publish_to: 'none'
 
 environment:
@@ -69,6 +69,7 @@ dependencies:
 
   # Authentication / Third-party Sign-In
   sign_in_with_apple: ^6.1.0
+  google_sign_in: ^6.2.1
 
   # In-App Purchase
   in_app_purchase: ^3.2.0
@@ -80,6 +81,7 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   hive_generator: ^2.0.1
   build_runner: ^2.4.7
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -95,3 +97,10 @@ flutter:
 
   # Fonts (using Google Fonts at runtime）
 
+flutter_launcher_icons:
+  android: true
+  ios: false  # iOS 已经有了,不动
+  image_path: "assets/icons/icon_1024.png"
+  adaptive_icon_background: "assets/icons/ic_background.png"
+  adaptive_icon_foreground: "assets/icons/ic_foreground.png"
+  min_sdk_android: 24

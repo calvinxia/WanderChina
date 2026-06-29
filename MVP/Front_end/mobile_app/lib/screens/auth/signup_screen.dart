@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../services/backend/auth_service.dart';
@@ -100,6 +101,54 @@ class _SignupScreenState extends State<SignupScreen> {
       await Sentry.addBreadcrumb(Breadcrumb(
         category: 'auth',
         message: 'apple_sign_in_failed',
+        data: {'error': e.toString()},
+      ));
+      await Sentry.captureException(e, stackTrace: StackTrace.current);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showVpnAwareErrorDialog(
+          title: 'Sign in failed',
+          body: 'If you\'re in mainland China:\n'
+                '• Make sure your VPN is on\n'
+                '• Try Smart Mode or Split Tunnel\n'
+                '• Or use Email sign-up instead',
+        );
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        category: 'auth',
+        message: 'google_sign_in_attempt',
+      ));
+
+      final result = await AuthService.signInWithGoogle();
+
+      // User cancelled - silent return
+      if (result == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint('🔐 Google Sign-In error: $e');
+      await Sentry.addBreadcrumb(Breadcrumb(
+        category: 'auth',
+        message: 'google_sign_in_failed',
         data: {'error': e.toString()},
       ));
       await Sentry.captureException(e, stackTrace: StackTrace.current);
@@ -305,25 +354,49 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 20),
 
-                // Apple Sign-In
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _signInWithApple,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white.withOpacity(0.8),
-                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                // Apple Sign-In (iOS only)
+                if (Platform.isIOS) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _signInWithApple,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white.withOpacity(0.8),
+                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: Image.asset(
+                        'assets/icons/oauth/apple_logo_white.png',
+                        width: 20,
+                        height: 20,
+                      ),
+                      label: const Text('Continue with Apple', style: TextStyle(fontSize: 15)),
                     ),
-                    icon: Image.asset(
-                      'assets/icons/oauth/apple_logo_white.png',
-                      width: 20,
-                      height: 20,
-                    ),
-                    label: const Text('Continue with Apple', style: TextStyle(fontSize: 15)),
                   ),
-                ),
+                ],
+                // Google Sign-In (Android only)
+                if (Platform.isAndroid) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _signInWithGoogle,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1F1F1F),
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFFDADCE0)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: Image.asset(
+                        'assets/icons/oauth/google_logo.png',
+                        width: 20,
+                        height: 20,
+                      ),
+                      label: const Text('Continue with Google', style: TextStyle(fontSize: 15)),
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 32),
 

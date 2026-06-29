@@ -5,6 +5,17 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// ============================================================================
+// 读取 release 签名配置(2026-06)
+// key.properties 存放 wanderchina.jks 的路径与密码,不提交 git
+// 文件位置:android/key.properties
+// ============================================================================
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.wanderchina.app"
     compileSdk = flutter.compileSdkVersion
@@ -30,11 +41,26 @@ android {
         versionName = flutter.versionName
     }
 
+    // ========================================================================
+    // 签名配置(2026-06)
+    // release 使用 wanderchina.jks,SHA1: 7D:E0:46:AE:... 对应高德「发布版安全码」
+    // ========================================================================
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            // 使用正式 release 签名(wanderchina.jks)
+            // 若 key.properties 不存在,回退到 debug 签名以保证 `flutter run --release` 仍可用
+            signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
 
             // 显式控制 R8 + 引用高德 keep 规则(2026-05-28)
             // 根因:AGP 8.9.1 release 默认启用 R8,无 keep 规则时会误删
@@ -69,4 +95,11 @@ flutter {
 //
 // 注:Android 正式版开发时,应升级 sentry_flutter 到 9.x 并启用
 //     splits.abi 配置,届时本注释可删除。
+//
+// 签名说明(2026-06):
+//     release 构建现使用 wanderchina.jks(见 signingConfigs.release)。
+//     keystore 信息存于 android/key.properties(不提交 git)。
+//     SHA1 7D:E0:46:AE:... 已对应高德开放平台「发布版安全码 SHA1」。
+//     debug 签名 SHA1 80:37:F4:... 已对应高德「调试版安全码 SHA1」,
+//     供 `flutter run` 调试构建使用。
 // ============================================================================

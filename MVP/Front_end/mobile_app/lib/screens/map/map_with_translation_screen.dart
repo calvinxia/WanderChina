@@ -15,7 +15,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/city_theme.dart';
 import '../../services/poi_service.dart';
 import '../../services/route_planning_service.dart';
-import '../../services/amap_service.dart';
 import '../../services/api_client.dart';
 import '../../services/analytics_service.dart';
 import '../../core/config/backend_config.dart';
@@ -76,6 +75,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
   bool _showRoutePanel = false;
   bool _isLoadingRoutes = false;
   LatLng? _currentLocation;  // 从定位获取
+  bool _hasInitialCentered = false;
   bool _showRouteOnMap = false;  // Scenario 1: 路线已显示在地图上
   LatLng? _customOrigin;  // 自定义起点
   String _originName = 'My Location';  // 起点名称
@@ -98,7 +98,6 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
   void initState() {
     super.initState();
     _currentLanguage = widget.language;
-    _fetchCurrentLocation();
     _checkConnectivity();
   }
 
@@ -140,24 +139,13 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     return map[city] ?? '北京';
   }
 
-  Future<void> _fetchCurrentLocation() async {
-    try {
-      final amapService = AMapService();
-      await amapService.initialize();
-      final location = await amapService.getLocation();
-      if (location != null && mounted) {
-        final lat = double.tryParse(location['latitude'].toString());
-        final lng = double.tryParse(location['longitude'].toString());
-        if (lat != null && lng != null) {
-          debugPrint('📍 Got location: $lat, $lng');
-          setState(() {
-            _currentLocation = LatLng(lat, lng);
-          });
-          _mapKey.currentState?.moveTo(_currentLocation!, zoom: 15);
-        }
-      }
-    } catch (e) {
-      debugPrint('📍 Location failed: $e');
+  void _fetchCurrentLocation() {
+    final loc = _currentLocation;
+    if (loc != null) {
+      _mapKey.currentState?.moveTo(loc, zoom: 15);
+      debugPrint('📍 Recenter: moveTo $loc');
+    } else {
+      debugPrint('📍 Recenter: 定位尚未就绪');
     }
   }
 
@@ -705,6 +693,16 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                   'zoom': pos.zoom,
                 },
               ));
+            },
+            onLocationUpdate: (LatLng loc) {
+              if (!mounted) return;
+              _currentLocation = loc;
+              if (!_hasInitialCentered) {
+                _hasInitialCentered = true;
+                final ctrl = _mapKey.currentState;
+                ctrl?.moveTo(loc, zoom: 15);
+                debugPrint('📍 地图自带定位居中: $loc');
+              }
             },
           ),
           ), // RepaintBoundary

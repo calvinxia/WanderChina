@@ -1,13 +1,14 @@
 # route_plan/index.py
 # -*- coding: utf-8 -*-
 """
-路线规划云函数（优化版 v2.1）
+路线规划云函数（优化版 v2.2）
 - 调用高德路线规划 API 获取路线
 - 步行/驾车指令：纯本地模板翻译，零网络调用
 - 公交站名：查库翻译（3s 超时），未命中返回中文原文（不 fallback DeepSeek）
 - 线路名：规则化翻译（不需要 AI）
 - 目标：总响应时间 < 10s
 - v2.1: 修复高德返回 list 而非 dict 的类型防御
+- v2.2: 新增 _safe_int / _safe_float，修复高德数值字段返回空 list 导致 int() 崩溃
 """
 import os
 import sys
@@ -79,6 +80,45 @@ def _safe_dict(value, default=None):
     if isinstance(value, dict):
         return value
     return default
+
+
+def _safe_int(value, default=0):
+    """确保返回 int，防御高德返回 list / 空 list / None / 字符串 / dict"""
+    if isinstance(value, list):
+        value = value[0] if value else default
+    if isinstance(value, dict):
+        return default
+    if value is None or value == '':
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float(value, default=0.0):
+    """确保返回 float，防御高德返回 list / 空 list / None / 字符串 / dict"""
+    if isinstance(value, list):
+        value = value[0] if value else default
+    if isinstance(value, dict):
+        return default
+    if value is None or value == '':
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_str(value, default=''):
+    """确保返回 str，防御高德返回 list / None / dict"""
+    if isinstance(value, list):
+        value = value[0] if value else default
+    if isinstance(value, dict):
+        return default
+    if value is None:
+        return default
+    return str(value)
 
 
 # ===== 纯本地翻译函数（零网络调用）=====
@@ -217,25 +257,36 @@ def lookup_station_name(name_zh, lang):
 
 def parse_transit_route(route_data, lang):
     routes = []
-    transits = route_data.get('route', {}).get('transits', [])
+    route_obj = _safe_dict(route_data.get('route', {}))
+    transits = route_obj.get('transits', [])
+    if not isinstance(transits, list):
+        transits = []
 
     for transit in transits[:3]:
+        transit = _safe_dict(transit)
         steps = []
         segments = transit.get('segments', [])
+        if not isinstance(segments, list):
+            segments = []
 
         for segment in segments:
+            segment = _safe_dict(segment)
+
             # 步行段（类型防御）
             walking = _safe_dict(segment.get('walking', {}))
-            if walking and int(walking.get('distance', 0)) > 0:
+            walk_distance = _safe_int(walking.get('distance'))
+            if walking and walk_distance > 0:
                 walk_steps = walking.get('steps', [])
-                distance = int(walking.get('distance', 0))
-                duration = int(walking.get('duration', 0))
+                if not isinstance(walk_steps, list):
+                    walk_steps = []
+                distance = walk_distance
+                duration = _safe_int(walking.get('duration'))
 
                 # 提取目的地
                 destination_zh = ''
                 if walk_steps:
                     last_step = _safe_dict(walk_steps[-1]) if walk_steps else {}
-                    last_instruction = last_step.get('instruction', '')
+                    last_instruction = _safe_str(last_step.get('instruction', ''))
                     m = re.search(r'到达(.+)', last_instruction)
                     if m:
                         destination_zh = m.group(1)
@@ -263,16 +314,18 @@ def parse_transit_route(route_data, lang):
             # 公交/地铁段（类型防御）
             bus_info = _safe_dict(segment.get('bus', {}))
             buslines = bus_info.get('buslines', [])
+            if not isinstance(buslines, list):
+                buslines = []
             if buslines:
                 line = _safe_dict(buslines[0]) if buslines else {}
-                line_name_zh = line.get('name', '')
+                line_name_zh = _safe_str(line.get('name', ''))
                 departure_stop = _safe_dict(line.get('departure_stop', {}))
                 arrival_stop = _safe_dict(line.get('arrival_stop', {}))
-                departure_zh = departure_stop.get('name', '')
-                arrival_zh = arrival_stop.get('name', '')
-                via_num = int(line.get('via_num', 0))
-                distance = int(line.get('distance', 0))
-                duration = int(line.get('duration', 0))
+                departure_zh = _safe_str(departure_stop.get('name', ''))
+                arrival_zh = _safe_str(arrival_stop.get('name', ''))
+                via_num = _safe_int(line.get('via_num'))
+                distance = _safe_int(line.get('distance'))
+                duration = _safe_int(line.get('duration'))
 
                 instruction_zh = f"乘坐{line_name_zh}, {departure_zh}上车, {arrival_zh}下车"
                 if via_num > 0:
@@ -316,26 +369,33 @@ def parse_transit_route(route_data, lang):
         # 拼接 transit polyline（步行段 + 公交段，类型防御）
         all_polyline_parts = []
         for segment in segments:
+            segment = _safe_dict(segment)
             walking = _safe_dict(segment.get('walking', {}))
-            for ws in walking.get('steps', []):
+            walk_steps = walking.get('steps', [])
+            if not isinstance(walk_steps, list):
+                walk_steps = []
+            for ws in walk_steps:
                 ws = _safe_dict(ws)
-                pl = ws.get('polyline', '')
+                pl = _safe_str(ws.get('polyline', ''))
                 if pl:
                     all_polyline_parts.append(pl)
             bus_info = _safe_dict(segment.get('bus', {}))
-            for bl in bus_info.get('buslines', []):
+            buslines = bus_info.get('buslines', [])
+            if not isinstance(buslines, list):
+                buslines = []
+            for bl in buslines:
                 bl = _safe_dict(bl)
-                pl = bl.get('polyline', '')
+                pl = _safe_str(bl.get('polyline', ''))
                 if pl:
                     all_polyline_parts.append(pl)
         all_polyline = ';'.join(all_polyline_parts)
 
         # 路线摘要
         route_entry = {
-            'distance': int(transit.get('distance', 0)),
-            'duration': int(transit.get('duration', 0)),
-            'cost': float(transit.get('cost', 0) or 0),
-            'walking_distance': int(transit.get('walking_distance', 0)),
+            'distance': _safe_int(transit.get('distance')),
+            'duration': _safe_int(transit.get('duration')),
+            'cost': _safe_float(transit.get('cost')),
+            'walking_distance': _safe_int(transit.get('walking_distance')),
             'steps': steps,
             'polyline': all_polyline,
         }
@@ -363,17 +423,23 @@ def parse_transit_route(route_data, lang):
 
 def parse_walking_driving_route(route_data, mode, lang):
     routes = []
-    paths = route_data.get('route', {}).get('paths', [])
+    route_obj = _safe_dict(route_data.get('route', {}))
+    paths = route_obj.get('paths', [])
+    if not isinstance(paths, list):
+        paths = []
 
     for path in paths[:2]:
+        path = _safe_dict(path)
         steps = []
-        for raw_step in path.get('steps', []):
+        raw_steps = path.get('steps', [])
+        if not isinstance(raw_steps, list):
+            raw_steps = []
+        for raw_step in raw_steps:
             raw_step = _safe_dict(raw_step)
-            instruction_zh = raw_step.get('instruction', '')
-            road_raw = raw_step.get('road', '')
-            road_zh = road_raw if isinstance(road_raw, str) else ''
-            distance = int(raw_step.get('distance', 0))
-            duration = int(raw_step.get('duration', 0))
+            instruction_zh = _safe_str(raw_step.get('instruction', ''))
+            road_zh = _safe_str(raw_step.get('road', ''))
+            distance = _safe_int(raw_step.get('distance'))
+            duration = _safe_int(raw_step.get('duration'))
 
             step = {
                 'type': mode,
@@ -381,7 +447,7 @@ def parse_walking_driving_route(route_data, mode, lang):
                 'road_zh': road_zh,
                 'distance': distance,
                 'duration': duration,
-                'polyline': raw_step.get('polyline', ''),
+                'polyline': _safe_str(raw_step.get('polyline', '')),
             }
 
             if lang != 'zh':
@@ -397,8 +463,8 @@ def parse_walking_driving_route(route_data, mode, lang):
         all_polyline = ';'.join(s.get('polyline', '') for s in steps if s.get('polyline'))
 
         routes.append({
-            'distance': int(path.get('distance', 0)),
-            'duration': int(path.get('duration', 0)),
+            'distance': _safe_int(path.get('distance')),
+            'duration': _safe_int(path.get('duration')),
             'steps': steps,
             'polyline': all_polyline,
         })
@@ -409,6 +475,11 @@ def parse_walking_driving_route(route_data, mode, lang):
 # ===== 主入口 =====
 
 def main_handler(event, context):
+
+    # 定时触发器预热 — 快速返回保持容器热
+    if isinstance(event, dict) and 'TriggerName' in event:
+        return {'statusCode': 200, 'body': '{"status":"warm"}'}
+
     global _station_cache
     _station_cache = {}
 

@@ -23,6 +23,7 @@ class WanderMap extends StatefulWidget {
   final void Function(LatLng)?           onMapTap;
   final void Function(POITranslation)?   onPOITap;
   final void Function(CameraPosition)?   onCameraMove;
+  final void Function(LatLng)?           onLocationUpdate;
 
   const WanderMap({
     super.key,
@@ -36,6 +37,7 @@ class WanderMap extends StatefulWidget {
     this.onMapTap,
     this.onPOITap,
     this.onCameraMove,
+    this.onLocationUpdate,
   });
 
   @override
@@ -399,6 +401,9 @@ class WanderMapState extends State<WanderMap> {
             // 注：高德原生 SDK 的定位蓝点 InfoWindow 文字无法直接改为英文
             // MyLocationStyleOptions 只有 enabled 参数，无法禁用 InfoWindow
           ),
+          onLocationChanged: (AMapLocation loc) {
+            widget.onLocationUpdate?.call(loc.latLng);
+          },
           // 自定义地图样式
           customStyleOptions: _styleData != null && _styleExtraData != null
               ? CustomStyleOptions(

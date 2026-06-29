@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 OAuth ID Token 验证模块.
-当前只支持 Apple (Google 因腾讯云广州 SCF 无法访问 googleapis.com 暂时移除).
+支持 Apple 和 Google Sign-In.
+Google 验证经 Cloudflare 代理中转(广州 SCF 无法直连 googleapis.com).
 """
 import os
 import time
@@ -67,3 +68,67 @@ def verify_apple_id_token(id_token):
         issuer='https://appleid.apple.com'
     )
     return decoded
+
+
+# ============================================================================
+# Google Sign-In 验证(方式 1:经 Cloudflare 中转 tokeninfo 端点)
+# ----------------------------------------------------------------------------
+# 背景:广州 SCF 无法直连 googleapis.com(2026-05-12 实测 TCP 阻断),
+#       故经 gproxy.wanderchina.app 中转。详见 ADR_google_signin_verification.md
+# 约束:必须带正常 User-Agent,否则 Cloudflare bot 防护返回 403
+# ============================================================================
+
+GOOGLE_PROXY_URL = os.environ.get(
+    'GOOGLE_PROXY_URL',
+    'https://gproxy.wanderchina.app/verify-google-token'
+)
+GOOGLE_WEB_CLIENT_ID = os.environ.get('GOOGLE_WEB_CLIENT_ID', '')
+
+_PROXY_UA = 'Mozilla/5.0 (compatible; WanderChina-SCF/1.0)'
+
+
+def verify_google_id_token(id_token):
+    """验证 Google ID token,返回解析后的 payload(含 sub, email)。
+
+    方式 1:将 id_token 经 gproxy 转发至 Google tokeninfo 端点,
+    由 Google 验证并返回解析结果。
+
+    Raises:
+        RuntimeError: 配置缺失
+        ValueError:   token 无效 / aud 不匹配 / 验证失败
+    """
+    if not GOOGLE_WEB_CLIENT_ID:
+        raise RuntimeError("GOOGLE_WEB_CLIENT_ID env var not set")
+
+    url = f"{GOOGLE_PROXY_URL}?token={id_token}"
+    try:
+        resp = http_requests.get(
+            url,
+            headers={'User-Agent': _PROXY_UA},
+            timeout=10,
+        )
+    except Exception as e:
+        raise ValueError(f"Google token verification request failed: {e}")
+
+    if resp.status_code != 200:
+        raise ValueError(
+            f"Google token invalid (status {resp.status_code}): {resp.text[:200]}"
+        )
+
+    try:
+        payload = resp.json()
+    except Exception as e:
+        raise ValueError(f"Google tokeninfo returned non-JSON: {e}")
+
+    aud = payload.get('aud')
+    if aud != GOOGLE_WEB_CLIENT_ID:
+        raise ValueError(f"Google token aud mismatch: {aud}")
+
+    iss = payload.get('iss')
+    if iss not in ('accounts.google.com', 'https://accounts.google.com'):
+        raise ValueError(f"Google token iss invalid: {iss}")
+
+    if not payload.get('sub'):
+        raise ValueError("Google token missing sub")
+
+    return payload
