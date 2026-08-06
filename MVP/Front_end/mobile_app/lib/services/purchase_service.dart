@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:flutter/foundation.dart';
 import 'api_client.dart';
@@ -74,7 +76,9 @@ class PurchaseService {
     }
   }
 
-  /// 触发购买 (Non-Renewing 用 buyNonConsumable)
+  /// 触发购买:
+  /// - Android: buyConsumable (限时通行证过期后可重买)
+  /// - iOS: buyNonConsumable (Non-Renewing Subscription)
   Future<bool> buy(String productId) async {
     final product = findProduct(productId);
     if (product == null) {
@@ -84,7 +88,16 @@ class PurchaseService {
 
     try {
       final purchaseParam = PurchaseParam(productDetails: product);
-      final result = await _iap.buyNonConsumable(purchaseParam: purchaseParam);
+      final bool result;
+      if (Platform.isAndroid) {
+        // autoConsume: false — 后端验证成功后再手动 consume
+        result = await _iap.buyConsumable(
+          purchaseParam: purchaseParam,
+          autoConsume: false,
+        );
+      } else {
+        result = await _iap.buyNonConsumable(purchaseParam: purchaseParam);
+      }
       debugPrint('[PURCHASE] Purchase initiated for $productId, result: $result');
       return result;
     } catch (e) {
@@ -113,7 +126,14 @@ class PurchaseService {
           final verified = await _verifyOnBackend(purchase);
 
           if (verified) {
-            await _iap.completePurchase(purchase);
+            if (Platform.isAndroid) {
+              // consumePurchase = acknowledge + consume (允许重复购买)
+              final androidAddition =
+                  _iap.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+              await androidAddition.consumePurchase(purchase);
+            } else {
+              await _iap.completePurchase(purchase);
+            }
             debugPrint('[PURCHASE] Verified + completed: ${purchase.productID}');
           } else {
             debugPrint('[PURCHASE] Backend verification FAILED for ${purchase.productID}');
@@ -137,18 +157,75 @@ class PurchaseService {
     }
   }
 
-  /// 后端验证 Apple 收据
+  /// 后端验证,按平台分发
   Future<bool> _verifyOnBackend(PurchaseDetails purchase) async {
+    final userId = AuthService.currentUserId;
+    if (userId == null) {
+      debugPrint('[PURCHASE] No current user, cannot verify');
+      return false;
+    }
+
+    if (Platform.isAndroid) {
+      return _verifyAndroidOnBackend(purchase, userId);
+    }
+    return _verifyiOSOnBackend(purchase, userId);
+  }
+
+  /// Android: 发送 Google Play Purchase Token 到后端
+  Future<bool> _verifyAndroidOnBackend(
+    PurchaseDetails purchase,
+    String userId,
+  ) async {
     try {
-      final userId = AuthService.currentUserId;
-      if (userId == null) {
-        debugPrint('[PURCHASE] No current user, cannot verify');
-        return false;
+      final purchaseToken = purchase.verificationData.serverVerificationData;
+
+      final result = await ApiClient.post(
+        ApiClient.purchaseVerifyUrl,
+        {
+          'user_id': userId,
+          'platform': 'google',
+          'product_id': purchase.productID,
+          'transaction_id': purchase.purchaseID ?? '',
+          'purchase_token': purchaseToken,
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      final success = result['success'] == true;
+
+      if (success) {
+        final expiresStr = result['premium_expires_at']?.toString() ?? '';
+        final expiresAt = DateTime.tryParse(expiresStr) ??
+            DateTime.now().add(const Duration(days: 7));
+        SubscriptionService.instance
+            .updateFromPurchase(purchase.productID, expiresAt);
+        debugPrint('[PURCHASE] Android backend verified: expires=$expiresAt');
+      } else {
+        AppEventBus.instance.fire(PurchaseFailedEvent(
+          productId: purchase.productID,
+          reason: result['error']?.toString() ?? 'unknown',
+        ));
+        debugPrint('[PURCHASE] Android backend rejected: ${result['error'] ?? 'unknown'}');
       }
 
-      // 通过公开 API 获取 App Receipt（base64 PKCS7）
-      final platformAddition = _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
-      final receiptData = await platformAddition.refreshPurchaseVerificationData();
+      return success;
+    } catch (e) {
+      debugPrint('[PURCHASE] Android verification exception: $e');
+      return false;
+    }
+  }
+
+  /// iOS: 发送 App Receipt (PKCS7) 到后端
+  Future<bool> _verifyiOSOnBackend(
+    PurchaseDetails purchase,
+    String userId,
+  ) async {
+    try {
+      // 获取 App Receipt（base64 PKCS7）— 需要 enableStoreKit1 已调用
+      final platformAddition =
+          _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
+      final receiptData =
+          await platformAddition.refreshPurchaseVerificationData();
       final appReceipt = receiptData?.localVerificationData ?? '';
 
       if (appReceipt.isEmpty) {
@@ -168,29 +245,26 @@ class PurchaseService {
         timeout: const Duration(seconds: 15),
       );
 
-      // ApiClient.post 已解析 JSON，result 直接是 Map
       final success = result['success'] == true;
 
       if (success) {
         final expiresStr = result['premium_expires_at']?.toString() ?? '';
-        final expiresAt = DateTime.tryParse(expiresStr) ?? DateTime.now().add(const Duration(days: 7));
-
-        // 更新 SubscriptionService（自动持久化 + 发事件）
-        SubscriptionService.instance.updateFromPurchase(purchase.productID, expiresAt);
-
-        debugPrint('[PURCHASE] Backend verified: expires=$expiresAt');
+        final expiresAt = DateTime.tryParse(expiresStr) ??
+            DateTime.now().add(const Duration(days: 7));
+        SubscriptionService.instance
+            .updateFromPurchase(purchase.productID, expiresAt);
+        debugPrint('[PURCHASE] iOS backend verified: expires=$expiresAt');
       } else {
-        // 发送购买失败事件
         AppEventBus.instance.fire(PurchaseFailedEvent(
           productId: purchase.productID,
           reason: result['error']?.toString() ?? 'unknown',
         ));
-        debugPrint('[PURCHASE] Backend rejected: ${result['error'] ?? 'unknown'}');
+        debugPrint('[PURCHASE] iOS backend rejected: ${result['error'] ?? 'unknown'}');
       }
 
       return success;
     } catch (e) {
-      debugPrint('[PURCHASE] Backend verification exception: $e');
+      debugPrint('[PURCHASE] iOS verification exception: $e');
       return false;
     }
   }

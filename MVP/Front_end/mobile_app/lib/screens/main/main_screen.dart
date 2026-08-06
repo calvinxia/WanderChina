@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../widgets/common/app_bottom_navigation.dart';
@@ -189,7 +190,9 @@ class MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final isMapPage = _currentIndex == 1;
 
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       body: CityBackground(
         theme: _cityTheme,
@@ -201,6 +204,7 @@ class MainScreenState extends State<MainScreen> {
         onTap: _onTabTapped,
         isTransparent: !isMapPage,
         themeColor: _cityTheme.pillActiveColor,
+      ),
       ),
     );
   }

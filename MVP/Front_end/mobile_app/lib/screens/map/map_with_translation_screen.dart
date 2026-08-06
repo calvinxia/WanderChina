@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 import '../../widgets/map/wander_map.dart';
@@ -654,7 +655,9 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
     // Get city theme from MainScreen
     final cityTheme = context.findAncestorStateOfType<MainScreenState>()?.cityTheme ?? CityTheme.defaultTheme;
 
-    return GestureDetector(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () => FocusScope.of(context).unfocus(),
       child: Stack(
@@ -672,6 +675,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             onPOITap: _handlePOITap,
             // Fix-2: 点击空白处收回 POI Bottom Sheet 和搜索结果
             onMapTap: (latLng) {
+              FocusScope.of(context).unfocus();
               if (_showPOISheet || _showRoutePanel || _showSearchResults) {
                 setState(() {
                   _showPOISheet = false;
@@ -733,8 +737,8 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
             top: 0,
             left: 0,
             right: 0,
-            child: SafeArea(
-              bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -823,9 +827,8 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
           // 3. Map controls (right side)
           Positioned(
             right: 16,
-            top: 140,
-            child: SafeArea(
-              child: Column(mainAxisSize: MainAxisSize.min,
+            top: MediaQuery.of(context).padding.top + 140,
+            child: Column(mainAxisSize: MainAxisSize.min,
                 children: [
                   // GPS recenter button
                   FloatingActionButton.small(
@@ -865,7 +868,6 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
                     child: const Icon(Icons.remove, color: AppColors.gray700),
                   ),
                 ],
-              ),
             ),
           ),
 
@@ -931,6 +933,7 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

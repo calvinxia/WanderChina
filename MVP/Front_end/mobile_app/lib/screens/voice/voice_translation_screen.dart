@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/poi_translation.dart';
@@ -151,7 +152,9 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     final mainState = MainScreen.globalKey.currentState;
     final cityTheme = mainState?.cityTheme ?? CityTheme.defaultTheme;
 
-    return CityBackground(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: CityBackground(
       theme: cityTheme,
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
@@ -220,6 +223,7 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         ),
       ),
         ),
+      ),
       ),
     );
   }

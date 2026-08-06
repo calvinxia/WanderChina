@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:amap_map/amap_map.dart';
 import 'package:x_amap_base/x_amap_base.dart';
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/amap_config.dart';
 import 'core/config/backend_config.dart';
@@ -19,6 +21,13 @@ import 'screens/onboarding/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // StoreKit 1 必须在任何 IAP platform 注册之前调用
+  // in_app_purchase_storekit 0.4.0 起默认 SK2,需明确降回 SK1
+  // 保持与现有后端 App Receipt (PKCS7) 验证兼容
+  if (Platform.isIOS) {
+    await InAppPurchaseStoreKitPlatform.enableStoreKit1();
+  }
 
   // AMap 地图隐私合规 + API Key（必须在 runApp 之前）
   AMapInitializer.updatePrivacyAgree(AMapPrivacyStatement(

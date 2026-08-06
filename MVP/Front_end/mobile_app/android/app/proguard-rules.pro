@@ -35,8 +35,13 @@
 -keep class com.loc.**  { *; }
 
 -dontwarn com.amap.api.**
+-dontwarn com.amap.ams.**
 -dontwarn com.autonavi.**
 -dontwarn com.loc.**
+
+# SDK 11.2.000 引入的可选 GNSS 模块,通过独立 .so 加载,R8 静态扫描找不到
+-keep class com.amap.ams.** { *; }
+-keep class com.amap.location.** { *; }
 
 # 高德通过反射调用的 native 回调类,必须保留成员
 -keepclassmembers class com.autonavi.** { *; }

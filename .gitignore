@@ -314,3 +314,23 @@ AuthKey_*.p8
 **/cloud_functions/**/bin/
 **/cloud_functions/**/cffi/
 *.backup
+
+# 商业与战略文档(本地保留,不入库)
+MVP_Guide/**/*.pdf
+MVP_Guide/**/DECISION_*.md
+MVP_Guide/**/SEO战略*.md
+MVP_Guide/**/多语言战略*.md
+MVP_Guide/**/MASTER_ROADMAP*.md
+MVP_Guide/**/地图英文化方案*.md
+MVP_Guide/*/*.pdf
+MVP_Guide/*.pdf
+
+# PDF 补充排除(** 在单层目录下匹配不可靠)
+MVP_Guide/*/*.pdf
+MVP_Guide/*.pdf
+
+# 例外:技术决策记录入库(覆盖上方 **/*.md)
+!docs/
+!docs/decisions/
+!docs/decisions/*.md
+*.pdf

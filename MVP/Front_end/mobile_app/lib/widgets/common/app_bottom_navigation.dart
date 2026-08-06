@@ -117,7 +117,7 @@ class AppBottomNavigation extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              isVoice ? '🎙️' : label,
+              label,
               style: TextStyle(
                 fontSize: 10,
                 color: color,

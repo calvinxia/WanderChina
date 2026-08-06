@@ -76,6 +76,9 @@ class WanderMapState extends State<WanderMap> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.language != widget.language) {
       _badgeCache.clear(); // 清缓存，下次 _fetchAndBuildMarkers 会重新渲染
+    }
+    if (oldWidget.language != widget.language ||
+        oldWidget.showTranslationOverlay != widget.showTranslationOverlay) {
       _scheduleOverlayUpdate();
     }
   }
@@ -187,7 +190,12 @@ class WanderMapState extends State<WanderMap> {
   }
 
   Future<void> _scheduleOverlayUpdate() async {
-    if (!widget.showTranslationOverlay) return;
+    if (!widget.showTranslationOverlay) {
+      if (_translationMarkers.isNotEmpty) {
+        setState(() => _translationMarkers.clear());
+      }
+      return;
+    }
     if (_currentZoom < 13.5) {
       if (_translationMarkers.isNotEmpty) {
         setState(() => _translationMarkers = {});
@@ -393,7 +401,7 @@ class WanderMapState extends State<WanderMap> {
           onCameraMove: _onCameraMove,
           onTap:        (ll) => widget.onMapTap?.call(ll),
           markers:      {..._translationMarkers, ..._searchMarkers},
-          polylines:    _routePolylines, // Step 1.3: 传入 polylines
+          polylines:    _routePolylines,
           rotateGesturesEnabled: false,
           compassEnabled:        true,
           myLocationStyleOptions: MyLocationStyleOptions(
