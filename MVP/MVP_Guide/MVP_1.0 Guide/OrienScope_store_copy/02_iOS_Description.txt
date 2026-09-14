@@ -1,0 +1,63 @@
+WanderChina is now OrienScope — same app, same team, new name.
+
+Travel China with confidence — even if you don't speak a word of Mandarin.
+
+OrienScope is an AI-powered travel companion built specifically for foreign visitors exploring Mainland China. We combine translated maps, real-time voice translation, AI itinerary planning, and verified venue data in one app — so you can focus on the trip, not the logistics.
+
+WHAT YOU CAN DO
+
+• Plan a trip in under a minute
+Tell our AI your city, dates, and what you care about — food, culture, history, nature, shopping, or nightlife. Get a day-by-day itinerary with real venues, opening hours, and price estimates.
+
+• Read every sign and menu
+Our translated map layer shows street names, neighborhoods, and points of interest in English, side-by-side with the original Chinese. No more guessing which subway exit to take.
+
+• Speak and be understood
+Hold the mic, speak in English, and play back the Chinese translation instantly. Works both ways — perfect for ordering food, asking directions, or buying tickets.
+
+• Navigate like a local
+Tap any venue for transit, walking, and cab times — including DiDi deeplinks for one-tap ride booking. Apple Maps integration for turn-by-turn navigation.
+
+• Pay without a Chinese bank card
+View venue prices in RMB. Tap "Pay" to open Alipay's QR scanner directly — perfect for in-person merchant payments at restaurants, markets, and attractions.
+
+• Edit your trip with AI
+Don't like a stop? Tap "Edit with AI" and tell it what you want changed. Add food breaks, swap museums for parks, extend the day — it adapts.
+
+CITIES SUPPORTED
+
+Beijing · Shanghai · Guangzhou · Shenzhen · Chengdu · Xi'an
+More cities coming based on user demand.
+
+WHY WE BUILT IT
+
+Most travel apps are built for domestic users. Most translation apps don't understand context. Most AI chatbots invent venues that don't exist. OrienScope exists because we wanted one place to plan, navigate, translate, and pay — without the friction of switching between five apps that weren't designed for foreign visitors.
+
+PRIVACY & TRANSPARENCY
+
+All AI-generated content is labeled. We disclose which providers handle your data (DeepSeek for itineraries, Baidu Cloud for voice, Amap for maps) and you acknowledge this before any data leaves your device. Personal data is removed on account deletion.
+
+Privacy: https://orienscope.app/privacy
+Terms: https://orienscope.app/terms
+
+TRIP PASS (Optional)
+
+Free to use with generous limits. Trip Pass unlocks unlimited itinerary generation, unlimited AI edits, and extended voice translation. Three durations available:
+• 7-day pass — $9.99
+• 14-day pass — $14.99
+• 30-day pass — $24.99
+
+All passes are non-renewing. No auto-renewal. No surprises.
+
+KNOWN LIMITATIONS
+
+• Voice and map translation support English ↔ Chinese only. Other languages are planned.
+• Offline maps are city-bounded. Navigation outside the 6 supported cities falls back to Apple Maps.
+• Alipay payment requires the Alipay app installed on your device.
+
+QUESTIONS?
+
+support@orienscope.app
+We respond within 1 business day.
+
+Made in Guangzhou. Built for the world.
