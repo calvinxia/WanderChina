@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Mountain Silhouette - Visual motif for WanderChina
+/// Mountain Silhouette - Visual motif for OrienScope
 ///
-/// 山水剪影 - WanderChina 的视觉记忆点
+/// 山水剪影 - OrienScope 的视觉记忆点
 /// 用于 Onboarding、Auth、Home、Me 页面的装饰性背景元素
 class MountainSilhouette extends StatelessWidget {
   final Color color;

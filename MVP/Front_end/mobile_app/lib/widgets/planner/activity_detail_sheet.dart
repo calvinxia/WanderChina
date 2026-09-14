@@ -189,7 +189,7 @@ class _ActivityDetailSheetState extends State<ActivityDetailSheet> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
-                              launchUrl(Uri.parse('https://unsplash.com/?utm_source=wanderchina&utm_medium=referral'));
+                              launchUrl(Uri.parse('https://unsplash.com/?utm_source=orienscope&utm_medium=referral'));
                             },
                         ),
                       ],

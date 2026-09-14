@@ -1,4 +1,4 @@
-/// WanderChina 后端配置
+/// OrienScope 后端配置
 /// 所有值通过 --dart-define-from-file=.env 编译时注入
 /// Flutter 端不存储任何后端密钥
 class BackendConfig {

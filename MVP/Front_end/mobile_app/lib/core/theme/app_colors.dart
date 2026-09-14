@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// WanderChina Color System
+/// OrienScope Color System
 /// Based on MVP v2.0 Design Specifications
 class AppColors {
   AppColors._();

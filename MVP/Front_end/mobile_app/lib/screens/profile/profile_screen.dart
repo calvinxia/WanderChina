@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +19,8 @@ import '../planner/itinerary_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../core/theme/city_theme.dart';
 import '../../widgets/paywall_dialog.dart';
+import '../../widgets/cards/saved_trip_card.dart';
+import '../../services/feature_flags_service.dart';
 import '../main/main_screen.dart';
 
 /// Screen 12: Profile / Me Page
@@ -60,6 +63,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     _loginEventSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
       if (mounted) _loadProfile();
     });
+    _refreshFlags();
+  }
+
+  Future<void> _refreshFlags() async {
+    await FeatureFlagsService.instance.fetchAndCache();
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadProfile() async {
@@ -325,10 +334,11 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                 const SizedBox(height: 12),
 
-                // 订阅状态卡片
-                _buildSubscriptionCard(),
-
-                const SizedBox(height: 12),
+                // 订阅状态卡片：仅 paywall 开启时显示（fail-closed：默认隐藏）
+                if (FeatureFlagsService.instance.paywallEnabled) ...[
+                  _buildSubscriptionCard(),
+                  const SizedBox(height: 12),
+                ],
 
                 // 操作按钮组
                 Padding(
@@ -585,93 +595,145 @@ class _ProfileScreenState extends State<ProfileScreen>
       );
     } else {
       return ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         itemCount: _userTrips.length,
         itemBuilder: (context, index) {
           final trip = _userTrips[index];
-          return _buildTripCard(trip);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SavedTripCard(
+              title: trip['title'] ?? '',
+              date: _formatDate(trip['created_at']),
+              cityDisplay: (trip['cities'] as List?)?.join(', ') ?? '',
+              onTap: () => _viewTrip(trip),
+              onDelete: () => _deleteTrip(trip),
+            ),
+          );
         },
       );
     }
   }
 
-  Widget _buildTripCard(Map<String, dynamic> trip) {
-    final title = trip['title'] ?? 'My Trip';
-    final createdAt = _formatDate(trip['created_at']);
-
-    // Get theme based on trip's city
-    final tripCity = (trip['cities'] as List?)?.first ?? '';
-    final tripTheme = CityTheme.fromCityKey(_getCityKey(tripCity));
-
-    return Builder(
-      builder: (context) {
-        final cityTheme = tripTheme;
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          color: Colors.white.withOpacity(0.25),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.white.withOpacity(0.3)),
-          ),
-          child: ListTile(
-            leading: Icon(Icons.calendar_today, color: cityTheme.pillActiveColor),
-            title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(createdAt, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                  onPressed: () async {
-                try {
-                  final detail = await ApiClient.post(BackendConfig.tripUrl, {
-                    'action': 'get',
-                    'trip_id': trip['trip_id'],
-                  });
-
-                  final itinerary = Itinerary.fromCloudData({
-                    'days': detail['days'],
-                    'title': detail['title'],
-                    'cities': detail['cities'],
-                    'duration_days': detail['duration_days'],
-                    'interests': detail['interests'],
-                    'trip_id': detail['trip_id'],
-                    'status': detail['status'],
-                  });
-
-                  if (mounted) {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ItineraryDetailScreen(
-                          itinerary: itinerary,
-                          tripId: detail['trip_id'],
-                        ),
-                      ),
-                    );
-                    _loadTrips(); // 返回后刷新
-                  }
-                } catch (e) {
-                  debugPrint('❌ View trip error: $e');
-                  if (mounted) {
-                    final message = (e is SocketException || e.toString().contains('host lookup'))
-                        ? 'No internet connection. Please check your network and try again.'
-                        : 'Something went wrong. Please try again.';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(message)),
-                    );
-                  }
-                }
-              },
-              child: Text('View', style: TextStyle(color: cityTheme.pillActiveColor)),
+  Future<void> _viewTrip(Map<String, dynamic> trip) async {
+    final tripId = trip['trip_id'] as String?;
+    try {
+      final detail = await ApiClient.post(BackendConfig.tripUrl, {
+        'action': 'get',
+        'trip_id': tripId,
+      });
+      if (tripId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_trip_$tripId', json.encode(detail));
+      }
+      final itineraryJson = detail['itinerary_json'] ?? detail['itinerary'] ?? detail['days'];
+      if (itineraryJson != null && mounted) {
+        final itineraryData = itineraryJson is String ? json.decode(itineraryJson) : itineraryJson;
+        final itinerary = Itinerary.fromCloudData({
+          'days': itineraryData,
+          'title': detail['title'],
+          'cities': detail['cities'],
+          'duration_days': detail['duration_days'],
+          'interests': detail['interests'],
+          'trip_id': detail['trip_id'],
+          'status': detail['status'],
+        });
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ItineraryDetailScreen(
+              itinerary: itinerary,
+              tripId: tripId,
             ),
-          ],
-        ),
+          ),
+        );
+        _loadTrips();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trip itinerary data not available')),
+        );
+      }
+    } catch (e) {
+      if (tripId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString('cached_trip_$tripId');
+        if (cached != null && mounted) {
+          final detail = json.decode(cached) as Map<String, dynamic>;
+          final itineraryJson = detail['itinerary_json'] ?? detail['itinerary'] ?? detail['days'];
+          if (itineraryJson != null) {
+            final itineraryData = itineraryJson is String ? json.decode(itineraryJson) : itineraryJson;
+            final itinerary = Itinerary.fromCloudData({
+              'days': itineraryData,
+              'title': detail['title'],
+              'cities': detail['cities'],
+              'duration_days': detail['duration_days'],
+              'interests': detail['interests'],
+              'trip_id': detail['trip_id'],
+              'status': detail['status'],
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Offline mode. Showing cached trip.')),
+            );
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ItineraryDetailScreen(
+                  itinerary: itinerary,
+                  tripId: tripId,
+                ),
+              ),
+            );
+            return;
+          }
+        }
+      }
+      if (mounted) {
+        final message = (e is SocketException || e.toString().contains('host lookup'))
+            ? 'No internet connection. Please check your network and try again.'
+            : 'Something went wrong. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
+  }
+
+  Future<void> _deleteTrip(Map<String, dynamic> trip) async {
+    final mainState = context.findAncestorStateOfType<MainScreenState>();
+    final themeColor = mainState?.cityTheme.pillActiveColor ?? const Color(0xFF2D6A4F);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Trip'),
+        content: Text('Delete "${trip['title'] ?? 'this trip'}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancel', style: TextStyle(color: themeColor)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Delete', style: TextStyle(color: themeColor)),
+          ),
+        ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ApiClient.post(BackendConfig.tripUrl, {
+        'action': 'delete',
+        'trip_id': trip['trip_id'],
+        'user_id': AuthService.currentUserId,
+      });
+      setState(() {
+        _userTrips.removeWhere((t) => t['trip_id'] == trip['trip_id']);
+        _userProfile?['trips_count'] = _userTrips.length;
+      });
+    } catch (e) {
+      if (mounted) {
+        final message = (e is SocketException || e.toString().contains('host lookup'))
+            ? 'No internet connection. Please check your network and try again.'
+            : 'Something went wrong. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
-    );
+    }
   }
 
   String _formatDate(dynamic timestamp) {
@@ -694,16 +756,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     } catch (e) {
       return 'Unknown date';
     }
-  }
-
-  String _getCityKey(String cityName) {
-    if (cityName.contains('Beijing') || cityName.contains('北京')) return 'BJ';
-    if (cityName.contains('Shanghai') || cityName.contains('上海')) return 'SH';
-    if (cityName.contains('Guangzhou') || cityName.contains('广州')) return 'GZ';
-    if (cityName.contains('Shenzhen') || cityName.contains('深圳')) return 'SZ';
-    if (cityName.contains('Chengdu') || cityName.contains('成都')) return 'CD';
-    if (cityName.contains("Xi'an") || cityName.contains('西安')) return 'XA';
-    return 'GZ'; // Default to Guangzhou
   }
 
   Widget _buildSavedPlacesTab() {

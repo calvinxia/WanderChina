@@ -13,7 +13,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Wanderchina</string>
+	<string>OrienScope</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,7 +21,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>wanderchina</string>
+	<string>OrienScope</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -46,19 +46,19 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>WanderChina uses your camera to take your profile picture and scan Chinese text for translation.</string>
+	<string>OrienScope uses your camera to take your profile picture and scan Chinese text for translation.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>WanderChina uses your location to show nearby places and provide navigation. Background location is not used.</string>
+	<string>OrienScope uses your location to show nearby places and provide navigation. Background location is not used.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>WanderChina uses your location to show nearby places, provide navigation, and customize city recommendations.</string>
+	<string>OrienScope uses your location to show nearby places, provide navigation, and customize city recommendations.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>WanderChina uses your microphone to translate spoken English to Chinese in real time.</string>
+	<string>OrienScope uses your microphone to translate spoken English to Chinese in real time.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>WanderChina saves translated images and lets you update your profile picture.</string>
+	<string>OrienScope saves translated images and lets you update your profile picture.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>WanderChina accesses your photos to set your profile picture and translate text in images.</string>
+	<string>OrienScope accesses your photos to set your profile picture and translate text in images.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>WanderChina uses speech recognition to convert your voice into text for translation.</string>
+	<string>OrienScope uses speech recognition to convert your voice into text for translation.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

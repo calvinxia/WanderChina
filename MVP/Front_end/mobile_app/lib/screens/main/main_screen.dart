@@ -12,7 +12,7 @@ import '../../core/theme/city_theme.dart';
 import '../../widgets/common/city_background.dart';
 import '../../services/analytics_service.dart';
 
-/// WanderChina v2.0 主导航页面
+/// OrienScope v2.0 主导航页面
 ///
 /// 规范来自 SCREEN_SPECIFICATIONS_v2.md
 /// - 5个标签: Home · Map · Planner · Voice · Me

@@ -34,12 +34,12 @@ class _SignupScreenState extends State<SignupScreen> {
     super.initState();
     _privacyTapRecognizer = TapGestureRecognizer()
       ..onTap = () => launchUrl(
-            Uri.parse('https://wanderchina.app/privacy'),
+            Uri.parse('https://orienscope.app/privacy'),
             mode: LaunchMode.externalApplication,
           );
     _termsTapRecognizer = TapGestureRecognizer()
       ..onTap = () => launchUrl(
-            Uri.parse('https://wanderchina.app/terms'),
+            Uri.parse('https://orienscope.app/terms'),
             mode: LaunchMode.externalApplication,
           );
   }

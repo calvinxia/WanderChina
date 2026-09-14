@@ -6,5 +6,9 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+    		<string>applinks:orienscope.app</string>
+	</array>
 </dict>
 </plist>

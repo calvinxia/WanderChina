@@ -16,7 +16,7 @@ import '../../services/backend/auth_service.dart';
 import '../../widgets/ai_disclosure_dialog.dart';
 import '../main/main_screen.dart';
 
-/// WanderChina Onboarding Screen - MVP v2.0
+/// OrienScope Onboarding Screen - MVP v2.0
 ///
 /// 三屏 Onboarding 流程，深色墨底+山水剪影风格
 /// Slide 1: App Logo (Biscuit accent)
@@ -316,43 +316,53 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildSlide(OnboardingSlide slide, int index) {
     final isActive = index == _currentPage;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Visual element (logo or illustration)
-          _buildVisual(slide, isActive, index),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Visual element (logo or illustration)
+                  _buildVisual(slide, isActive, index),
 
-          const SizedBox(height: 56),
+                  const SizedBox(height: 56),
 
-          // Title
-          Text(
-            slide.title,
-            style: AppTextStyles.h1(color: Colors.white.withOpacity(0.95)),
-            textAlign: TextAlign.center,
-          )
-              .animate(
-                key: ValueKey('title_$index'),
-              )
-              .fadeIn(duration: 500.ms, delay: 200.ms)
-              .slideY(begin: 0.3, end: 0, duration: 500.ms, delay: 200.ms),
+                  // Title
+                  Text(
+                    slide.title,
+                    style: AppTextStyles.h1(color: Colors.white.withOpacity(0.95)),
+                    textAlign: TextAlign.center,
+                  )
+                      .animate(
+                        key: ValueKey('title_$index'),
+                      )
+                      .fadeIn(duration: 500.ms, delay: 200.ms)
+                      .slideY(begin: 0.3, end: 0, duration: 500.ms, delay: 200.ms),
 
-          AppSpacing.gapHeightM,
+                  AppSpacing.gapHeightM,
 
-          // Description
-          Text(
-            slide.description,
-            style: AppTextStyles.body(color: Colors.white.withOpacity(0.65)),
-            textAlign: TextAlign.center,
-          )
-              .animate(
-                key: ValueKey('desc_$index'),
-              )
-              .fadeIn(duration: 500.ms, delay: 400.ms)
-              .slideY(begin: 0.3, end: 0, duration: 500.ms, delay: 400.ms),
-        ],
-      ),
+                  // Description
+                  Text(
+                    slide.description,
+                    style: AppTextStyles.body(color: Colors.white.withOpacity(0.65)),
+                    textAlign: TextAlign.center,
+                  )
+                      .animate(
+                        key: ValueKey('desc_$index'),
+                      )
+                      .fadeIn(duration: 500.ms, delay: 400.ms)
+                      .slideY(begin: 0.3, end: 0, duration: 500.ms, delay: 400.ms),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

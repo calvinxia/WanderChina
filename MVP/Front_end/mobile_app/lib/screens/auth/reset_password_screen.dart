@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/backend/auth_service.dart';
+import '../../services/api_client.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
@@ -59,12 +62,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
 
     try {
-      // TODO: Call AuthService.resetPassword() when backend is ready
-      // For now, simulate a delay
-      await Future.delayed(const Duration(seconds: 1));
+      await AuthService.resetPassword(
+        email: widget.email,
+        token: code,
+        newPassword: password,
+      );
 
       if (mounted) {
-        // Show success and pop back to login
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Password reset successfully'),
@@ -73,12 +77,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         );
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
+    } on ApiException catch (e) {
+      debugPrint('🔐 Reset password ApiException(${e.statusCode})');
+      String msg = 'Failed to reset password. Please try again.';
+      if (e.statusCode == 400 || e.statusCode == 429) {
+        try {
+          final parsed = jsonDecode(e.body) as Map<String, dynamic>;
+          msg = (parsed['error'] as String?) ?? msg;
+        } catch (_) {}
+      }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = msg;
+        });
+      }
     } catch (e) {
       debugPrint('🔐 Reset password error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to reset password. Please check your code and try again.';
+          _errorMessage = 'Failed to reset password. Please try again.';
         });
       }
     }
@@ -129,8 +148,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Enter the verification code sent to ${widget.email}',
+                    'If this email is registered, a verification code has been sent.\nPlease check your inbox and spam folder.',
                     style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.6)),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const Text(
+                      'Wrong email? Tap to go back',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFE8D5B0),
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFFE8D5B0),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 40),

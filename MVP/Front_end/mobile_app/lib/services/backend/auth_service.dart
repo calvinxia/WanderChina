@@ -168,6 +168,29 @@ class AuthService {
     }
   }
 
+  /// 发送密码重置验证码
+  /// 后端防枚举设计：无论邮箱是否存在均返回 200，不得用返回值推断邮箱是否存在
+  static Future<void> forgotPassword(String email) async {
+    await ApiClient.post(ApiClient.authUrl, {
+      'action': 'forgot_password',
+      'email': email,
+    });
+  }
+
+  /// 重置密码（token 为后端发送的 6 位验证码）
+  static Future<void> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    await ApiClient.post(ApiClient.authUrl, {
+      'action': 'reset_password',
+      'email': email,
+      'token': token,
+      'new_password': newPassword,
+    });
+  }
+
   /// 获取用户资料
   static Future<Map<String, dynamic>> getProfile() async {
     return ApiClient.post(ApiClient.authUrl, {

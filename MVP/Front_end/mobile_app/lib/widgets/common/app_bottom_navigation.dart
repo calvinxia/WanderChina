@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 
-/// WanderChina v2.0 底部导航栏
+/// OrienScope v2.0 底部导航栏
 ///
 /// 5个标签: Home · Map · Planner · Voice · Me
 ///

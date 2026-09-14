@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// WanderChina Typography System
+/// OrienScope Typography System
 /// Based on Figma Design System
 class AppTextStyles {
   AppTextStyles._();

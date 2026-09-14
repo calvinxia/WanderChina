@@ -324,7 +324,7 @@ class _PaywallDialogState extends State<PaywallDialog> {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   onPressed: () => launchUrl(
-                    Uri.parse('https://wanderchina.app/terms/'),
+                    Uri.parse('https://orienscope.app/terms'),
                     mode: LaunchMode.externalApplication,
                   ),
                   child: Text(
@@ -340,7 +340,7 @@ class _PaywallDialogState extends State<PaywallDialog> {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   onPressed: () => launchUrl(
-                    Uri.parse('https://wanderchina.app/privacy/'),
+                    Uri.parse('https://orienscope.app/privacy'),
                     mode: LaunchMode.externalApplication,
                   ),
                   child: Text(

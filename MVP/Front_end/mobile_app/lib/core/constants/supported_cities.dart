@@ -1,6 +1,6 @@
 /// 支持的城市列表
 ///
-/// WanderChina仅支持以下6个主要城市的POI搜索和翻译
+/// OrienScope仅支持以下6个主要城市的POI搜索和翻译
 class SupportedCities {
   /// 支持的城市列表（中文名称）
   static const List<String> citiesZh = [

@@ -146,12 +146,16 @@ class PurchaseService {
             productId: purchase.productID,
             reason: purchase.error?.message ?? 'Unknown error',
           ));
-          await _iap.completePurchase(purchase);
+          if (purchase.pendingCompletePurchase) {
+            await _iap.completePurchase(purchase);
+          }
           break;
 
         case PurchaseStatus.canceled:
           debugPrint('[PURCHASE] User canceled: ${purchase.productID}');
-          await _iap.completePurchase(purchase);
+          if (purchase.pendingCompletePurchase) {
+            await _iap.completePurchase(purchase);
+          }
           break;
       }
     }

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
-/// WanderChina App Theme
+/// OrienScope App Theme
 class AppTheme {
   AppTheme._();
 

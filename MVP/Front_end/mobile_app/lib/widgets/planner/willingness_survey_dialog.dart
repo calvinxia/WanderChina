@@ -53,7 +53,7 @@ class WillingnessSurveyDialog extends StatelessWidget {
 
             // Title
             const Text(
-              'Enjoying WanderChina?',
+              'Enjoying OrienScope?',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,

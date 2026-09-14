@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:amap_map/amap_map.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
@@ -16,6 +17,7 @@ import 'services/voice/voice_translation_service.dart';
 import 'services/backend/auth_service.dart';
 import 'services/purchase_service.dart';
 import 'services/subscription_service.dart';
+import 'services/feature_flags_service.dart';
 import 'core/services/language_manager.dart';
 import 'screens/onboarding/splash_screen.dart';
 
@@ -128,27 +130,32 @@ void main() async {
     debugPrint('❌ IAP 购买服务初始化失败: $e');
   }
 
+  // 9. 拉取 Feature Flags（fail-closed：失败默认 paywallEnabled=false）
+  await FeatureFlagsService.instance.fetchAndCache();
+  debugPrint('✅ Feature Flags 已加载');
+
   debugPrint('🎉 应用服务初始化完成！\n');
 
   // 9. 初始化 Sentry
+  final packageInfo = await PackageInfo.fromPlatform();
   await SentryFlutter.init(
     (options) {
       options.dsn = const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
       options.tracesSampleRate = 0.3;
       options.environment = 'beta';
-      options.release = 'wanderchina@1.0.0+1';
+      options.release = 'orienscope@${packageInfo.version}+${packageInfo.buildNumber}';
       options.debug = false;
     },
     appRunner: () => runApp(
       const ProviderScope(
-        child: WanderChinaApp(),
+        child: OrienScopeApp(),
       ),
     ),
   );
 }
 
-class WanderChinaApp extends StatelessWidget {
-  const WanderChinaApp({super.key});
+class OrienScopeApp extends StatelessWidget {
+  const OrienScopeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +166,7 @@ class WanderChinaApp extends StatelessWidget {
     ));
 
     return MaterialApp(
-      title: 'WanderChina',
+      title: 'OrienScope',
       debugShowCheckedModeBanner: false,
 
       // Theme

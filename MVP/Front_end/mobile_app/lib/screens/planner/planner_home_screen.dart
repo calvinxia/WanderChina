@@ -18,6 +18,7 @@ import '../../widgets/planner/willingness_survey_dialog.dart';
 import '../../utils/quota_helper.dart';
 import '../../services/itinerary_stream_service.dart';
 import '../../widgets/soft_login_sheet.dart';
+import '../../widgets/cards/saved_trip_card.dart';
 import '../../services/app_event_bus.dart';
 
 /// Screen 9: AI Trip Planner Home
@@ -389,24 +390,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             const SizedBox(height: 40),
 
             // Saved Trips
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'My Saved Trips (${_savedTrips.length})',
-                  style: AppTextStyles.h4(color: AppColors.gray900),
-                ),
-                if (_savedTrips.length > 3)
-                  TextButton(
-                    onPressed: () {
-                      // MVP: 滚动到列表或 SnackBar
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Showing all trips below')),
-                      );
-                    },
-                    child: Text('View All', style: AppTextStyles.body(color: _activeTheme.pillActiveColor)),
-                  ),
-              ],
+            Text(
+              'My Saved Trips (${_savedTrips.length})',
+              style: AppTextStyles.h4(color: AppColors.gray900),
             ),
             const SizedBox(height: 12),
             if (_isLoadingTrips)
@@ -421,13 +407,12 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                 ),
               )
             else
-              ...(_savedTrips.take(5).map((trip) => Padding(
+              ...(_savedTrips.map((trip) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _buildSavedTripCard(
-                  city: (trip['cities'] as List?)?.join(', ') ?? '',
-                  days: '${trip['duration_days'] ?? 0} days',
-                  focus: trip['title'] ?? '',
+                child: SavedTripCard(
+                  title: trip['title'] ?? '',
                   date: _formatDate(trip['created_at']),
+                  cityDisplay: (trip['cities'] as List?)?.join(', ') ?? '',
                   onDelete: () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
@@ -773,76 +758,6 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     );
   }
 
-  Widget _buildSavedTripCard({
-    required String city,
-    required String days,
-    required String focus,
-    required String date,
-    required VoidCallback onTap,
-    VoidCallback? onDelete,
-  }) {
-    // Get theme based on trip city
-    final tripCity = city.split(',').first.trim(); // Extract first city if multiple
-    final tripTheme = CityTheme.fromCityKey(_getCityKey(tripCity));
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.25),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: tripTheme.pillActiveColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.calendar_today,
-                color: tripTheme.pillActiveColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 直接用 title，不再拼接
-                  Text(
-                    focus.isNotEmpty ? focus : 'My Trip',
-                    style: AppTextStyles.body(color: AppColors.gray900)
-                        .copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    date,
-                    style: AppTextStyles.caption(color: AppColors.gray600),
-                  ),
-                ],
-              ),
-            ),
-            if (onDelete != null)
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: AppColors.gray400, size: 20),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: onDelete,
-              )
-            else
-              const Icon(Icons.chevron_right, color: AppColors.gray400),
-          ],
-        ),
-      ),
-    );
-  }
-
   bool _canGenerate() {
     return _selectedCity != null &&
         (_selectedInterests.isNotEmpty || _customInput.text.trim().isNotEmpty);
@@ -857,16 +772,6 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     } catch (_) {
       return dateStr.split(' ').first;  // fallback: 只取日期部分
     }
-  }
-
-  String _getCityKey(String cityName) {
-    if (cityName.contains('Beijing') || cityName.contains('北京')) return 'BJ';
-    if (cityName.contains('Shanghai') || cityName.contains('上海')) return 'SH';
-    if (cityName.contains('Guangzhou') || cityName.contains('广州')) return 'GZ';
-    if (cityName.contains('Shenzhen') || cityName.contains('深圳')) return 'SZ';
-    if (cityName.contains('Chengdu') || cityName.contains('成都')) return 'CD';
-    if (cityName.contains("Xi'an") || cityName.contains('西安')) return 'XA';
-    return 'GZ'; // Default to Guangzhou
   }
 
   Future<void> _generatePlan() async {

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,10 +25,13 @@ class DeeplinkService {
   /// 打开 DiDi 打车（独立 App）
   /// 复制目的地到剪贴板，方便用户粘贴
   /// 返回 true = 成功跳转，false = DiDi 未安装
+  ///
+  /// iOS 版滴滴注册 diditaxi:// scheme；
+  /// Android 版滴滴注册 OneTravel:// scheme（驼峰，无 Authority/Path 限制）。
   static Future<bool> openDidi(String destName) async {
     await Clipboard.setData(ClipboardData(text: destName));
 
-    const url = 'diditaxi://';
+    final url = Platform.isIOS ? 'diditaxi://' : 'OneTravel://';
     try {
       if (await canLaunchUrl(Uri.parse(url))) {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);

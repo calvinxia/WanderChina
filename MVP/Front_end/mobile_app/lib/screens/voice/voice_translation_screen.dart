@@ -237,15 +237,17 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildDirectionPill(
-            label: '${_getLanguageCode(_selectedLanguage)} → CN',
-            isActive: _direction == TranslationDirection.foreignToChinese,
-            cityTheme: cityTheme,
-            onTap: () {
-              setState(() {
-                _direction = TranslationDirection.foreignToChinese;
-              });
-            },
+          Expanded(
+            child: _buildDirectionPill(
+              label: '${_getLanguageCode(_selectedLanguage)} → CN',
+              isActive: _direction == TranslationDirection.foreignToChinese,
+              cityTheme: cityTheme,
+              onTap: () {
+                setState(() {
+                  _direction = TranslationDirection.foreignToChinese;
+                });
+              },
+            ),
           ),
           const SizedBox(width: 16),
           // Swap button to toggle direction
@@ -262,15 +264,17 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
             tooltip: 'Swap direction',
           ),
           const SizedBox(width: 16),
-          _buildDirectionPill(
-            label: 'CN → ${_getLanguageCode(_selectedLanguage)}',
-            isActive: _direction == TranslationDirection.chineseToForeign,
-            cityTheme: cityTheme,
-            onTap: () {
-              setState(() {
-                _direction = TranslationDirection.chineseToForeign;
-              });
-            },
+          Expanded(
+            child: _buildDirectionPill(
+              label: 'CN → ${_getLanguageCode(_selectedLanguage)}',
+              isActive: _direction == TranslationDirection.chineseToForeign,
+              cityTheme: cityTheme,
+              onTap: () {
+                setState(() {
+                  _direction = TranslationDirection.chineseToForeign;
+                });
+              },
+            ),
           ),
         ],
       ),
@@ -286,7 +290,6 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 140,
         height: 40,
         decoration: BoxDecoration(
           color: isActive ? cityTheme.pillActiveColor : Colors.white.withOpacity(0.25),
@@ -298,6 +301,8 @@ class _VoiceTranslationScreenState extends State<VoiceTranslationScreen>
         alignment: Alignment.center,
         child: Text(
           label,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,

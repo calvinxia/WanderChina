@@ -64,7 +64,7 @@ class AIDisclosureDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'How WanderChina Uses Your Data',
+                'How OrienScope Uses Your Data',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18,
@@ -126,7 +126,7 @@ class AIDisclosureDialog extends StatelessWidget {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => launchUrl(
-                  Uri.parse('https://wanderchina.app/privacy'),
+                  Uri.parse('https://orienscope.app/privacy'),
                   mode: LaunchMode.externalApplication,
                 ),
                 child: Text(

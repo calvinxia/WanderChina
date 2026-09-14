@@ -212,7 +212,7 @@ class _SplashScreenState extends State<SplashScreen> {
     return Column(
       children: [
         Text(
-          'WanderChina',
+          'OrienScope'.toUpperCase(),
           style: AppTextStyles.h1(color: const Color(0xFFE8D5B0)),
           textAlign: TextAlign.center,
         )
@@ -295,7 +295,7 @@ class SplashScreenWithLottie extends StatelessWidget {
               ),
               AppSpacing.gapHeightL,
               Text(
-                'WanderChina',
+                'OrienScope'.toUpperCase(),
                 style: AppTextStyles.h1(color: AppColors.primary),
               ),
             ],

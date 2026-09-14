@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// WanderChina Spacing System
+/// OrienScope Spacing System
 /// Based on 8-point grid system
 class AppSpacing {
   AppSpacing._();

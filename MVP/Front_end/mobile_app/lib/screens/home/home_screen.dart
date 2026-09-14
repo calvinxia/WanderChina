@@ -191,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'WanderChina',
+                          'OrienScope'.toUpperCase(),
                           style: AppTextStyles.h4(
                             color: cityTheme.primaryTextColor,
                           ),

@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../services/backend/auth_service.dart';
+import '../../services/api_client.dart';
 import 'reset_password_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -40,9 +43,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      // TODO: Call AuthService.forgotPassword() when backend is ready
-      // For now, simulate a delay
-      await Future.delayed(const Duration(seconds: 1));
+      await AuthService.forgotPassword(email);
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -52,6 +53,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             builder: (_) => ResetPasswordScreen(email: email),
           ),
         );
+      }
+    } on ApiException catch (e) {
+      debugPrint('🔐 Forgot password ApiException(${e.statusCode})');
+      String msg = 'Failed to send reset code. Please try again.';
+      if (e.statusCode == 429) {
+        try {
+          final parsed = jsonDecode(e.body) as Map<String, dynamic>;
+          msg = (parsed['error'] as String?) ?? msg;
+        } catch (_) {}
+      }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = msg;
+        });
       }
     } catch (e) {
       debugPrint('🔐 Forgot password error: $e');
