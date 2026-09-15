@@ -4,8 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../core/config/backend_config.dart';
+import 'app_event_bus.dart';
 
 class ApiClient {
+  // 并发 401 去重：首次收到 401 后置 true，后续相同错误不重复 fire 事件。
+  // 重置时机：任何成功认证后调用 resetSessionExpiry()。
+  static bool _sessionExpired = false;
+
+  static void resetSessionExpiry() => _sessionExpired = false;
+
   static String get translateUrl => BackendConfig.translateUrl;
   static String get dbWriteUrl => BackendConfig.dbWriteUrl;
   static String get nearbyUrl => BackendConfig.nearbyUrl;
@@ -25,10 +32,13 @@ class ApiClient {
   static String get incrementVoiceUsageUrl => BackendConfig.incrementVoiceUsageUrl;
 
   /// 通用 POST 请求
+  ///
+  /// [handle401]：默认 true。restore_session 自身传 false，避免在启动阶段误触发会话失效流程。
   static Future<Map<String, dynamic>> post(
     String url,
     Map<String, dynamic> body, {
     Duration timeout = const Duration(seconds: 25),
+    bool handle401 = true,
   }) async {
     try {
       final response = await http.post(
@@ -44,6 +54,13 @@ class ApiClient {
         final responseBody = utf8.decode(response.bodyBytes);
         return json.decode(responseBody);
       }
+
+      // 401 统一处理：fire 一次事件，UI 层负责清凭据 + 路由
+      if (response.statusCode == 401 && handle401 && !_sessionExpired) {
+        _sessionExpired = true;
+        AppEventBus.instance.fire(SessionExpiredEvent());
+      }
+
       throw ApiException(response.statusCode, response.body);
     } catch (e, stackTrace) {
       debugPrint('❌ API error: $e');

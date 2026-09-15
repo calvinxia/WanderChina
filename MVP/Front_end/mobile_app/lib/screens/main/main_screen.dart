@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +13,9 @@ import '../profile/profile_screen.dart';
 import '../../core/theme/city_theme.dart';
 import '../../widgets/common/city_background.dart';
 import '../../services/analytics_service.dart';
+import '../../services/app_event_bus.dart';
+import '../../services/backend/auth_service.dart';
+import '../auth/login_screen.dart';
 
 /// OrienScope v2.0 主导航页面
 ///
@@ -33,6 +38,7 @@ class MainScreenState extends State<MainScreen> {
   final GlobalKey<MapWithTranslationScreenState> _mapKey = GlobalKey();
   String? pendingSearchCity;
   CityTheme _cityTheme = CityTheme.defaultTheme;
+  StreamSubscription? _sessionExpiredSub;
 
   // v2.0 屏幕列表（不包括Voice，因为它是模态框）
   late final List<Widget> _screens;
@@ -41,6 +47,9 @@ class MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _loadCityTheme();
+    _sessionExpiredSub = AppEventBus.instance
+        .on<SessionExpiredEvent>()
+        .listen(_onSessionExpired);
     _screens = [
       HomeScreen(onNavigateToTab: _onTabTapped),
       MapWithTranslationScreen(key: _mapKey),
@@ -48,6 +57,12 @@ class MainScreenState extends State<MainScreen> {
       const Placeholder(), // Voice占位符（实际上打开模态框）
       const ProfileScreen(),
     ];
+  }
+
+  @override
+  void dispose() {
+    _sessionExpiredSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCityTheme() async {
@@ -102,6 +117,51 @@ class MainScreenState extends State<MainScreen> {
   /// "真的在广州" vs "匹配不到任何城市"
   bool _isInDefaultCity(double lat, double lng) {
     return lat > 22.5 && lat < 23.6 && lng > 112.9 && lng < 114.0;
+  }
+
+  /// 会话失效处理：由 ApiClient 在 401 时通过 AppEventBus 触发。
+  ///
+  /// 已注册用户：清空凭据 → 提示 → 路由至 LoginScreen。
+  /// 匿名用户：清空凭据 → 静默重认证（fire-and-forget，失败不提示不重试）。
+  void _onSessionExpired(SessionExpiredEvent _) {
+    final wasAnonymous = AuthService.isAnonymous;
+    AuthService.logout(); // 内存字段在首个 await 前同步清空，prefs 清除为 fire-and-forget
+    if (!wasAnonymous) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your session has expired. Please log in again.'),
+        ),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+      return;
+    }
+    // 匿名用户：后台静默重认证，不路由，不提示
+    _reAuthAnonymous();
+  }
+
+  /// 匿名会话过期后的静默重认证。
+  /// device_id 优先读 prefs，丢失时原地重新生成（与 SplashScreen._getOrCreateDeviceId 逻辑一致）。
+  /// 只尝试一次；网络不通则静默失败，用户以 userId=null 状态继续。
+  /// 成功后 resetSessionExpiry() 已由 AuthService.anonymousAuth() 内部调用（auth_service.dart:46）。
+  Future<void> _reAuthAnonymous() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var deviceId = prefs.getString('device_id');
+      if (deviceId == null) {
+        deviceId = List.generate(
+          32,
+          (_) => Random.secure().nextInt(16).toRadixString(16),
+        ).join();
+        await prefs.setString('device_id', deviceId);
+      }
+      await AuthService.anonymousAuth(deviceId);
+    } catch (_) {
+      // 网络不通时静默失败，不重试
+    }
   }
 
   /// Expose city theme for child pages

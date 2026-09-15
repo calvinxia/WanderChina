@@ -39,7 +39,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted || _hasNavigated) return;
 
-    final isLoggedIn = results[1] as bool;
+    final restoreResult = results[1] as SessionRestoreResult;
+    final isLoggedIn = restoreResult == SessionRestoreResult.verified ||
+        restoreResult == SessionRestoreResult.offline;
 
     if (isLoggedIn) {
       final prefs = await SharedPreferences.getInstance();
