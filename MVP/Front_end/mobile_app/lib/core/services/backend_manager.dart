@@ -66,9 +66,11 @@ class BackendManager {
   /// Restore previous session if exists
   Future<void> _restoreSession() async {
     try {
-      final restored = await AuthService.restoreSession();
-      if (restored) {
+      final result = await AuthService.restoreSession();
+      if (result == SessionRestoreResult.verified) {
         debugPrint('✅ Session restored for user: ${AuthService.currentUserId}');
+      } else if (result == SessionRestoreResult.offline) {
+        debugPrint('⚠️ Session retained in offline mode: ${AuthService.currentUserId}');
       } else {
         debugPrint('⏭️ No session to restore');
       }

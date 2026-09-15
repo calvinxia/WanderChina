@@ -14,7 +14,6 @@ import 'services/amap_service.dart'
     if (dart.library.html) 'services/amap_service_stub.dart';
 import 'services/map_translation_service.dart';
 import 'services/voice/voice_translation_service.dart';
-import 'services/backend/auth_service.dart';
 import 'services/purchase_service.dart';
 import 'services/subscription_service.dart';
 import 'services/feature_flags_service.dart';
@@ -104,18 +103,6 @@ void main() async {
     debugPrint('✅ 语音翻译服务初始化成功');
   } catch (e) {
     debugPrint('❌ 语音翻译服务初始化失败: $e');
-  }
-
-  // 6. 恢复用户 session
-  try {
-    final restored = await AuthService.restoreSession();
-    if (restored) {
-      debugPrint('✅ 用户 session 已恢复');
-    } else {
-      debugPrint('ℹ️  未找到已保存的 session（首次启动或已登出）');
-    }
-  } catch (e) {
-    debugPrint('❌ 恢复 session 失败: $e');
   }
 
   // 7. 读取本地订阅缓存（离线也能拿到订阅状态）

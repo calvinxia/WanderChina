@@ -7,6 +7,14 @@ import '../api_client.dart';
 import '../app_event_bus.dart';
 import '../subscription_service.dart';
 
+/// Session 恢复结果。调用方通过此枚举区分"已验证"和"离线保留"两种成功路径。
+enum SessionRestoreResult {
+  verified, // 后端确认有效，订阅状态已更新
+  offline,  // 网络不通/超时，凭据保留，以离线态继续
+  notFound, // prefs 中无 token（首次启动或已主动登出）
+  invalid,  // 后端明确拒绝（valid:false / 401），凭据已清空
+}
+
 class AuthService {
   static String? _currentUserId;
   static String? _currentToken;
@@ -35,6 +43,7 @@ class AuthService {
       _currentToken = result['token'];
       _loginType = 'anonymous';
       await _saveSession();
+      ApiClient.resetSessionExpiry();
       return true;
     } catch (e) {
       debugPrint('[AUTH] Anonymous auth failed: $e');
@@ -62,6 +71,7 @@ class AuthService {
     AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
     syncAIDisclosure(); // fire-and-forget
+    ApiClient.resetSessionExpiry();
     return result;
   }
 
@@ -82,6 +92,7 @@ class AuthService {
     await _saveSession();
     SubscriptionService.instance.updateFromServer(result);
     syncAIDisclosure(); // fire-and-forget
+    ApiClient.resetSessionExpiry();
     return result;
   }
 
@@ -116,6 +127,7 @@ class AuthService {
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
       syncAIDisclosure(); // fire-and-forget
+      ApiClient.resetSessionExpiry();
       return result;
     } on SignInWithAppleAuthorizationException catch (e) {
       // User cancelled authorization
@@ -161,6 +173,7 @@ class AuthService {
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
       syncAIDisclosure();
+      ApiClient.resetSessionExpiry();
       return result;
     } catch (e) {
       debugPrint('[AUTH] Google Sign-In failed: $e');
@@ -208,24 +221,44 @@ class AuthService {
     });
   }
 
-  /// 恢复 session（App 启动时调用）
-  static Future<bool> restoreSession() async {
+  /// 恢复 session（App 启动时由 SplashScreen 调用）
+  static Future<SessionRestoreResult> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     _currentToken = prefs.getString('auth_token');
     _currentUserId = prefs.getString('user_id');
     _loginType = prefs.getString('login_type');
-    if (_currentToken == null) return false;
+    if (_currentToken == null) return SessionRestoreResult.notFound;
 
     try {
-      final result = await ApiClient.post(ApiClient.authUrl, {
-        'action': 'verify',
-        'token': _currentToken,
-      });
-      return result['valid'] == true;
-    } catch (e) {
+      final result = await ApiClient.post(
+        ApiClient.authUrl,
+        {'action': 'restore_session', 'token': _currentToken},
+        handle401: false, // restore_session 内部自行处理 401，不触发全局失效流程
+      );
+      if (result['valid'] == true) {
+        _currentUserId = result['user_id'] ?? _currentUserId;
+        SubscriptionService.instance.updateFromServer(result);
+        ApiClient.resetSessionExpiry();
+        return SessionRestoreResult.verified;
+      }
+      // 后端明确返回 valid: false — token 已失效，清空全部凭据
       _currentToken = null;
       _currentUserId = null;
-      return false;
+      _loginType = null;
+      return SessionRestoreResult.invalid;
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        // HTTP 401 — 后端明确拒绝，清空全部凭据
+        _currentToken = null;
+        _currentUserId = null;
+        _loginType = null;
+        return SessionRestoreResult.invalid;
+      }
+      // 5xx 或其他服务端错误 — 无法判断有效性，保留凭据以离线态继续
+      return SessionRestoreResult.offline;
+    } catch (e) {
+      // TimeoutException / SocketException 等网络异常 — 保留凭据
+      return SessionRestoreResult.offline;
     }
   }
 
