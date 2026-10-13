@@ -56,8 +56,9 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('🔐 Login error: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isLoading = false;

@@ -17,12 +17,13 @@ app = Flask(__name__)
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 
 
-def _build_prompt(cities, days, interests, budget_level='medium', language='english'):
+def _build_prompt(cities, days, interests, budget_level='medium', language='english', custom_request=''):
     city_str = ', '.join(cities) if cities else 'Beijing'
     interest_str = ', '.join(interests) if interests else 'Culture, Food'
+    custom_line = f'\nSpecific request from the traveler: "{custom_request.strip()}"' if custom_request and custom_request.strip() else ''
 
     return f"""Create a {days}-day travel itinerary for {city_str}, China.
-Traveler interests: {interest_str}.
+Traveler interests: {interest_str}.{custom_line}
 Budget level: {budget_level}.
 
 Return ONLY valid JSON, no markdown or explanation:
@@ -197,6 +198,7 @@ def generate_stream():
         interests = body.get('interests', [])
         budget_level = body.get('budget_level', 'medium')
         language = body.get('language', 'english')
+        custom_request = body.get('custom_request', '')
 
         if not cities:
             return Response(
@@ -205,8 +207,8 @@ def generate_stream():
                 content_type='application/json',
             )
 
-        prompt = _build_prompt(cities, days, interests, budget_level, language)
-        print(f"[TIMING][stream] cities={cities}, days={days}, interests={interests}")
+        prompt = _build_prompt(cities, days, interests, budget_level, language, custom_request)
+        print(f"[TIMING][stream] cities={cities}, days={days}, interests={interests}, custom_request={repr(custom_request[:50])}")
 
         def event_stream():
             buffer = ''
@@ -241,10 +243,15 @@ def generate_stream():
                 print(f"[TIMING][stream] total={int((t_end-t_total)*1000)}ms, "
                       f"partial_events={partial_count}, days={len(final_obj['days'])}")
 
-                # 构建 title
+                # 构建 title：标签优先 → 自由文本前 20 字 → 回落 'Culture'
                 city_str = ', '.join(cities)
-                interest_str = interests[0] if interests else 'Culture'
-                title = f"{city_str} · {days} Days · {interest_str}"
+                if interests:
+                    interest_label = interests[0]
+                elif custom_request and custom_request.strip():
+                    interest_label = custom_request.strip()[:20]
+                else:
+                    interest_label = 'Culture'
+                title = f"{city_str} · {days} Days · {interest_label}"
 
                 yield f"data: {json.dumps({'event': 'complete', 'data': {'title': title, 'itinerary': final_obj}}, ensure_ascii=False)}\n\n"
 

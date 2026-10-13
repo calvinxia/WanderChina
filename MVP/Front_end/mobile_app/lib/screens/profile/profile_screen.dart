@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -82,8 +83,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           _isLoadingProfile = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ Load profile error: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
       // 网络失败时尝试读 SharedPreferences 缓存
       final prefs = await SharedPreferences.getInstance();
       final cachedName = prefs.getString('user_display_name');
@@ -120,8 +122,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           _isLoadingTrips = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ Load trips error: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         setState(() => _isLoadingTrips = false);
         if (e is SocketException || e.toString().contains('host lookup')) {
@@ -350,7 +353,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () async {
-                            _analytics.clearUser();
                             _analytics.track('logout');
                             final prefs = await SharedPreferences.getInstance();
                             await prefs.setBool('was_registered', true);
@@ -397,8 +399,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                               try {
                                 await PurchaseService.instance.restorePurchases();
                                 await Future.delayed(const Duration(seconds: 2));
-                              } catch (e) {
+                              } catch (e, stackTrace) {
                                 debugPrint('❌ Restore purchases error: $e');
+                                Sentry.captureException(e, stackTrace: stackTrace);
                                 restoreSuccess = false;
                                 restoreError = (e is SocketException || e.toString().contains('host lookup'))
                                     ? 'No internet connection. Please check your network and try again.'

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../services/api_client.dart';
 import '../services/subscription_service.dart';
 import '../widgets/paywall_dialog.dart';
@@ -36,8 +37,9 @@ Future<bool> requireQuotaCheck(
       await showPaywallDialog(context, theme, quotaType);
     }
     return false;
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('⚠️ Quota check failed: $e');
+    Sentry.captureException(e, stackTrace: stackTrace);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Service temporarily unavailable, please try again')),

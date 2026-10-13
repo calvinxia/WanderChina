@@ -91,6 +91,7 @@ class _AiChatInputState extends State<AiChatInput> {
               minLines: 1, // 最少 1 行
               textInputAction: TextInputAction.newline,
               keyboardType: TextInputType.multiline,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
               decoration: InputDecoration(
                 hintText: widget.placeholder ?? 'Ask AI to adjust...',
                 hintStyle: AppTextStyles.body(color: AppColors.gray400).copyWith(

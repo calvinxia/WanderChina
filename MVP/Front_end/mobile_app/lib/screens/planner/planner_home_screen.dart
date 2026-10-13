@@ -166,8 +166,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
           _isLoadingTrips = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ Load trips error: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
       // 网络失败 → 读本地缓存
       final userId = AuthService.currentUserId;
       final prefs = await SharedPreferences.getInstance();
@@ -503,6 +504,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                           'interests': detail['interests'],
                           'trip_id': detail['trip_id'],
                           'status': detail['status'],
+                          'description': detail['description'],
                         });
 
                         await Navigator.push(
@@ -528,6 +530,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                     } catch (e, stackTrace) {
                       debugPrint('❌ Load trip detail error: $e');
                       debugPrint('❌ Stack trace: $stackTrace');
+                      Sentry.captureException(e, stackTrace: stackTrace);
 
                       // 网络失败 → 读本地缓存
                       if (tripId != null) {
@@ -548,6 +551,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                               'interests': detail['interests'],
                               'trip_id': detail['trip_id'],
                               'status': detail['status'],
+                              'description': detail['description'],
                             });
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Offline mode. Showing cached trip.')),
@@ -803,6 +807,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         days: _selectedDays,
         interests: _selectedInterests.toList(),
         language: 'english',
+        customRequest: _customInput.text.trim(),
       )) {
         switch (event['event']) {
           case 'partial':
@@ -847,7 +852,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             'duration_days': _selectedDays,
             'interests': _selectedInterests.toList(),
             'itinerary': itineraryJson,
-            'description': null,
+            'description': _customInput.text.trim().isEmpty ? null : _customInput.text.trim(),
           },
           timeout: const Duration(seconds: 10),
         );
@@ -891,6 +896,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
             cities: [cityEnglishName],
             days: _selectedDays,
             interests: _selectedInterests.toList(),
+            customRequest: _customInput.text.trim().isEmpty ? null : _customInput.text.trim(),
           ),
         ),
       );

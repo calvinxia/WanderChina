@@ -18,6 +18,7 @@ class ItineraryStreamService {
     required List<String> interests,
     String budgetLevel = 'medium',
     String language = 'english',
+    String? customRequest,
   }) async* {
     try {
       yield* _streamFromCloud(
@@ -26,6 +27,7 @@ class ItineraryStreamService {
         interests: interests,
         budgetLevel: budgetLevel,
         language: language,
+        customRequest: customRequest,
       );
     } catch (e, stackTrace) {
       debugPrint('⚠️ Stream failed, falling back to non-stream: $e');
@@ -44,6 +46,8 @@ class ItineraryStreamService {
             'interests': interests,
             'budget_level': budgetLevel,
             'language': language,
+            if (customRequest != null && customRequest.isNotEmpty)
+              'custom_request': customRequest,
           },
           timeout: const Duration(seconds: 75),
         );
@@ -70,6 +74,7 @@ class ItineraryStreamService {
     required List<String> interests,
     required String budgetLevel,
     required String language,
+    String? customRequest,
   }) async* {
     final url = BackendConfig.generateItineraryStreamUrl;
     if (url.isEmpty) {
@@ -84,6 +89,8 @@ class ItineraryStreamService {
         'interests': interests,
         'budget_level': budgetLevel,
         'language': language,
+        if (customRequest != null && customRequest.isNotEmpty)
+          'custom_request': customRequest,
       });
 
     final response = await http.Client().send(request).timeout(

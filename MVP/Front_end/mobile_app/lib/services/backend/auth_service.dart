@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 // lib/services/backend/auth_service.dart
 import 'package:shared_preferences/shared_preferences.dart';
+import '../analytics_service.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../api_client.dart';
@@ -42,6 +43,7 @@ class AuthService {
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
       _loginType = 'anonymous';
+      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
       await _saveSession();
       ApiClient.resetSessionExpiry();
       return true;
@@ -68,6 +70,7 @@ class AuthService {
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
     _loginType = 'registered';
+    if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
     AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
     syncAIDisclosure(); // fire-and-forget
@@ -88,6 +91,7 @@ class AuthService {
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
     _loginType = 'registered';
+    if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
     AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
     SubscriptionService.instance.updateFromServer(result);
@@ -123,6 +127,7 @@ class AuthService {
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
       _loginType = 'registered';
+      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
       AppEventBus.instance.fire(LoginStatusChangedEvent());
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
@@ -169,6 +174,7 @@ class AuthService {
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
       _loginType = 'registered';
+      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
       AppEventBus.instance.fire(LoginStatusChangedEvent());
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
@@ -235,16 +241,18 @@ class AuthService {
         {'action': 'restore_session', 'token': _currentToken},
         handle401: false, // restore_session 内部自行处理 401，不触发全局失效流程
       );
-      if (result['valid'] == true) {
+      if (result['user_id'] != null) {
         _currentUserId = result['user_id'] ?? _currentUserId;
         SubscriptionService.instance.updateFromServer(result);
         ApiClient.resetSessionExpiry();
+        if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
         return SessionRestoreResult.verified;
       }
       // 后端明确返回 valid: false — token 已失效，清空全部凭据
       _currentToken = null;
       _currentUserId = null;
       _loginType = null;
+      AnalyticsService.instance.clearUser();
       return SessionRestoreResult.invalid;
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
@@ -252,12 +260,15 @@ class AuthService {
         _currentToken = null;
         _currentUserId = null;
         _loginType = null;
+        AnalyticsService.instance.clearUser();
         return SessionRestoreResult.invalid;
       }
       // 5xx 或其他服务端错误 — 无法判断有效性，保留凭据以离线态继续
+      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
       return SessionRestoreResult.offline;
     } catch (e) {
       // TimeoutException / SocketException 等网络异常 — 保留凭据
+      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
       return SessionRestoreResult.offline;
     }
   }
@@ -267,6 +278,7 @@ class AuthService {
     _currentToken = null;
     _currentUserId = null;
     _loginType = null;
+    AnalyticsService.instance.clearUser();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('user_id');

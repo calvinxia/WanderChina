@@ -242,8 +242,9 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
           setState(() => _isSearching = false);
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('🔍 Search error: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isSearching = false;
@@ -347,8 +348,9 @@ class MapWithTranslationScreenState extends State<MapWithTranslationScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('🔄 On-the-fly translate failed: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         final message = (e is SocketException || e.toString().contains('host lookup'))
             ? 'No internet connection. Please check your network.'

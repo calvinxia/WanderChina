@@ -28,10 +28,11 @@ import '../../widgets/soft_login_sheet.dart';
 /// - Manual Save for preview mode
 class ItineraryDetailScreen extends StatefulWidget {
   final Itinerary itinerary;
-  final String? tripId;           // null = 未保存（预览模式）
-  final List<String>? cities;     // 用于保存时传给后端
-  final int? days;                // 用于保存时传给后端
-  final List<String>? interests;  // 用于保存时传给后端
+  final String? tripId;              // null = 未保存（预览模式）
+  final List<String>? cities;        // 用于保存时传给后端
+  final int? days;                   // 用于保存时传给后端
+  final List<String>? interests;     // 用于保存时传给后端
+  final String? customRequest;       // 用于保存/修改时传给后端
 
   const ItineraryDetailScreen({
     super.key,
@@ -40,6 +41,7 @@ class ItineraryDetailScreen extends StatefulWidget {
     this.cities,
     this.days,
     this.interests,
+    this.customRequest,
   });
 
   @override
@@ -85,6 +87,10 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
     if (dest.contains("xi'an") || dest.contains('西安')) return CityTheme.xian;
     return CityTheme.defaultTheme;
   }
+
+  // 刚生成时用 widget.customRequest，从列表重新打开时用 _itinerary.customRequest（来自 trips.description）
+  String? get _effectiveCustomRequest =>
+      widget.customRequest ?? _itinerary.customRequest;
 
   @override
   void dispose() {
@@ -397,6 +403,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -536,6 +543,7 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
         'title': _itinerary.title,
         'itinerary': _itinerary.toJson(),
         'user_id': AuthService.currentUserId,
+        'description': _effectiveCustomRequest,
       });
 
       if (mounted) {
@@ -652,6 +660,10 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           'itinerary': currentJson,
           'instruction': instruction,
           'language': 'english',
+          if (widget.interests != null && widget.interests!.isNotEmpty)
+            'interests': widget.interests,
+          if (_effectiveCustomRequest != null && _effectiveCustomRequest!.isNotEmpty)
+            'custom_request': _effectiveCustomRequest,
         },
         timeout: const Duration(seconds: 60),
       );

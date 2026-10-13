@@ -250,6 +250,7 @@ class Itinerary {
   final bool isPublic; // For sharing with community
   final int? likes;
   final int? saves;
+  final String? customRequest; // User's free-text preference (stored in trips.description)
 
   Itinerary({
     required this.id,
@@ -268,6 +269,7 @@ class Itinerary {
     this.isPublic = false,
     this.likes,
     this.saves,
+    this.customRequest,
   });
 
   int get totalDays => endDate.difference(startDate).inDays + 1;
@@ -312,6 +314,7 @@ class Itinerary {
       isPublic: json['isPublic'] as bool? ?? false,
       likes: json['likes'] as int?,
       saves: json['saves'] as int?,
+      customRequest: json['customRequest'] as String?,
     );
   }
 
@@ -361,6 +364,7 @@ class Itinerary {
       updatedAt: now,
       tags: (json['interests'] as List<dynamic>?)?.map((t) => t.toString()).toList(),
       isPublic: false,
+      customRequest: json['description'] as String?,
     );
   }
 
@@ -382,6 +386,7 @@ class Itinerary {
       'isPublic': isPublic,
       'likes': likes,
       'saves': saves,
+      'customRequest': customRequest,
     };
   }
 }

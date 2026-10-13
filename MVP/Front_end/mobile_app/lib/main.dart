@@ -71,8 +71,9 @@ void main() async {
   try {
     await LanguageManager().initialize();
     debugPrint('✅ 语言管理器初始化成功');
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('❌ 语言管理器初始化失败: $e');
+    Sentry.captureException(e, stackTrace: stackTrace);
   }
 
   // 3. 初始化高德地图SDK
@@ -85,24 +86,27 @@ void main() async {
     } else {
       debugPrint('⚠️ 高德地图API Key未配置，地图功能将不可用');
     }
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('❌ 高德地图SDK初始化失败: $e');
+    Sentry.captureException(e, stackTrace: stackTrace);
   }
 
   // 4. 初始化地图翻译服务（路线翻译，本地词典模式）
   try {
     await MapTranslationService().initialize();
     debugPrint('✅ 地图翻译服务初始化成功');
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('❌ 地图翻译服务初始化失败: $e');
+    Sentry.captureException(e, stackTrace: stackTrace);
   }
 
   // 5. 初始化语音翻译服务
   try {
     await VoiceTranslationService().initialize();
     debugPrint('✅ 语音翻译服务初始化成功');
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('❌ 语音翻译服务初始化失败: $e');
+    Sentry.captureException(e, stackTrace: stackTrace);
   }
 
   // 7. 读取本地订阅缓存（离线也能拿到订阅状态）
@@ -113,8 +117,9 @@ void main() async {
   try {
     await PurchaseService.instance.initialize();
     debugPrint('✅ IAP 购买服务初始化成功');
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('❌ IAP 购买服务初始化失败: $e');
+    Sentry.captureException(e, stackTrace: stackTrace);
   }
 
   // 9. 拉取 Feature Flags（fail-closed：失败默认 paywallEnabled=false）

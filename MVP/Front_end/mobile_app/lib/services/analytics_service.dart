@@ -17,6 +17,10 @@ class AnalyticsService {
     _city = city;
   }
 
+  void setCity(String city) {
+    _city = city;
+  }
+
   void clearUser() {
     _userId = null;
     _city = null;

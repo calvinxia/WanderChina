@@ -100,8 +100,9 @@ class _SignupScreenState extends State<SignupScreen> {
           (route) => false,
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('🔐 Register error: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isLoading = false;

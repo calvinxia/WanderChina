@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../widgets/common/app_bottom_navigation.dart';
@@ -36,7 +37,7 @@ class MainScreenState extends State<MainScreen> {
   final _analytics = AnalyticsService.instance;
   int _currentIndex = 0;
   final GlobalKey<MapWithTranslationScreenState> _mapKey = GlobalKey();
-  String? pendingSearchCity;
+
   CityTheme _cityTheme = CityTheme.defaultTheme;
   StreamSubscription? _sessionExpiredSub;
 
@@ -87,6 +88,7 @@ class MainScreenState extends State<MainScreen> {
               _cityTheme = gpsTheme;
             });
           }
+          _analytics.setCity(gpsTheme.cityKey);
           return;
         }
       } catch (_) {
@@ -103,12 +105,14 @@ class MainScreenState extends State<MainScreen> {
             _cityTheme = CityTheme.fromCityKey(savedCity);
           });
         }
+        _analytics.setCity(savedCity);
         return;
       }
 
       // 3. 都没有 → 保持 defaultTheme
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('📍 City theme detection failed: $e');
+      Sentry.captureException(e, stackTrace: stackTrace);
     }
   }
 
@@ -226,10 +230,9 @@ class MainScreenState extends State<MainScreen> {
     setState(() {
       _currentIndex = 1;  // Map tab index
     });
-    pendingSearchCity = city;
     // 直接调 Map 页面的搜索方法
     Future.delayed(const Duration(milliseconds: 300), () {
-      _mapKey.currentState?.searchFromExternal(query, displayName: displayName, fallbackQuery: fallbackQuery);
+      _mapKey.currentState?.searchFromExternal(query, displayName: displayName, city: city, fallbackQuery: fallbackQuery);
     });
   }
 
@@ -239,7 +242,6 @@ class MainScreenState extends State<MainScreen> {
   /// 预留给未来嵌套 Navigator 改造（各 tab 独立导航栈）后启用。
   void switchToMapTabAndSearch(String query, {String? displayName, String? city, String? fallbackQuery}) {
     setState(() => _currentIndex = 1);
-    pendingSearchCity = city;
     // addPostFrameCallback 确保 tab 切换完成后再搜索
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _mapKey.currentState?.searchFromExternal(query, displayName: displayName, city: city, fallbackQuery: fallbackQuery);

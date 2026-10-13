@@ -96,7 +96,7 @@ def main_handler(event, context):
             cursor.execute("""
                 SELECT id, title, cities, duration_days, itinerary_json,
                        budget_level, interests, status, start_date, end_date,
-                       created_at, updated_at
+                       created_at, updated_at, description
                 FROM trips WHERE id = %s
             """, (trip_id,))
             row = cursor.fetchone()
@@ -133,7 +133,8 @@ def main_handler(event, context):
                 'end_date': str(row[9]) if row[9] else None,
                 'days': days,
                 'created_at': str(row[10]),
-                'updated_at': str(row[11])
+                'updated_at': str(row[11]),
+                'description': row[12]
             })
 
         # ===== 列出用户行程 =====

@@ -84,13 +84,14 @@ def _call_deepseek(prompt, max_tokens=16384, temperature=0.3, label='generate'):
     return result
 
 
-def _generate_itinerary(cities, days, interests, budget_level='medium', language='english'):
+def _generate_itinerary(cities, days, interests, budget_level='medium', language='english', custom_request=''):
     """生成新行程"""
     city_str = ', '.join(cities) if cities else 'Beijing'
     interest_str = ', '.join(interests) if interests else 'Culture, Food'
+    custom_line = f'\nSpecific request from the traveler: "{custom_request.strip()}"' if custom_request and custom_request.strip() else ''
 
     prompt = f"""Create a {days}-day travel itinerary for {city_str}, China.
-Traveler interests: {interest_str}.
+Traveler interests: {interest_str}.{custom_line}
 Budget level: {budget_level}.
 
 Return ONLY valid JSON, no markdown or explanation:
@@ -141,14 +142,22 @@ Rules:
     return itinerary
 
 
-def _modify_itinerary(current_itinerary, instruction, language='english'):
+def _modify_itinerary(current_itinerary, instruction, language='english', interests=None, custom_request=''):
     """用自然语言修改已有行程"""
     simplified = json.dumps(current_itinerary, ensure_ascii=False, indent=2)
+
+    context_lines = ''
+    if interests:
+        context_lines += f"\nThe traveler's original interests: {', '.join(interests)}."
+    if custom_request and custom_request.strip():
+        context_lines += f"\nThe traveler's original request: \"{custom_request.strip()}\""
+    if context_lines:
+        context_lines += "\nThese are background context only. The current instruction below takes priority and may override them."
 
     prompt = f"""You are a travel itinerary editor. Here is the current itinerary:
 
 {simplified}
-
+{context_lines}
 The user wants to make this change: "{instruction}"
 
 Apply the requested change and return the COMPLETE modified itinerary as valid JSON.
@@ -194,6 +203,8 @@ def main_handler(event, context):
             current_itinerary = body.get('itinerary')
             instruction = body.get('instruction', '').strip()
             language = body.get('language', 'english')
+            interests = body.get('interests', [])
+            custom_request = body.get('custom_request', '')
 
             if not current_itinerary:
                 return _response(400, {'error': 'Missing itinerary'})
@@ -205,6 +216,8 @@ def main_handler(event, context):
                 current_itinerary=current_itinerary,
                 instruction=instruction,
                 language=language,
+                interests=interests,
+                custom_request=custom_request,
             )
             t3 = time.time()
             print(f"[TIMING] modify_itinerary_total: {(t3-t2)*1000:.0f}ms")
@@ -225,8 +238,9 @@ def main_handler(event, context):
         interests = body.get('interests', [])
         budget_level = body.get('budget_level', 'medium')
         language = body.get('language', 'english')
+        custom_request = body.get('custom_request', '')
 
-        print(f"[TIMING] params: cities={cities}, days={days}, interests={interests}")
+        print(f"[TIMING] params: cities={cities}, days={days}, interests={interests}, custom_request={repr(custom_request[:50])}")
 
         if not cities:
             return _response(400, {'error': 'Missing cities'})
@@ -238,13 +252,20 @@ def main_handler(event, context):
             interests=interests,
             budget_level=budget_level,
             language=language,
+            custom_request=custom_request,
         )
         t3 = time.time()
         print(f"[TIMING] generate_itinerary_total: {(t3-t2)*1000:.0f}ms")
 
+        # 标题：标签优先 → 自由文本前 20 字 → 回落 'Culture'
         city_str = ', '.join(cities)
-        interest_str = interests[0] if interests else 'Culture'
-        title = f"{city_str} · {days} Days · {interest_str}"
+        if interests:
+            interest_label = interests[0]
+        elif custom_request and custom_request.strip():
+            interest_label = custom_request.strip()[:20]
+        else:
+            interest_label = 'Culture'
+        title = f"{city_str} · {days} Days · {interest_label}"
 
         response = _response(200, {
             'title': title,
