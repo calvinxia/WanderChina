@@ -32,9 +32,9 @@ def send_reset_email(email, token):
                 'Content-Type': 'application/json',
             },
             json={
-                'from': 'WanderChina <onboarding@resend.dev>',
+                'from': 'OrienScope <noreply@orienscope.app>',
                 'to': [email],
-                'subject': 'WanderChina - Password Reset Code',
+                'subject': 'OrienScope - Password Reset Code',
                 'html': (
                     '<div style="font-family: sans-serif; max-width: 400px; margin: 0 auto;">'
                     '<h2 style="color: #1a1a1a;">Reset Your Password</h2>'
