@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -16,6 +15,7 @@ import '../../widgets/common/city_background.dart';
 import '../../services/analytics_service.dart';
 import '../../services/app_event_bus.dart';
 import '../../services/backend/auth_service.dart';
+import '../../utils/device_utils.dart';
 import '../auth/login_screen.dart';
 
 /// OrienScope v2.0 主导航页面
@@ -154,14 +154,7 @@ class MainScreenState extends State<MainScreen> {
   Future<void> _reAuthAnonymous() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      var deviceId = prefs.getString('device_id');
-      if (deviceId == null) {
-        deviceId = List.generate(
-          32,
-          (_) => Random.secure().nextInt(16).toRadixString(16),
-        ).join();
-        await prefs.setString('device_id', deviceId);
-      }
+      final deviceId = await getOrCreateDeviceId(prefs);
       await AuthService.anonymousAuth(deviceId);
     } catch (_) {
       // 网络不通时静默失败，不重试

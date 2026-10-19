@@ -10,6 +10,7 @@ import '../../widgets/planner/activity_detail_sheet.dart';
 import '../../services/api_client.dart';
 import '../../services/analytics_service.dart';
 import '../../core/config/backend_config.dart';
+import '../../services/app_event_bus.dart';
 import '../../services/backend/auth_service.dart';
 import '../main/main_screen.dart';
 import '../../core/theme/city_theme.dart';
@@ -551,6 +552,8 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen>
           _isSaved = true;
           _isSaving = false;
         });
+
+        AppEventBus.instance.fire(TripsChangedEvent());
 
         // Analytics tracking
         _analytics.itinerarySaved(

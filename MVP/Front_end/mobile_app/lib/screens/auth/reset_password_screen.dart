@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import '../../services/backend/auth_service.dart';
 import '../../services/api_client.dart';
+import '../../services/backend/auth_service.dart';
+import '../../utils/auth_error.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
@@ -78,29 +78,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         );
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
-    } on ApiException catch (e, stackTrace) {
-      debugPrint('🔐 Reset password ApiException(${e.statusCode})');
-      Sentry.captureException(e, stackTrace: stackTrace);
-      String msg = 'Failed to reset password. Please try again.';
-      if (e.statusCode == 400 || e.statusCode == 429) {
-        try {
-          final parsed = jsonDecode(e.body) as Map<String, dynamic>;
-          msg = (parsed['error'] as String?) ?? msg;
-        } catch (_) {}
-      }
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = msg;
-        });
-      }
     } catch (e, stackTrace) {
       debugPrint('🔐 Reset password error: $e');
       Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to reset password. Please try again.';
+          _errorMessage = (e is ApiException && e.statusCode == 400)
+              ? 'Invalid or expired code. Please try again.'
+              : authErrorMessage(e);
         });
       }
     }

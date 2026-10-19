@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../services/backend/auth_service.dart';
+import '../../utils/auth_error.dart';
 import '../main/main_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -62,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Login failed. Please check your email and password.';
+          _errorMessage = authErrorMessage(e, isCredentialError: true);
         });
       }
     }
@@ -399,10 +400,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Text("Don't have an account? ", style: TextStyle(color: Colors.white.withOpacity(0.6))),
                     GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SignupScreen()),
-                      ),
+                      onTap: () async {
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SignupScreen(fromSoftLogin: widget.fromSoftLogin),
+                          ),
+                        );
+                        if (result == true && mounted && widget.fromSoftLogin) {
+                          Navigator.of(context).pop(true);
+                        }
+                      },
                       child: const Text(
                         'Sign Up',
                         style: TextStyle(color: Color(0xFFE8D5B0), fontWeight: FontWeight.w600),

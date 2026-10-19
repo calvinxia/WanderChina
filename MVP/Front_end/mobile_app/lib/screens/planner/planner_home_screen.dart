@@ -53,6 +53,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
   int _loadingStep = 0;
   Timer? _loadingTimer;
   StreamSubscription? _loginSub;
+  StreamSubscription? _tripsSub;
   Map<String, dynamic>? _streamingItinerary;
   bool _isStreaming = false;
 
@@ -141,6 +142,9 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         setState(() {});
       }
     });
+    _tripsSub = AppEventBus.instance.on<TripsChangedEvent>().listen((_) {
+      if (mounted) _loadSavedTrips();
+    });
   }
 
   Future<void> _loadSavedTrips() async {
@@ -153,7 +157,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
       final result = await ApiClient.post(BackendConfig.tripUrl, {
         'action': 'list',
         'user_id': userId,
-      });
+      }, retry5xx: true);
       final trips = result['trips'] as List? ?? [];
 
       // 成功后缓存到本地
@@ -197,6 +201,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
     _customInput.dispose();
     _loadingTimer?.cancel();
     _loginSub?.cancel();
+    _tripsSub?.cancel();
     super.dispose();
   }
 
@@ -440,10 +445,23 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                         'action': 'delete',
                         'trip_id': trip['trip_id'],
                         'user_id': AuthService.currentUserId,
-                      });
+                      }, retry5xx: true);
                       setState(() {
                         _savedTrips.removeWhere((t) => t['trip_id'] == trip['trip_id']);
                       });
+                      AppEventBus.instance.fire(TripsChangedEvent());
+                    } on ApiException catch (e) {
+                      if (e.statusCode == 404) {
+                        // 首次删除已成功但返回 504，重试收到 404；视为成功
+                        setState(() {
+                          _savedTrips.removeWhere((t) => t['trip_id'] == trip['trip_id']);
+                        });
+                        AppEventBus.instance.fire(TripsChangedEvent());
+                      } else if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to delete trip: $e')),
+                        );
+                      }
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -460,7 +478,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
                       final detail = await ApiClient.post(BackendConfig.tripUrl, {
                         'action': 'get',
                         'trip_id': tripId,
-                      });
+                      }, retry5xx: true);
 
                       debugPrint('📋 Trip detail response keys: ${detail.keys.toList()}');
                       debugPrint('📋 Trip detail response: $detail');
@@ -858,6 +876,7 @@ class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
         );
         savedTripId = saveResult['trip_id'] as String?;
         debugPrint('💾 Trip saved: $savedTripId');
+        AppEventBus.instance.fire(TripsChangedEvent());
       } catch (saveError) {
         // 保存失败 → 不阻塞用户，fallback 到预览模式（tripId: null）
         // 用户可在详情页手动点 Save

@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../services/api_client.dart';
 import '../services/subscription_service.dart';
 import '../widgets/paywall_dialog.dart';
 import '../core/theme/city_theme.dart';
+
+// DEBUG-ONLY: 用于测试购买门控，release 构建不生效
+const bool kForcePaywall = bool.fromEnvironment('FORCE_PAYWALL');
 
 /// 配额检查 + 付费墙触发
 /// 返回 true = 允许继续，false = 被拦截（已弹付费墙或报错）
@@ -19,6 +23,12 @@ Future<bool> requireQuotaCheck(
   // 如未来加 "premium 也有配额" 规则, 删除此行让 SCF 处理.
   if (SubscriptionService.instance.isPremium) return true;
 
+  // DEBUG-ONLY: 用于测试购买门控，release 构建不生效
+  if (kDebugMode && kForcePaywall) {
+    if (context.mounted) await showPaywallDialog(context, theme, quotaType);
+    return false;
+  }
+
   try {
     final body = <String, dynamic>{'quota_type': quotaType};
     if (userId != null) body['user_id'] = userId;
@@ -28,6 +38,7 @@ Future<bool> requireQuotaCheck(
       ApiClient.checkUserQuotaUrl,
       body,
       timeout: const Duration(seconds: 5),
+      retry5xx: true,
     );
 
     if (result['allowed'] == true) return true;

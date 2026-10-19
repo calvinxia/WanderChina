@@ -53,54 +53,71 @@ class AuthService {
     }
   }
 
-  /// 邮箱注册
-  static Future<Map<String, dynamic>> register({
+  /// 邮箱注册第一步：发送验证码（不重试，重试会使第一封邮件失效）
+  static Future<void> registerStart({required String email}) async {
+    await ApiClient.post(ApiClient.authUrl, {
+      'action': 'register_start',
+      'email': email,
+    });
+  }
+
+  /// 邮箱注册第二步：验证码 + 密码（不重试，已消耗的验证码重试会误报无效）
+  static Future<Map<String, dynamic>> registerVerify({
     required String email,
+    required String code,
     required String password,
-    String? username,
     String? deviceId,
+    String? username,
   }) async {
     final result = await ApiClient.post(ApiClient.authUrl, {
-      'action': 'register',
+      'action': 'register_verify',
       'email': email,
+      'code': code,
       'password': password,
-      'username': username,
-      'device_id': deviceId,
+      if (deviceId != null) 'device_id': deviceId,
+      if (username != null) 'username': username,
     });
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
     _loginType = 'registered';
     if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-    AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
-    syncAIDisclosure(); // fire-and-forget
+    SubscriptionService.instance.updateFromServer(result);
+    syncAIDisclosure();
     ApiClient.resetSessionExpiry();
+    AppEventBus.instance.fire(LoginStatusChangedEvent());
     return result;
   }
-
-  /// 邮箱登录
+  /// 邮箱登录（依赖 2.4 幂等，开启 5xx 重试）
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    final result = await ApiClient.post(ApiClient.authUrl, {
-      'action': 'login',
-      'email': email,
-      'password': password,
-    });
+    final prefs = await SharedPreferences.getInstance();
+    final deviceId = prefs.getString('device_id');
+    final result = await ApiClient.post(
+      ApiClient.authUrl,
+      {
+        'action': 'login',
+        'email': email,
+        'password': password,
+        if (deviceId != null) 'device_id': deviceId,
+      },
+      retry5xx: true,
+    );
     _currentUserId = result['user_id'];
     _currentToken = result['token'];
     _loginType = 'registered';
     if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-    AppEventBus.instance.fire(LoginStatusChangedEvent());
     await _saveSession();
     SubscriptionService.instance.updateFromServer(result);
     syncAIDisclosure(); // fire-and-forget
     ApiClient.resetSessionExpiry();
+    AppEventBus.instance.fire(LoginStatusChangedEvent());
     return result;
   }
 
-  /// Apple Sign-In 登录
+  /// Apple Sign-In 登录（依赖 2.4 幂等，开启 5xx 重试）
   ///
   /// ⚠️ 关键：使用 userIdentifier 作为主键，不依赖 email
   /// Apple 首次登录返回 email，后续返回 relay email 或不返回
@@ -114,25 +131,33 @@ class AuthService {
         ],
       );
 
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = prefs.getString('device_id');
+
       // 使用 userIdentifier (稳定) 而不是 email (不稳定)
-      final result = await ApiClient.post(ApiClient.authUrl, {
-        'action': 'apple_sign_in',
-        'apple_user_id': credential.userIdentifier,  // 主键
-        'id_token': credential.identityToken,
-        'email': credential.email,  // 可能为 null
-        'given_name': credential.givenName,  // 可能为 null
-        'family_name': credential.familyName,  // 可能为 null
-      });
+      final result = await ApiClient.post(
+        ApiClient.authUrl,
+        {
+          'action': 'apple_sign_in',
+          'apple_user_id': credential.userIdentifier,  // 主键
+          'id_token': credential.identityToken,
+          'email': credential.email,  // 可能为 null
+          'given_name': credential.givenName,  // 可能为 null
+          'family_name': credential.familyName,  // 可能为 null
+          if (deviceId != null) 'device_id': deviceId,
+        },
+        retry5xx: true,
+      );
 
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
       _loginType = 'registered';
       if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-      AppEventBus.instance.fire(LoginStatusChangedEvent());
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
       syncAIDisclosure(); // fire-and-forget
       ApiClient.resetSessionExpiry();
+      AppEventBus.instance.fire(LoginStatusChangedEvent());
       return result;
     } on SignInWithAppleAuthorizationException catch (e) {
       // User cancelled authorization
@@ -148,7 +173,7 @@ class AuthService {
     }
   }
 
-  /// Google Sign-In 登录(Android 主用;iOS 用 Apple Sign-In)
+  /// Google Sign-In 登录(Android 主用;iOS 用 Apple Sign-In)（依赖 2.4 幂等，开启 5xx 重试）
   ///
   /// 返回 null 表示用户取消,throw Exception 表示技术错误
   /// 后端 google_sign_in action 通过 Cloudflare 中转验证 id_token
@@ -165,21 +190,30 @@ class AuthService {
         debugPrint('[AUTH] Google Sign-In: idToken is null');
         throw Exception('Google Sign-In failed: no id token returned');
       }
-      final result = await ApiClient.post(ApiClient.authUrl, {
-        'action': 'google_sign_in',
-        'id_token': idToken,
-        'email': googleUser.email,
-        'display_name': googleUser.displayName,
-      });
+
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = prefs.getString('device_id');
+
+      final result = await ApiClient.post(
+        ApiClient.authUrl,
+        {
+          'action': 'google_sign_in',
+          'id_token': idToken,
+          'email': googleUser.email,
+          'display_name': googleUser.displayName,
+          if (deviceId != null) 'device_id': deviceId,
+        },
+        retry5xx: true,
+      );
       _currentUserId = result['user_id'];
       _currentToken = result['token'];
       _loginType = 'registered';
       if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-      AppEventBus.instance.fire(LoginStatusChangedEvent());
       await _saveSession();
       SubscriptionService.instance.updateFromServer(result);
       syncAIDisclosure();
       ApiClient.resetSessionExpiry();
+      AppEventBus.instance.fire(LoginStatusChangedEvent());
       return result;
     } catch (e) {
       debugPrint('[AUTH] Google Sign-In failed: $e');
@@ -227,7 +261,7 @@ class AuthService {
     });
   }
 
-  /// 恢复 session（App 启动时由 SplashScreen 调用）
+  /// 恢复 session（App 启动时由 SplashScreen 调用，开启 5xx 重试）
   static Future<SessionRestoreResult> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     _currentToken = prefs.getString('auth_token');
@@ -240,6 +274,7 @@ class AuthService {
         ApiClient.authUrl,
         {'action': 'restore_session', 'token': _currentToken},
         handle401: false, // restore_session 内部自行处理 401，不触发全局失效流程
+        retry5xx: true,
       );
       if (result['user_id'] != null) {
         _currentUserId = result['user_id'] ?? _currentUserId;

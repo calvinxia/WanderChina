@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../services/backend/auth_service.dart';
-import '../../services/api_client.dart';
+import '../../utils/auth_error.dart';
 import 'reset_password_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -55,29 +54,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         );
       }
-    } on ApiException catch (e, stackTrace) {
-      debugPrint('🔐 Forgot password ApiException(${e.statusCode})');
-      Sentry.captureException(e, stackTrace: stackTrace);
-      String msg = 'Failed to send reset code. Please try again.';
-      if (e.statusCode == 429) {
-        try {
-          final parsed = jsonDecode(e.body) as Map<String, dynamic>;
-          msg = (parsed['error'] as String?) ?? msg;
-        } catch (_) {}
-      }
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = msg;
-        });
-      }
     } catch (e, stackTrace) {
       debugPrint('🔐 Forgot password error: $e');
       Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to send reset code. Please try again.';
+          _errorMessage = authErrorMessage(e);
         });
       }
     }

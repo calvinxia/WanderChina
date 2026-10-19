@@ -1,5 +1,6 @@
 // lib/services/api_client.dart
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -34,42 +35,79 @@ class ApiClient {
   /// 通用 POST 请求
   ///
   /// [handle401]：默认 true。restore_session 自身传 false，避免在启动阶段误触发会话失效流程。
+  /// [retry5xx]：默认 false。传 true 时对 502/503/504 及 SocketException 最多重试 3 次，
+  ///   退避 1s→3s→8s。500、4xx、TimeoutException 不重试。
+  ///   不重试：register_start / register_verify / tripUrl create / 行程生成。
   static Future<Map<String, dynamic>> post(
     String url,
     Map<String, dynamic> body, {
     Duration timeout = const Duration(seconds: 25),
     bool handle401 = true,
+    bool retry5xx = false,
   }) async {
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-        },
-        body: json.encode(body),
-      ).timeout(timeout);
+    const retryDelays = [1, 3, 8];
+    int attempt = 0;
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        // 显式使用 UTF-8 解码，确保中文字符正确处理
-        final responseBody = utf8.decode(response.bodyBytes);
-        return json.decode(responseBody);
+    while (true) {
+      try {
+        final response = await http.post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+          },
+          body: json.encode(body),
+        ).timeout(timeout);
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseBody = utf8.decode(response.bodyBytes);
+          return json.decode(responseBody);
+        }
+
+        // 401 统一处理：fire 一次事件，UI 层负责清凭据 + 路由
+        if (response.statusCode == 401 && handle401 && !_sessionExpired) {
+          _sessionExpired = true;
+          AppEventBus.instance.fire(SessionExpiredEvent());
+        }
+
+        final isRetryable = retry5xx &&
+            (response.statusCode == 502 ||
+                response.statusCode == 503 ||
+                response.statusCode == 504) &&
+            attempt < retryDelays.length;
+
+        if (isRetryable) {
+          debugPrint(
+              '⚠️ API ${response.statusCode}, retrying in ${retryDelays[attempt]}s (attempt ${attempt + 1}/3)');
+          await Future.delayed(Duration(seconds: retryDelays[attempt]));
+          attempt++;
+          continue;
+        }
+
+        throw ApiException(response.statusCode, response.body);
+      } on SocketException catch (e, stackTrace) {
+        if (retry5xx && attempt < retryDelays.length) {
+          debugPrint(
+              '⚠️ API SocketException, retrying in ${retryDelays[attempt]}s (attempt ${attempt + 1}/3): $e');
+          await Future.delayed(Duration(seconds: retryDelays[attempt]));
+          attempt++;
+          continue;
+        }
+        debugPrint('❌ API error: $e');
+        Sentry.captureException(
+          e,
+          stackTrace: stackTrace,
+          hint: Hint.withMap({'url': url, 'body': body}),
+        );
+        rethrow;
+      } catch (e, stackTrace) {
+        debugPrint('❌ API error: $e');
+        Sentry.captureException(
+          e,
+          stackTrace: stackTrace,
+          hint: Hint.withMap({'url': url, 'body': body}),
+        );
+        rethrow;
       }
-
-      // 401 统一处理：fire 一次事件，UI 层负责清凭据 + 路由
-      if (response.statusCode == 401 && handle401 && !_sessionExpired) {
-        _sessionExpired = true;
-        AppEventBus.instance.fire(SessionExpiredEvent());
-      }
-
-      throw ApiException(response.statusCode, response.body);
-    } catch (e, stackTrace) {
-      debugPrint('❌ API error: $e');
-      Sentry.captureException(
-        e,
-        stackTrace: stackTrace,
-        hint: Hint.withMap({'url': url, 'body': body}),
-      );
-      rethrow;
     }
   }
 }

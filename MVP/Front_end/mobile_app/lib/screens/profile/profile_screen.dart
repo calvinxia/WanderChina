@@ -49,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _currentCity = 'China';
   StreamSubscription? _subEventSub;
   StreamSubscription? _loginEventSub;
+  StreamSubscription? _tripsSub;
 
   @override
   void initState() {
@@ -62,7 +63,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (mounted) setState(() {});
     });
     _loginEventSub = AppEventBus.instance.on<LoginStatusChangedEvent>().listen((_) {
-      if (mounted) _loadProfile();
+      if (mounted) {
+        _loadProfile();
+        _loadTrips();
+      }
+    });
+    _tripsSub = AppEventBus.instance.on<TripsChangedEvent>().listen((_) {
+      if (mounted) _loadTrips();
     });
     _refreshFlags();
   }
@@ -115,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       final result = await ApiClient.post(BackendConfig.tripUrl, {
         'action': 'list',
         'user_id': userId,
-      });
+      }, retry5xx: true);
       if (mounted) {
         setState(() {
           _userTrips = List<Map<String, dynamic>>.from(result['trips'] ?? []);
@@ -148,6 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _subEventSub?.cancel();
     _loginEventSub?.cancel();
+    _tripsSub?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -623,7 +631,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       final detail = await ApiClient.post(BackendConfig.tripUrl, {
         'action': 'get',
         'trip_id': tripId,
-      });
+      }, retry5xx: true);
       if (tripId != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('cached_trip_$tripId', json.encode(detail));
@@ -724,11 +732,25 @@ class _ProfileScreenState extends State<ProfileScreen>
         'action': 'delete',
         'trip_id': trip['trip_id'],
         'user_id': AuthService.currentUserId,
-      });
+      }, retry5xx: true);
       setState(() {
         _userTrips.removeWhere((t) => t['trip_id'] == trip['trip_id']);
         _userProfile?['trips_count'] = _userTrips.length;
       });
+      AppEventBus.instance.fire(TripsChangedEvent());
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) {
+        // 首次删除已成功但返回 504，重试收到 404；视为成功
+        setState(() {
+          _userTrips.removeWhere((t) => t['trip_id'] == trip['trip_id']);
+          _userProfile?['trips_count'] = _userTrips.length;
+        });
+        AppEventBus.instance.fire(TripsChangedEvent());
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Something went wrong. Please try again.')),
+        );
+      }
     } catch (e) {
       if (mounted) {
         final message = (e is SocketException || e.toString().contains('host lookup'))

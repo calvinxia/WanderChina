@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,6 +12,7 @@ import '../../widgets/mountain_silhouette.dart';
 import '../../widgets/onboarding_illustrations.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../services/backend/auth_service.dart';
+import '../../utils/device_utils.dart';
 import '../../widgets/ai_disclosure_dialog.dart';
 import '../main/main_screen.dart';
 
@@ -162,12 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await prefs.setBool('onboarding_done', true);
 
     // 生成或读取 device_id
-    String? deviceId = prefs.getString('device_id');
-    if (deviceId == null) {
-      final random = Random.secure();
-      deviceId = List.generate(32, (_) => random.nextInt(16).toRadixString(16)).join();
-      await prefs.setString('device_id', deviceId);
-    }
+    final deviceId = await getOrCreateDeviceId(prefs);
 
     // 匿名登录，最多重试 2 次，失败也进（离线模式）
     for (int attempt = 0; attempt < 2; attempt++) {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/city_theme.dart';
+import '../services/backend/auth_service.dart';
 import '../services/purchase_service.dart';
+import 'soft_login_sheet.dart';
 
 /// Paywall Dialog for Trip Pass Non-Renewing Subscriptions
 ///
@@ -86,6 +88,13 @@ class _PaywallDialogState extends State<PaywallDialog> {
   Future<void> _handlePurchase(String productId) async {
     if (_isPurchasing) return;
 
+    // 4.5: 未注册用户先弹软登录；成功后回到 paywall 让用户再次确认，不自动购买
+    if (!AuthService.isRegistered) {
+      final loggedIn = await requireLogin(context, 'purchase', theme: widget.theme);
+      if (!loggedIn || !mounted) return;
+      return; // 软登录成功后停留在 paywall，等用户重新点击
+    }
+
     setState(() {
       _isPurchasing = true;
       _selectedProductId = productId;
@@ -110,7 +119,7 @@ class _PaywallDialogState extends State<PaywallDialog> {
           _selectedProductId = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Purchase failed. Please try again.'),
             backgroundColor: Color(0xFFFF6B6B),
           ),

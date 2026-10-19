@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +5,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/theme/city_theme.dart';
 import '../../services/backend/auth_service.dart';
+import '../../utils/device_utils.dart';
 import '../../widgets/ai_disclosure_dialog.dart';
 import '../auth/login_screen.dart';
 import '../main/main_screen.dart';
@@ -85,7 +85,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     // 匿名用户 → anonymous_auth → MainScreen（最多重试 2 次）
-    final deviceId = await _getOrCreateDeviceId(prefs);
+    final deviceId = await getOrCreateDeviceId(prefs);
     for (int attempt = 0; attempt < 2; attempt++) {
       try {
         final ok = await AuthService.anonymousAuth(deviceId);
@@ -111,16 +111,6 @@ class _SplashScreenState extends State<SplashScreen> {
       MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
       (route) => false,
     );
-  }
-
-  Future<String> _getOrCreateDeviceId(SharedPreferences prefs) async {
-    String? deviceId = prefs.getString('device_id');
-    if (deviceId == null) {
-      final random = Random.secure();
-      deviceId = List.generate(32, (_) => random.nextInt(16).toRadixString(16)).join();
-      await prefs.setString('device_id', deviceId);
-    }
-    return deviceId;
   }
 
   @override

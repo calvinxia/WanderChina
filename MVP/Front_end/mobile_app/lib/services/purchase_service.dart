@@ -193,6 +193,7 @@ class PurchaseService {
           'purchase_token': purchaseToken,
         },
         timeout: const Duration(seconds: 15),
+        retry5xx: true,
       );
 
       final success = result['success'] == true;
@@ -247,6 +248,7 @@ class PurchaseService {
           'receipt_data': appReceipt,
         },
         timeout: const Duration(seconds: 15),
+        retry5xx: true,
       );
 
       final success = result['success'] == true;

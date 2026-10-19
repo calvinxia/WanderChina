@@ -28,6 +28,8 @@ class QuotaUpdatedEvent extends AppEvent {
   QuotaUpdatedEvent({required this.feature, required this.usedCount});
 }
 
+class TripsChangedEvent extends AppEvent {}
+
 /// 全局事件总线 — broadcast StreamController
 class AppEventBus {
   static final AppEventBus instance = AppEventBus._();

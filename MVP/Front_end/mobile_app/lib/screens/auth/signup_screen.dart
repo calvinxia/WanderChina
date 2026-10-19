@@ -5,10 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/backend/auth_service.dart';
+import '../../utils/auth_error.dart';
 import '../main/main_screen.dart';
+import 'verify_email_screen.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final bool fromSoftLogin;
+  const SignupScreen({super.key, this.fromSoftLogin = false});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -89,24 +92,30 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      await AuthService.register(
-        email: email,
-        password: password,
-        username: name,
-      );
+      await AuthService.registerStart(email: email);
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => MainScreen(key: MainScreen.globalKey)),
-          (route) => false,
+        setState(() => _isLoading = false);
+        final result = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => VerifyEmailScreen(
+              email: email,
+              password: password,
+              username: name,
+              fromSoftLogin: widget.fromSoftLogin,
+            ),
+          ),
         );
+        if (result == true && mounted && widget.fromSoftLogin) {
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e, stackTrace) {
-      debugPrint('🔐 Register error: $e');
+      debugPrint('🔐 Register start error: $e');
       Sentry.captureException(e, stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Registration failed: $e';
+          _errorMessage = authErrorMessage(e);
         });
       }
     }

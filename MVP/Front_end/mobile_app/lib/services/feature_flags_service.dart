@@ -36,6 +36,7 @@ class FeatureFlagsService {
         ApiClient.getFeatureFlagsUrl,
         {},
         timeout: const Duration(seconds: 5),
+        retry5xx: true,
       );
 
       final flags = result['flags'];
