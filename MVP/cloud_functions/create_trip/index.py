@@ -74,7 +74,8 @@ def main_handler(event, context):
             # 更新用户行程计数
             if user_id:
                 cursor.execute("""
-                    UPDATE users SET trips_count = trips_count + 1
+                    UPDATE users SET trips_count = trips_count + 1,
+                                     trips_created_total = trips_created_total + 1
                     WHERE id = %s
                 """, (user_id,))
 

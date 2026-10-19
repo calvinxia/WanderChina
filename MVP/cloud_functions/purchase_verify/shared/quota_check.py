@@ -36,8 +36,8 @@ def check_itinerary_quota(cur, user_id):
     """
     行程生成配额判断 (纯只读).
     
-    设计: 基于 users.trips_count, 不使用 usage_quota 表.
-          扣减时机由 create_trip 函数的 INSERT trip + trips_count + 1 同事务保证.
+    设计: 基于 users.trips_created_total (累计创建数, 不随删除回退), 不使用 usage_quota 表.
+          扣减时机由 create_trip 函数的 INSERT trip + trips_created_total + 1 同事务保证.
     
     免费阈值: 由 paywall_trigger_itinerary_count flag 控制, 默认 3.
     
@@ -49,38 +49,38 @@ def check_itinerary_quota(cur, user_id):
         Dict: {'allowed': bool, 'reason': str, ...}
     """
     cur.execute(
-        "SELECT is_premium, premium_expires_at, trips_count FROM users WHERE id = %s",
+        "SELECT is_premium, premium_expires_at, trips_created_total FROM users WHERE id = %s",
         (user_id,)
     )
     row = cur.fetchone()
     if not row:
         return {'allowed': False, 'reason': 'user_not_found'}
-    
-    is_premium, premium_expires_at, trips_count = row
-    
+
+    is_premium, premium_expires_at, trips_created_total = row
+
     # 付费用户: 订阅有效期内无限
     if is_premium and premium_expires_at and premium_expires_at > datetime.now():
         return {'allowed': True, 'reason': 'premium'}
-    
+
     # 读免费阈值 (默认 3, 与 005_feature_flags.sql 的初始值一致)
     flags = get_flags(cur, ['paywall_trigger_itinerary_count'])
     threshold = flags.get('paywall_trigger_itinerary_count', 3)
-    
-    # 免费用户: trips_count < threshold 表示还有免费额度
-    if trips_count < threshold:
+
+    # 免费用户: trips_created_total < threshold 表示还有免费额度
+    if trips_created_total < threshold:
         return {
             'allowed': True,
             'reason': 'free_trial',
-            'trips_used': trips_count,
+            'trips_used': trips_created_total,
             'free_limit': threshold,
         }
-    
+
     # 超出免费额度
     return {
         'allowed': False,
         'reason': 'quota_exceeded',
         'feature': 'itinerary_generate',
-        'trips_used': trips_count,
+        'trips_used': trips_created_total,
         'free_limit': threshold,
     }
 

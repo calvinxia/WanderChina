@@ -147,15 +147,16 @@ def _find_anon_row(cursor, device_id):
     return cursor.fetchone()
 
 def _do_upgrade(cursor, anon_id, email=None, pw_hash=None,
-                apple_user_id=None, google_user_id=None):
+                apple_user_id=None, google_user_id=None, username=None):
     """2.3 原地升级:更新匿名行写入认证标识。调用方负责 commit。"""
     if pw_hash:
         cursor.execute("""
             UPDATE users SET
                 email = %s, password_hash = %s, email_verified = TRUE,
+                username = COALESCE(%s, username),
                 last_login_at = NOW(), updated_at = NOW()
             WHERE id = %s
-        """, (email, pw_hash, anon_id))
+        """, (email, pw_hash, username, anon_id))
     elif apple_user_id:
         cursor.execute("""
             UPDATE users SET
@@ -461,7 +462,7 @@ def main_handler(event, context):
                 anon_row = _find_anon_row(cursor, device_id)
                 if anon_row:
                     user_id = str(anon_row[0])
-                    _do_upgrade(cursor, anon_row[0], email=email, pw_hash=pw_hash)
+                    _do_upgrade(cursor, anon_row[0], email=email, pw_hash=pw_hash, username=username)
                     upgraded = True
                 else:
                     user_id = str(uuid.uuid4())
