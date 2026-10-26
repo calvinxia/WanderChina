@@ -8,7 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../services/backend/auth_service.dart';
 import '../../services/purchase_service.dart';
-import '../../services/subscription_service.dart';
+import '../../providers/subscription_notifier.dart';
 import '../../services/app_event_bus.dart';
 import '../../services/analytics_service.dart';
 import '../../services/api_client.dart';
@@ -864,8 +864,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Widget _buildSubscriptionCard() {
-    final sub = SubscriptionService.instance;
-    final isPremium = sub.isPremium;
+    final sub = ref.watch(subscriptionProvider);
+    final isPremium = sub.isActive;
 
     // 跟随 city theme（和 paywall_dialog 一致）
     final mainState = MainScreen.globalKey.currentState;

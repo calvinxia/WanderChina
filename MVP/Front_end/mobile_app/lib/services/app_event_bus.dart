@@ -16,17 +16,9 @@ class PurchaseFailedEvent extends AppEvent {
   PurchaseFailedEvent({required this.productId, required this.reason});
 }
 
-class SubscriptionExpiredEvent extends AppEvent {}
-
 class LoginStatusChangedEvent extends AppEvent {}
 
 class SessionExpiredEvent extends AppEvent {}
-
-class QuotaUpdatedEvent extends AppEvent {
-  final String feature;
-  final int usedCount;
-  QuotaUpdatedEvent({required this.feature, required this.usedCount});
-}
 
 class TripsChangedEvent extends AppEvent {}
 
