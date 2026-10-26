@@ -21,7 +21,8 @@ import 'edit_profile_screen.dart';
 import '../../core/theme/city_theme.dart';
 import '../../widgets/paywall_dialog.dart';
 import '../../widgets/cards/saved_trip_card.dart';
-import '../../services/feature_flags_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/feature_flags_provider.dart';
 import '../main/main_screen.dart';
 
 /// Screen 12: Profile / Me Page
@@ -31,14 +32,14 @@ import '../main/main_screen.dart';
 /// - 3-tab layout: Trips · Saved Places · History
 /// - Removed non-MVP features: Challenges, Budget Tracker, Points
 /// - Trip cards with View/Edit/Share actions
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
+class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin {
   final _analytics = AnalyticsService.instance;
   late TabController _tabController;
@@ -75,7 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _refreshFlags() async {
-    await FeatureFlagsService.instance.fetchAndCache();
+    await ref.read(featureFlagsProvider).fetchAndCache();
     if (mounted) setState(() {});
   }
 
@@ -346,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 const SizedBox(height: 12),
 
                 // 订阅状态卡片：仅 paywall 开启时显示（fail-closed：默认隐藏）
-                if (FeatureFlagsService.instance.paywallEnabled) ...[
+                if (ref.watch(featureFlagsProvider).paywallEnabled) ...[
                   _buildSubscriptionCard(),
                   const SizedBox(height: 12),
                 ],

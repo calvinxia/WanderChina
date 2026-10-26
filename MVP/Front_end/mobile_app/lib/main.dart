@@ -16,7 +16,8 @@ import 'services/map_translation_service.dart';
 import 'services/voice/voice_translation_service.dart';
 import 'services/purchase_service.dart';
 import 'services/subscription_service.dart';
-import 'services/feature_flags_service.dart';
+import 'providers/app_container.dart';
+import 'providers/feature_flags_provider.dart';
 import 'core/services/language_manager.dart';
 import 'screens/onboarding/splash_screen.dart';
 
@@ -123,7 +124,7 @@ void main() async {
   }
 
   // 9. 拉取 Feature Flags（fail-closed：失败默认 paywallEnabled=false）
-  await FeatureFlagsService.instance.fetchAndCache();
+  await appContainer.read(featureFlagsProvider).fetchAndCache();
   debugPrint('✅ Feature Flags 已加载');
 
   debugPrint('🎉 应用服务初始化完成！\n');
@@ -139,8 +140,9 @@ void main() async {
       options.debug = false;
     },
     appRunner: () => runApp(
-      const ProviderScope(
-        child: OrienScopeApp(),
+      UncontrolledProviderScope(
+        container: appContainer,
+        child: const OrienScopeApp(),
       ),
     ),
   );
