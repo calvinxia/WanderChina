@@ -1,353 +1,77 @@
-import 'package:flutter/foundation.dart';
-// lib/services/backend/auth_service.dart
-import 'package:shared_preferences/shared_preferences.dart';
-import '../analytics_service.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import '../api_client.dart';
-import '../app_event_bus.dart';
-import '../subscription_service.dart';
+import '../../providers/app_container.dart';
+import '../../providers/auth_notifier.dart';
+import '../../providers/auth_state.dart';
 
-/// Session 恢复结果。调用方通过此枚举区分"已验证"和"离线保留"两种成功路径。
-enum SessionRestoreResult {
-  verified, // 后端确认有效，订阅状态已更新
-  offline,  // 网络不通/超时，凭据保留，以离线态继续
-  notFound, // prefs 中无 token（首次启动或已主动登出）
-  invalid,  // 后端明确拒绝（valid:false / 401），凭据已清空
-}
+// re-export 使现有调用方无需修改导入路径
+export '../../providers/auth_state.dart' show SessionRestoreResult;
 
+/// 薄门面层 —— 签名与调用约定不变，内部转发到 AuthNotifier。
+/// 调用代码（SplashScreen、各登录屏、BackendManager 等）无需修改。
 class AuthService {
-  static String? _currentUserId;
-  static String? _currentToken;
-  static String? _loginType;  // 'anonymous' | 'registered'
+  static String? get currentUserId => appContainer.read(authProvider).userId;
+  static bool get isLoggedIn => appContainer.read(authProvider).isLoggedIn;
+  static bool get isRegistered => appContainer.read(authProvider).isRegistered;
+  static bool get isAnonymous => appContainer.read(authProvider).isAnonymous;
 
-  // Google Sign-In 实例(serverClientId 用 Web Client,以便后端验证 id_token)
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: '641720570444-ilmrpkcu3161kmh59jbk2algc1h4p9dq.apps.googleusercontent.com',
-    scopes: ['email', 'profile', 'openid'],
-  );
+  static Future<bool> anonymousAuth(String deviceId, {String lang = 'en'}) =>
+      appContainer.read(authProvider.notifier).anonymousAuth(deviceId, lang: lang);
 
-  static String? get currentUserId => _currentUserId;
-  static bool get isLoggedIn => _currentToken != null;
-  static bool get isRegistered => _loginType == 'registered';
-  static bool get isAnonymous => _loginType == 'anonymous';
+  static Future<void> registerStart({required String email}) =>
+      appContainer.read(authProvider.notifier).registerStart(email: email);
 
-  /// 匿名认证（App 首次启动时调用）
-  static Future<bool> anonymousAuth(String deviceId, {String lang = 'en'}) async {
-    try {
-      final result = await ApiClient.post(ApiClient.authUrl, {
-        'action': 'anonymous_auth',
-        'device_id': deviceId,
-        'preferred_lang': lang,
-      });
-      _currentUserId = result['user_id'];
-      _currentToken = result['token'];
-      _loginType = 'anonymous';
-      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-      await _saveSession();
-      ApiClient.resetSessionExpiry();
-      return true;
-    } catch (e) {
-      debugPrint('[AUTH] Anonymous auth failed: $e');
-      return false;
-    }
-  }
-
-  /// 邮箱注册第一步：发送验证码（不重试，重试会使第一封邮件失效）
-  static Future<void> registerStart({required String email}) async {
-    await ApiClient.post(ApiClient.authUrl, {
-      'action': 'register_start',
-      'email': email,
-    });
-  }
-
-  /// 邮箱注册第二步：验证码 + 密码（不重试，已消耗的验证码重试会误报无效）
   static Future<Map<String, dynamic>> registerVerify({
     required String email,
     required String code,
     required String password,
     String? deviceId,
     String? username,
-  }) async {
-    final result = await ApiClient.post(ApiClient.authUrl, {
-      'action': 'register_verify',
-      'email': email,
-      'code': code,
-      'password': password,
-      if (deviceId != null) 'device_id': deviceId,
-      if (username != null) 'username': username,
-    });
-    _currentUserId = result['user_id'];
-    _currentToken = result['token'];
-    _loginType = 'registered';
-    if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-    await _saveSession();
-    SubscriptionService.instance.updateFromServer(result);
-    syncAIDisclosure();
-    ApiClient.resetSessionExpiry();
-    AppEventBus.instance.fire(LoginStatusChangedEvent());
-    return result;
-  }
-  /// 邮箱登录（依赖 2.4 幂等，开启 5xx 重试）
+  }) =>
+      appContainer.read(authProvider.notifier).registerVerify(
+        email: email,
+        code: code,
+        password: password,
+        deviceId: deviceId,
+        username: username,
+      );
+
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final deviceId = prefs.getString('device_id');
-    final result = await ApiClient.post(
-      ApiClient.authUrl,
-      {
-        'action': 'login',
-        'email': email,
-        'password': password,
-        if (deviceId != null) 'device_id': deviceId,
-      },
-      retry5xx: true,
-    );
-    _currentUserId = result['user_id'];
-    _currentToken = result['token'];
-    _loginType = 'registered';
-    if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-    await _saveSession();
-    SubscriptionService.instance.updateFromServer(result);
-    syncAIDisclosure(); // fire-and-forget
-    ApiClient.resetSessionExpiry();
-    AppEventBus.instance.fire(LoginStatusChangedEvent());
-    return result;
-  }
+  }) =>
+      appContainer.read(authProvider.notifier).login(email: email, password: password);
 
-  /// Apple Sign-In 登录（依赖 2.4 幂等，开启 5xx 重试）
-  ///
-  /// ⚠️ 关键：使用 userIdentifier 作为主键，不依赖 email
-  /// Apple 首次登录返回 email，后续返回 relay email 或不返回
-  /// 返回 null 表示用户取消，throw Exception 表示技术错误
-  static Future<Map<String, dynamic>?> signInWithApple() async {
-    try {
-      final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-      );
+  static Future<Map<String, dynamic>?> signInWithApple() =>
+      appContainer.read(authProvider.notifier).signInWithApple();
 
-      final prefs = await SharedPreferences.getInstance();
-      final deviceId = prefs.getString('device_id');
+  static Future<Map<String, dynamic>?> signInWithGoogle() =>
+      appContainer.read(authProvider.notifier).signInWithGoogle();
 
-      // 使用 userIdentifier (稳定) 而不是 email (不稳定)
-      final result = await ApiClient.post(
-        ApiClient.authUrl,
-        {
-          'action': 'apple_sign_in',
-          'apple_user_id': credential.userIdentifier,  // 主键
-          'id_token': credential.identityToken,
-          'email': credential.email,  // 可能为 null
-          'given_name': credential.givenName,  // 可能为 null
-          'family_name': credential.familyName,  // 可能为 null
-          if (deviceId != null) 'device_id': deviceId,
-        },
-        retry5xx: true,
-      );
+  static Future<void> forgotPassword(String email) =>
+      appContainer.read(authProvider.notifier).forgotPassword(email);
 
-      _currentUserId = result['user_id'];
-      _currentToken = result['token'];
-      _loginType = 'registered';
-      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-      await _saveSession();
-      SubscriptionService.instance.updateFromServer(result);
-      syncAIDisclosure(); // fire-and-forget
-      ApiClient.resetSessionExpiry();
-      AppEventBus.instance.fire(LoginStatusChangedEvent());
-      return result;
-    } on SignInWithAppleAuthorizationException catch (e) {
-      // User cancelled authorization
-      if (e.code == AuthorizationErrorCode.canceled) {
-        debugPrint('[AUTH] Apple Sign-In cancelled by user');
-        return null;
-      }
-      debugPrint('[AUTH] Apple Sign-In authorization error: $e');
-      rethrow;
-    } catch (e) {
-      debugPrint('[AUTH] Apple Sign-In failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Google Sign-In 登录(Android 主用;iOS 用 Apple Sign-In)（依赖 2.4 幂等，开启 5xx 重试）
-  ///
-  /// 返回 null 表示用户取消,throw Exception 表示技术错误
-  /// 后端 google_sign_in action 通过 Cloudflare 中转验证 id_token
-  static Future<Map<String, dynamic>?> signInWithGoogle() async {
-    try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        debugPrint('[AUTH] Google Sign-In cancelled by user');
-        return null;
-      }
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      if (idToken == null) {
-        debugPrint('[AUTH] Google Sign-In: idToken is null');
-        throw Exception('Google Sign-In failed: no id token returned');
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final deviceId = prefs.getString('device_id');
-
-      final result = await ApiClient.post(
-        ApiClient.authUrl,
-        {
-          'action': 'google_sign_in',
-          'id_token': idToken,
-          'email': googleUser.email,
-          'display_name': googleUser.displayName,
-          if (deviceId != null) 'device_id': deviceId,
-        },
-        retry5xx: true,
-      );
-      _currentUserId = result['user_id'];
-      _currentToken = result['token'];
-      _loginType = 'registered';
-      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-      await _saveSession();
-      SubscriptionService.instance.updateFromServer(result);
-      syncAIDisclosure();
-      ApiClient.resetSessionExpiry();
-      AppEventBus.instance.fire(LoginStatusChangedEvent());
-      return result;
-    } catch (e) {
-      debugPrint('[AUTH] Google Sign-In failed: $e');
-      rethrow;
-    }
-  }
-
-  /// 发送密码重置验证码
-  /// 后端防枚举设计：无论邮箱是否存在均返回 200，不得用返回值推断邮箱是否存在
-  static Future<void> forgotPassword(String email) async {
-    await ApiClient.post(ApiClient.authUrl, {
-      'action': 'forgot_password',
-      'email': email,
-    });
-  }
-
-  /// 重置密码（token 为后端发送的 6 位验证码）
   static Future<void> resetPassword({
     required String email,
     required String token,
     required String newPassword,
-  }) async {
-    await ApiClient.post(ApiClient.authUrl, {
-      'action': 'reset_password',
-      'email': email,
-      'token': token,
-      'new_password': newPassword,
-    });
-  }
-
-  /// 获取用户资料
-  static Future<Map<String, dynamic>> getProfile() async {
-    return ApiClient.post(ApiClient.authUrl, {
-      'action': 'get_profile',
-      'user_id': _currentUserId,
-    });
-  }
-
-  /// 更新用户资料
-  static Future<void> updateProfile(Map<String, dynamic> fields) async {
-    await ApiClient.post(ApiClient.authUrl, {
-      'action': 'update_profile',
-      'user_id': _currentUserId,
-      ...fields,
-    });
-  }
-
-  /// 恢复 session（App 启动时由 SplashScreen 调用，开启 5xx 重试）
-  static Future<SessionRestoreResult> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    _currentToken = prefs.getString('auth_token');
-    _currentUserId = prefs.getString('user_id');
-    _loginType = prefs.getString('login_type');
-    if (_currentToken == null) return SessionRestoreResult.notFound;
-
-    try {
-      final result = await ApiClient.post(
-        ApiClient.authUrl,
-        {'action': 'restore_session', 'token': _currentToken},
-        handle401: false, // restore_session 内部自行处理 401，不触发全局失效流程
-        retry5xx: true,
+  }) =>
+      appContainer.read(authProvider.notifier).resetPassword(
+        email: email,
+        token: token,
+        newPassword: newPassword,
       );
-      if (result['user_id'] != null) {
-        _currentUserId = result['user_id'] ?? _currentUserId;
-        SubscriptionService.instance.updateFromServer(result);
-        ApiClient.resetSessionExpiry();
-        if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-        return SessionRestoreResult.verified;
-      }
-      // 后端明确返回 valid: false — token 已失效，清空全部凭据
-      _currentToken = null;
-      _currentUserId = null;
-      _loginType = null;
-      AnalyticsService.instance.clearUser();
-      return SessionRestoreResult.invalid;
-    } on ApiException catch (e) {
-      if (e.statusCode == 401) {
-        // HTTP 401 — 后端明确拒绝，清空全部凭据
-        _currentToken = null;
-        _currentUserId = null;
-        _loginType = null;
-        AnalyticsService.instance.clearUser();
-        return SessionRestoreResult.invalid;
-      }
-      // 5xx 或其他服务端错误 — 无法判断有效性，保留凭据以离线态继续
-      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-      return SessionRestoreResult.offline;
-    } catch (e) {
-      // TimeoutException / SocketException 等网络异常 — 保留凭据
-      if (_currentUserId != null) AnalyticsService.instance.setUser(_currentUserId!);
-      return SessionRestoreResult.offline;
-    }
-  }
 
-  /// 退出登录
-  static Future<void> logout() async {
-    _currentToken = null;
-    _currentUserId = null;
-    _loginType = null;
-    AnalyticsService.instance.clearUser();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    await prefs.remove('user_id');
-    await prefs.remove('login_type');
-  }
+  static Future<Map<String, dynamic>> getProfile() =>
+      appContainer.read(authProvider.notifier).getProfile();
 
-  static Future<void> _saveSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_currentToken != null) await prefs.setString('auth_token', _currentToken!);
-    if (_currentUserId != null) await prefs.setString('user_id', _currentUserId!);
-    if (_loginType != null) await prefs.setString('login_type', _loginType!);
-  }
+  static Future<void> updateProfile(Map<String, dynamic> fields) =>
+      appContainer.read(authProvider.notifier).updateProfile(fields);
 
-  /// 登录/注册成功后，把本地 AI disclosure 状态同步到注册用户（fire-and-forget）
-  static Future<void> syncAIDisclosure() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final shown = prefs.getBool('ai_disclosure_shown') ?? false;
-      if (!shown || _currentUserId == null) return;
+  static Future<SessionRestoreResult> restoreSession() =>
+      appContainer.read(authProvider.notifier).restoreSession();
 
-      // 检查是否已为当前用户同步过，避免重复调用后端
-      final syncKey = 'ai_disclosure_synced_$_currentUserId';
-      if (prefs.getBool(syncKey) == true) return;
+  static Future<void> logout() =>
+      appContainer.read(authProvider.notifier).logout();
 
-      await ApiClient.post(ApiClient.authUrl, {
-        'action': 'mark_ai_disclosure_shown',
-        'user_id': _currentUserId,
-      });
-
-      // 标记已同步
-      await prefs.setBool(syncKey, true);
-      debugPrint('[AUTH] AI disclosure synced to user: $_currentUserId');
-    } catch (e) {
-      debugPrint('[AUTH] AI disclosure sync failed (non-blocking): $e');
-    }
-  }
+  static Future<void> syncAIDisclosure() =>
+      appContainer.read(authProvider.notifier).syncAIDisclosure();
 }
